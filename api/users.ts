@@ -1,5 +1,5 @@
-import { query } from './_lib/db';
-import { handleError, json, requireAccess } from './_lib/http';
+import { query } from './_lib/db.js';
+import { handleError, json, requireAccess } from './_lib/http.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
