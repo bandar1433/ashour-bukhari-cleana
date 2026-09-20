@@ -1,5 +1,5 @@
-import { hasDatabaseUrl, query } from './_lib/db';
-import { json } from './_lib/http';
+import { hasDatabaseUrl, query } from './_lib/db.js';
+import { json } from './_lib/http.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') {
