@@ -1,0 +1,1 @@
+import{query}from'./_lib/db.js';import{json,requireAccess,handleError}from'./_lib/http.js';export default async function h(req:any,res:any){if(!requireAccess(req,res))return;try{return json(res,200,await query("select * from rewards where is_active order by points_cost"))}catch(e){return handleError(res,e)}}
