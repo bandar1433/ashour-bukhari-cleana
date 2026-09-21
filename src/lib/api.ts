@@ -82,3 +82,5 @@ export async function getStatus() {
   const response = await fetch('/api/status', { headers: { Accept: 'application/json' } });
   return response.json();
 }
+
+export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','x-access-code':getAccessCode()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(payload?.message||payload?.error||`HTTP ${response.status}`);return payload as T;}
