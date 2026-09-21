@@ -378,133 +378,51 @@ export default function App() {
 
       {!code ? <>
         {publicView==='الرئيسية'&&<>
-        <section className="homeHeroV6">
-          <div className="homeHeroMediaV6"><SitePhoto src={siteImages['madinah-group']||siteImages['photo-1']||siteImages['hifz']} alt="طلاب حلقات عاشور بخاري" /></div>
-          <div className="homeHeroShadeV6"></div>
-          <div className="homeHeroGlowV6"></div>
-          <div className="homeHeroInnerV6 reveal reveal-right">
-            <span className="homeHeroBadgeV6">حلقات عاشور بخاري • مكة المكرمة</span>
-            <span className="homeHeroBasmalaV6">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ</span>
-            <h1>رحلة قرآنية<br/><em>تُرى آثارها.</em></h1>
-            <p>من التسجيل والتسكين في الحلقة، إلى الحفظ والمراجعة والحضور والتقارير؛ منصة واحدة تجعل رحلة الطالب أوضح للطالب والمعلم والأسرة والإدارة.</p>
-            <div className="homeHeroActionsV6">
-              <button className="homeHeroPrimaryV6" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة <span>←</span></button>
-              <button className="homeHeroGhostV6" type="button" onClick={()=>setPublicView('الحلقات القرآنية')}>استكشف المسارات</button>
-            </div>
-            <div className="homeHeroMiniStatsV6">
-              <div><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span></div>
-              <div><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span></div>
-              <div><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span></div>
-            </div>
+        <section className="topNews reveal reveal-up">
+          <div className="topNewsMeta">
+            <div><span className="eyebrow">الأخبار والفعاليات</span><strong>آخر أخبار الحلقات</strong></div>
+            <small>{announcementIndex%announcements.length+1} / {announcements.length}</small>
           </div>
-          <aside className="homeHeroPanelV6 reveal reveal-left">
-            <span className="homeHeroPanelLabelV6">منظومة تعليمية متكاملة</span>
-            <h3>القرآن في قلب التجربة، والبيانات في خدمة الأثر.</h3>
-            <ul>
-              <li><span>01</span><div><b>متابعة يومية</b><small>حضور، حفظ، مراجعة، وتسميع.</small></div></li>
-              <li><span>02</span><div><b>تقارير دقيقة</b><small>صورة واضحة للتقدم والإنجاز.</small></div></li>
-              <li><span>03</span><div><b>صلاحيات ذكية</b><small>لكل مستخدم ما يحتاجه فقط.</small></div></li>
-            </ul>
-          </aside>
-        </section>
-
-        <section className="portalBarV6" aria-label="بوابات المنصة">
-          <button type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}><span>01</span><div><b>بوابة الطالب وولي الأمر</b><small>متابعة التقدم والتقارير</small></div><i>←</i></button>
-          <button type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}><span>02</span><div><b>لوحة المعلم</b><small>الحضور والتسميع والمتابعة</small></div><i>←</i></button>
-          <button type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}><span>03</span><div><b>لوحة الإدارة والإشراف</b><small>إدارة الحلقات وقراءة المؤشرات</small></div><i>←</i></button>
-        </section>
-
-        <section className="sectionPro homeTracksV6">
-          <div className="sectionHeadingV6">
-            <div><span className="sectionKickerV6">المسارات التعليمية</span><h2>لكل طالب نقطة بداية،<br/>ولكل مرحلة مسار واضح.</h2></div>
-            <p>مسارات متدرجة تراعي مستوى الطالب وتنتقل به من التأسيس إلى الحفظ والإتقان والقراءات.</p>
-          </div>
-          <div className="trackGridV6">
-            {[
-              ['talqeen','التلقين والتهجي','تأسيس القراءة الصحيحة وبناء المهارة الأولى.','01'],
-              ['hifz','حفظ القرآن','خطة حفظ متدرجة مع مراجعة وتثبيت مستمر.','02'],
-              ['itqan','الإتقان','رفع جودة الحفظ والتلاوة وضبط الأداء.','03'],
-              ['qiraat','القراءات','مسار متقدم للقراءات والروايات بإشراف متخصص.','04']
-            ].map(([key,title,text,no])=><article className="trackCardV6" key={key}>
-              <SitePhoto src={siteImages[key]} alt={title} />
-              <div className="trackShadeV6"></div>
-              <div className="trackContentV6"><span>{no}</span><h3>{title}</h3><p>{text}</p><button type="button" onClick={()=>setPublicView('الحلقات القرآنية')}>تفاصيل المسار ←</button></div>
-            </article>)}
+          <article className="topNewsSlide" key={activeAnnouncement?.id||announcementIndex}>
+            <time>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'حديثًا'}</time>
+            <h2>{activeAnnouncement?.title}</h2>
+            <p>{activeAnnouncement?.body}</p>
+          </article>
+          <div className="topNewsControls">
+            <button type="button" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>السابق</button>
+            <div className="newsDots">{announcements.map((_:any,i:number)=><button type="button" aria-label={`الخبر ${i+1}`} key={i} className={i===announcementIndex%announcements.length?'active':''} onClick={()=>setAnnouncementIndex(i)} />)}</div>
+            <button type="button" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>التالي</button>
+            <button type="button" className="allNewsButton" onClick={()=>setPublicView('الأخبار والفعاليات')}>عرض كل الأخبار</button>
           </div>
         </section>
 
-        <section className="journeyHomeV6">
-          <div className="journeyHomeInnerV6">
-            <div className="sectionHeadingV6 lightV6">
-              <div><span className="sectionKickerV6">رحلة الطالب</span><h2>من أول تسجيل…<br/>إلى أثرٍ يُقاس.</h2></div>
-              <p>تسلسل واضح يجعل كل طرف يعرف ماذا يحدث الآن، وما الخطوة التالية.</p>
+        <section className="hero legacyHero">
+          <div className="heroText">
+            <span className="eyebrow reveal reveal-right delay-1">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ</span>
+            <div className="heroKicker reveal reveal-right delay-1">قرآن • تربية • متابعة • أثر</div>
+            <h1 className="reveal reveal-right delay-2">حلقات عاشور بخاري</h1>
+            <h2 className="reveal reveal-right delay-3">منصة تجمع التعليم والإدارة والمتابعة في مكان واحد</h2>
+            <p className="reveal reveal-right delay-4">بيئة رقمية متكاملة لخدمة حلقات القرآن الكريم، وبناء جيل متصل بكتاب الله علمًا وعملًا.</p>
+            <div className="heroHighlights reveal reveal-up delay-4"><span>✓ متابعة يومية</span><span>✓ تقارير دقيقة</span><span>✓ صلاحيات آمنة</span></div>
+            <div className="actions reveal reveal-up delay-5">
+              <button className="primary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button>
+              <button className="secondary" type="button" onClick={()=>setPublicView('عن الحلقات')}>تعرف على الحلقات</button>
             </div>
-            <div className="journeyLineV6">
-              {[
-                ['01','التسجيل','إدخال بيانات الطالب الأساسية.'],
-                ['02','تحديد المسار','اختيار المسار الأنسب للمستوى.'],
-                ['03','المراجعة والقبول','مراجعة الطلب واعتماده.'],
-                ['04','التسكين','ربط الطالب بالحلقة والمعلم.'],
-                ['05','بدء الحلقة','انطلاق الخطة التعليمية اليومية.'],
-                ['06','المتابعة','حضور وحفظ ومراجعة وتسميع.'],
-                ['07','الإنجاز','تقارير ومؤشرات توثق التقدم.']
-              ].map(([no,title,text])=><article key={no} className="journeyItemV6"><span>{no}</span><h3>{title}</h3><p>{text}</p></article>)}
+          </div>
+          <div className="heroArt reveal reveal-left delay-2">
+            <div className="heroLogoCard">
+              <img className="heroLogo" src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" />
             </div>
           </div>
         </section>
 
-        <section className="followStudentV6">
-          <div className="followCopyV6">
-            <span className="sectionKickerV6">متابعة الطالب</span>
-            <h2>تعرف على مستوى الطالب<br/>دون انتظار التقارير الورقية.</h2>
-            <p>من حسابك يمكنك الوصول إلى الحضور، والحفظ الجديد، والمراجعة، ونتائج التسميع، ومؤشرات التقدم في مكان واحد.</p>
-            <div className="followPointsV6"><span>● حضور وغياب</span><span>● حفظ ومراجعة</span><span>● تقييمات وتقارير</span></div>
-          </div>
-          <div className="followCardV6">
-            <span>بوابة المتابعة</span>
-            <h3>تقارير الطالب محفوظة وآمنة</h3>
-            <p>سجّل الدخول بحسابك المعتمد للوصول إلى الطلاب المرتبطين بك والصلاحيات المخصصة لدورك.</p>
-            <button type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>الدخول إلى المتابعة <b>←</b></button>
-            <small>تُعرض البيانات بحسب الصلاحية حفاظًا على الخصوصية.</small>
-          </div>
-        </section>
-
-        <section className="stats homeStats homeStatsV6">
-          <article><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span><small>في المسارات القرآنية</small></article>
-          <article><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span><small>تعليم ومتابعة</small></article>
-          <article><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span><small>حلقة نشطة</small></article>
-          <article><b>{publicData.stats?.centers ?? '—'}</b><span>مركز</span><small>مركز وفرع</small></article>
-        </section>
-
-        <section className="announcementBoard announcementV6 reveal reveal-up">
-          <div className="announcementMedia"><SitePhoto src={announcementImage(activeAnnouncement)} alt={activeAnnouncement?.title||'إعلان الحلقات'} /></div>
-          <div className="announcementContent">
-            <div className="announcementTop"><div><span className="sectionLabel">آخر المستجدات</span><small>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'أخبار الحلقات'}</small></div><b>{announcementIndex%announcements.length+1} / {announcements.length}</b></div>
-            <h2>{activeAnnouncement?.title}</h2><p>{activeAnnouncement?.body}</p>
-            <div className="announcementControls"><button type="button" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>السابق</button><div className="announcementDots">{announcements.map((_:any,i:number)=><button aria-label={`الإعلان ${i+1}`} key={i} className={i===announcementIndex%announcements.length?'active':''} onClick={()=>setAnnouncementIndex(i)} />)}</div><button type="button" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>التالي</button><button className="allNewsButton" type="button" onClick={()=>setPublicView('الأخبار والفعاليات')}>كل الأخبار</button></div>
-          </div>
-        </section>
-
-        <section className="sectionPro achievementsHomeV6">
-          <div className="sectionHeadingV6">
-            <div><span className="sectionKickerV6">الإنجازات</span><h2>حين تتحول المتابعة<br/>إلى نتائج تُرى.</h2></div>
-            <button type="button" onClick={()=>setPublicView('الإنجازات')}>عرض جميع الإنجازات ←</button>
-          </div>
-          <div className="achievementStripV6">
-            {report1447.achievements.map(([t,b],i)=><article key={t}>
-              <SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-tanzania','achievement-omar'][i]]} alt={t} />
-              <div><span>إنجاز</span><h3>{t}</h3><p>{b}</p></div>
-            </article>)}
-          </div>
-        </section>
-
-        <section className="whyPlatformV6">
-          <div className="whyIntroV6"><span className="sectionKickerV6">لماذا هذه المنصة؟</span><h2>كل ما تحتاجه الحلقة،<br/>دون تعقيد.</h2></div>
-          <div className="whyGridV6">
-            <article><span>01</span><h3>مستوى الطالب أولًا بأول</h3><p>تسجل المتابعة في وقتها، فتتحول رحلة الحفظ إلى بيانات واضحة يمكن الرجوع إليها.</p></article>
-            <article><span>02</span><h3>حضور موثق ومتابعة أدق</h3><p>الحضور والتأخر والاستئذان والتقييمات في سجل واحد يسهل على المعلم والإدارة قراءته.</p></article>
-            <article><span>03</span><h3>تقرير جاهز حين تحتاجه</h3><p>مؤشرات الطالب والحلقة والمركز متاحة في المنصة بدل الملفات المتفرقة والمتابعة اليدوية.</p></article>
-          </div>
+        <section className="stats platformStats">
+          {[
+            ['01','منصة موحدة','لإدارة التعليم والمتابعة'],
+            ['04','مسارات قرآنية','تلقين • حفظ • إتقان • قراءات'],
+            ['06','بوابات صلاحيات','لكل مستخدم ما يخصه'],
+            ['04','محاور تشغيلية','تعليم • حضور • تقارير • تحفيز']
+          ].map(([number,label,detail],index)=><article key={label} className="statCard reveal reveal-up" style={{animationDelay:`${0.18+index*0.11}s`}}><b>{number}</b><span>{label}</span><small>{detail}</small></article>)}
         </section>
         </>}
         {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<><AboutSections/><section className="report1447"><div className="sectionHead"><div><span>حصاد 1447هـ</span><h2>حلقات تمتد من مكة إلى العالم</h2></div></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div><div className="sectionHead reportSubhead"><div><span>أخبار الحلقات</span><h2>برامج مصاحبة تصنع الأثر</h2></div></div><div className="reportCards">{report1447.news.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['madinah','iftar','recreation','khatm','eid'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div></section></>}
