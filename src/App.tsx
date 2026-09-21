@@ -6,13 +6,17 @@ import {
   CenterRow,
   CircleRow,
   clearAccessCode,
+  clearSessionToken,
   getAccessCode,
+  getSessionToken,
   getStatus,
   setAccessCode,
+  setSessionToken,
   StudentRow,
   Summary,
   UserRow,
 } from './lib/api';
+import { authClient } from './lib/auth';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news';
 
@@ -35,8 +39,11 @@ const roleLabel: Record<string, string> = {
 };
 
 export default function App() {
-  const [code, setCode] = useState(getAccessCode());
+  const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
   const [enteredCode, setEnteredCode] = useState(getAccessCode());
+  const [authMode,setAuthMode]=useState<'account'|'legacy'>('account');
+  const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
+  const [accountForm,setAccountForm]=useState({name:'',email:'',password:''});
   const [status, setStatus] = useState<any>(null);
   const [publicData,setPublicData]=useState<any>({stats:{},news:[],circles:[]});
   const [publicView,setPublicView]=useState('الرئيسية');
@@ -46,6 +53,7 @@ export default function App() {
   const [circles, setCircles] = useState<CircleRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roleData, setRoleData] = useState<any>({roles:[],permissions:[]});
+  const [loginRequests,setLoginRequests]=useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [memorization, setMemorization] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
@@ -72,7 +80,7 @@ export default function App() {
         apiGet<{ items: CenterRow[] }>('/api/centers'),
         apiGet<{ items: StudentRow[] }>('/api/students'),
         apiGet<{ items: CircleRow[] }>('/api/circles'),
-        apiGet<{ items: UserRow[] }>('/api/users'),
+        apiGet<{ items: UserRow[]; requests?: any[] }>('/api/users'),
         apiGet<any>('/api/roles'),
         apiGet<{ items: any[] }>('/api/attendance'), apiGet<{ items:any[] }>('/api/memorization'), apiGet<{ items:any[] }>('/api/plans'), apiGet<{ items:any[] }>('/api/news'),
       ]);
@@ -81,7 +89,7 @@ export default function App() {
       setCenters(centersData.items || []);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
-      setUsers(usersData.items || []); setRoleData(rolesData||{roles:[],permissions:[]}); setAttendance(attendanceData.items||[]); setMemorization(memorizationData.items||[]); setPlans(plansData.items||[]); setNews(newsData.items||[]);
+      setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setAttendance(attendanceData.items||[]); setMemorization(memorizationData.items||[]); setPlans(plansData.items||[]); setNews(newsData.items||[]);
       setLoadState('ready');
     } catch (err) {
       setLoadState('error');
@@ -102,12 +110,49 @@ export default function App() {
       setError('أدخل رمز الدخول.');
       return;
     }
+    clearSessionToken();
     setAccessCode(cleaned);
     setCode(cleaned);
   }
 
+  async function handleAccountLogin(event:React.FormEvent){
+    event.preventDefault();
+    setError('');
+    try{
+      const email=accountForm.email.trim();
+      const password=accountForm.password;
+      if(!email||!password) throw new Error('أدخل البريد الإلكتروني وكلمة المرور.');
+      let authResult:any;
+      if(authIntent==='signup'){
+        const name=accountForm.name.trim();
+        if(!name) throw new Error('أدخل الاسم.');
+        authResult=await authClient.signUp.email({email,password,name});
+        if(authResult?.error) throw new Error(authResult.error.message||'تعذر إنشاء الحساب');
+      }else{
+        authResult=await authClient.signIn.email({email,password});
+        if(authResult?.error) throw new Error(authResult.error.message||'بيانات الدخول غير صحيحة');
+      }
+      const neonSessionToken=authResult?.data?.token;
+      if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول.');
+      const response=await fetch('/api/status',{
+        method:'POST',
+        headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}
+      });
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
+      clearAccessCode();
+      setSessionToken(payload.token);
+      setCode('session');
+      setAccountForm({name:'',email:'',password:''});
+    }catch(err){
+      setError(err instanceof Error?err.message:'تعذر تسجيل الدخول');
+    }
+  }
+
   function handleLogout() {
     clearAccessCode();
+    clearSessionToken();
+    authClient.signOut().catch(()=>{});
     setCode('');
     setEnteredCode('');
     setSummary(null);
@@ -115,6 +160,7 @@ export default function App() {
     setStudents([]);
     setCircles([]);
     setUsers([]);
+    setLoginRequests([]);
     setRoleData({roles:[],permissions:[]});
     setLoadState('idle');
   }
@@ -186,7 +232,28 @@ export default function App() {
         {publicView==='الحلقات القرآنية'&&<section className="section"><div className="innerHero"><span className="sectionLabel">الحلقات القرآنية</span><h1>مسارات تعليمية تناسب مراحل الطلاب</h1><p>من التهجي والتلقين إلى الحفظ والإتقان والقراءات.</p></div><div className="roleGrid">{['مسار التهجي والتلقين','مسار حفظ القرآن للأشبال','مسار حفظ القرآن للشباب','مسار حفظ القرآن والمتون','مسار القراءات'].map((x,i)=><article className="roleCard" key={x}><i>◈</i><b>{x}</b><small>{i===0?'تأسيس القراءة والتلقين الصحيح':'حفظ ومراجعة وتسميع وفق خطة متدرجة'}</small></article>)}</div><div className="sectionHead reportSubhead"><div><span>الحلقات المسجلة</span><h2>الحلقات النشطة في المنصة</h2></div></div><div className="roleGrid">{publicData.circles?.map((x:any)=><article className="roleCard" key={x.id}><b>{x.name}</b><small>{x.center_name||'—'}</small><em>{x.teacher_name||'لم يحدد المعلم'}</em></article>)}</div></section>}
         {publicView==='الأخبار والفعاليات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">أخبار الحلقات</span><h1>برامج وفعاليات تصنع الأثر</h1><p>نماذج من البرامج المصاحبة والفعاليات الموثقة في تقرير حلقات عاشور بخاري لعام 1447هـ.</p></div><div className="reportCards publicCards">{report1447.news.map(([t,b])=><article key={t}><div><span className="sectionLabel">خبر وفعالية</span><h3>{t}</h3><p>{b}</p></div></article>)}</div>{publicData.news?.length>0&&<><div className="sectionHead reportSubhead"><div><span>آخر المستجدات</span><h2>أخبار منشورة من إدارة المنصة</h2></div></div><div className="reportCards publicCards">{publicData.news.map((n:any)=><article key={n.id}><div><span className="sectionLabel">{n.kind==='achievement'?'إنجاز':n.kind==='event'?'فعالية':'خبر'}</span><h3>{n.title}</h3><p>{n.body}</p></div></article>)}</div></>}</section>}
         {publicView==='الإنجازات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">إنجازات 1447هـ</span><h1>طلاب الحلقات في ميادين التميز</h1><p>نماذج من الإنجازات العالمية والدولية والمحلية الواردة في التقرير السنوي.</p></div><div className="reportCards achievements publicCards">{report1447.achievements.map(([t,b])=><article key={t}><div><span className="sectionLabel">إنجاز</span><h3>{t}</h3><p>{b}</p></div></article>)}</div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='المعلمون'&&<section className="simplePage richSimplePage"><span className="sectionLabel">المعلمون</span><h1>معلمون يصنعون أثرًا قرآنيًا</h1><p>يقوم المعلم بإدارة الحلقة ومتابعة الحفظ والمراجعة والتسميع والحضور ضمن مسار تعليمي واضح.</p></section>}{publicView==='الطلاب'&&<section className="simplePage richSimplePage"><span className="sectionLabel">الطلاب</span><h1>رحلة الطالب مع كتاب الله</h1><p>تبدأ بالتهيئة وتحديد المستوى، ثم التعلم والتثبيت والقياس والمتابعة المستمرة.</p></section>}{publicView==='الوسائط'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">الوسائط</span><h1>من ذاكرة الحلقات</h1><p>سيعرض هذا القسم الصور الموثقة للمسارات والبرامج والإنجازات بعد استكمال نقل ملفات الوسائط الأصلية.</p></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='تواصل معنا'&&<section className="simplePage richSimplePage"><span className="sectionLabel">تواصل معنا</span><h1>حلقات عاشور بخاري</h1><p>للتواصل والاستفسارات المتعلقة بالحلقات والبرامج، يتم تحديث بيانات التواصل من إدارة المنصة.</p></section>}
-        <section className="section"><div className="sectionHead"><div><span>بوابة الإدارة</span><h2>الدخول إلى المنصة</h2></div></div><div className="panel" style={{maxWidth:520,margin:'0 auto'}}><form onSubmit={handleLogin}><label className="field"><span>رمز الدخول</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="أدخل رمز الدخول" autoFocus /></label><button className="primary" type="submit">دخول</button></form>{error&&<div className="notice">{error}</div>}</div></section>
+        <section className="section">
+          <div className="sectionHead"><div><span>بوابة الإدارة</span><h2>الدخول إلى المنصة</h2></div></div>
+          <div className="panel" style={{maxWidth:560,margin:'0 auto'}}>
+            <div className="headerActions" style={{justifyContent:'center',marginBottom:18}}>
+              <button type="button" className={authMode==='account'?'primary':'secondary'} onClick={()=>{setAuthMode('account');setError('')}}>البريد وكلمة المرور</button>
+              <button type="button" className={authMode==='legacy'?'primary':'secondary'} onClick={()=>{setAuthMode('legacy');setError('')}}>رمز المدير</button>
+            </div>
+            {authMode==='account'?<form onSubmit={handleAccountLogin}>
+              {authIntent==='signup'&&<label className="field"><span>الاسم</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} autoComplete="name" /></label>}
+              <label className="field"><span>البريد الإلكتروني</span><input type="email" required value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" /></label>
+              <label className="field"><span>كلمة المرور</span><input type="password" required minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete={authIntent==='signup'?'new-password':'current-password'} /></label>
+              <button className="primary" type="submit">{authIntent==='signup'?'إنشاء حساب':'تسجيل الدخول'}</button>
+              <button className="secondary" type="button" style={{marginTop:10}} onClick={()=>{setAuthIntent(x=>x==='signin'?'signup':'signin');setError('')}}>{authIntent==='signin'?'إنشاء حساب جديد':'لدي حساب بالفعل'}</button>
+              <small style={{display:'block',marginTop:12}}>الحسابات الجديدة تحتاج إلى اعتماد وربط من إدارة المنصة قبل إتاحة الصلاحيات.</small>
+            </form>:<form onSubmit={handleLogin}>
+              <label className="field"><span>رمز دخول مدير النظام</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="أدخل رمز الدخول" autoFocus /></label>
+              <button className="primary" type="submit">دخول</button>
+              <small style={{display:'block',marginTop:12}}>يبقى هذا المسار متاحًا مؤقتًا أثناء نقل الحسابات إلى Neon Auth.</small>
+            </form>}
+            {error&&<div className="notice">{error}</div>}
+          </div>
+        </section>
       </> :
       <div className="workspace">
         <aside>
@@ -214,7 +281,7 @@ export default function App() {
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
             {loadState!=='loading'&&activeTab==='students'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/students',e)}><label className="field"><span>اسم الطالب</span><input name="full_name" required /></label><label className="field"><span>الحلقة</span><select name="circle_id" defaultValue=""><option value="">بدون حلقة</option>{circles.map((x:any)=><option key={x.id} value={x.id}>{x.name} — {x.center_name||''}</option>)}</select></label><label className="field"><span>الصف/المرحلة</span><input name="grade_level" /></label><button className="primary" type="submit">إضافة الطالب</button></form><StudentsTable rows={filteredStudents} circles={circles} onChanged={loadDashboard}/></>}
             {loadState!=='loading'&&activeTab==='circles'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/circles',e)}><label className="field"><span>اسم الحلقة</span><input name="name" required /></label><label className="field"><span>المركز</span><select name="center_id" required defaultValue=""><option value="" disabled>اختر المركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label className="field"><span>المعلم</span><select name="teacher_user_id" defaultValue=""><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>المسار الرئيس</span><select name="student_track" defaultValue="الطلاب من أهل مكة"><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></label><label className="field"><span>المسار القرآني</span><select name="quran_track" defaultValue="مسار حفظ القرآن للشباب"><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></label><label className="field"><span>الموعد</span><input name="schedule" /></label><button className="primary" type="submit">إضافة الحلقة</button></form><CirclesTable rows={filteredCircles} users={users} onChanged={loadDashboard}/></>}
-            {loadState!=='loading'&&activeTab==='users'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/users',e)}><label className="field"><span>الاسم</span><input name="full_name" required /></label><label className="field"><span>البريد</span><input name="email" type="email" /></label><label className="field"><span>الجوال</span><input name="phone" /></label><label className="field"><span>الدور</span><select name="role" required defaultValue="teacher"><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label><label className="field"><span>المركز</span><select name="center_id" defaultValue=""><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary" type="submit">إضافة المستخدم</button></form><UsersTable rows={filteredUsers} centers={centers} onChanged={loadDashboard}/></>}
+            {loadState!=='loading'&&activeTab==='users'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/users',e)}><label className="field"><span>الاسم</span><input name="full_name" required /></label><label className="field"><span>البريد</span><input name="email" type="email" /></label><label className="field"><span>الجوال</span><input name="phone" /></label><label className="field"><span>الدور</span><select name="role" required defaultValue="teacher"><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label><label className="field"><span>المركز</span><select name="center_id" defaultValue=""><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary" type="submit">إضافة المستخدم</button></form><UsersTable rows={filteredUsers} centers={centers} onChanged={loadDashboard}/><LoginRequestsPanel rows={loginRequests} users={users} onChanged={loadDashboard}/></>}
             {loadState!=='loading'&&activeTab==='roles'&&<RolesPanel data={roleData} onChanged={loadDashboard}/>}
             {loadState!=='loading'&&activeTab==='attendance'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/attendance',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>التاريخ</span><input name="attendance_date" type="date" required defaultValue={new Date().toISOString().slice(0,10)} /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="present"><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue="0" /></label><button className="primary" type="submit">حفظ الحضور</button></form><GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/></>}
             {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option><option value="recitation">تسميع</option></select></label><label className="field"><span>رقم السورة</span><input name="surah_no" type="number" min="1" max="114" required /></label><label className="field"><span>من آية</span><input name="from_ayah" type="number" min="1" required /></label><label className="field"><span>إلى آية</span><input name="to_ayah" type="number" min="1" required /></label><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ التسميع</button></form><GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/></>}
@@ -296,6 +363,30 @@ function UsersTable({ rows, centers, onChanged }: { rows: UserRow[]; centers: Ce
       </table>
     </div>
   );
+}
+
+function LoginRequestsPanel({rows,users,onChanged}:{rows:any[];users:UserRow[];onChanged:()=>Promise<void>}){
+  const [targets,setTargets]=useState<Record<string,string>>({});
+  if(!rows.length) return <section className="panel" style={{marginTop:18}}><h3>طلبات ربط الدخول</h3><div className="empty">لا توجد طلبات اعتماد معلقة.</div></section>;
+  async function approve(row:any){
+    const matched=users.find(u=>(u.email||'').toLowerCase()===String(row.email||'').toLowerCase());
+    const target=targets[row.id]||matched?.id||'';
+    if(!target){alert('اختر حساب المنصة الذي تريد ربطه بهذا الدخول.');return;}
+    try{
+      await apiPut('/api/users',{id:target,auth_subject:row.auth_subject,request_id:row.id});
+      await onChanged();
+    }catch(err){alert(err instanceof Error?err.message:'تعذر اعتماد الربط');}
+  }
+  return <section className="panel" style={{marginTop:18}}>
+    <div className="panelHead"><div><h3>طلبات ربط الدخول</h3><small>لا يتم منح أي صلاحية قبل اعتماد الربط يدويًا.</small></div><b>{rows.length}</b></div>
+    <div className="table-wrap"><table><thead><tr><th>الاسم</th><th>البريد</th><th>تاريخ الطلب</th><th>ربط بحساب المنصة</th><th>الإجراء</th></tr></thead><tbody>
+      {rows.map(row=>{const matched=users.find(u=>(u.email||'').toLowerCase()===String(row.email||'').toLowerCase());const selected=targets[row.id]||matched?.id||'';return <tr key={row.id}>
+        <td>{row.full_name||'—'}</td><td>{row.email}</td><td>{row.requested_at?new Date(row.requested_at).toLocaleString('ar-SA'):'—'}</td>
+        <td><select value={selected} onChange={e=>setTargets(x=>({...x,[row.id]:e.target.value}))}><option value="">اختر الحساب</option>{users.map(u=><option key={u.id} value={u.id}>{u.full_name} — {roleLabel[u.role]||u.role}{u.email?` — ${u.email}`:''}</option>)}</select></td>
+        <td><button className="primary" type="button" onClick={()=>approve(row)}>اعتماد الربط</button></td>
+      </tr>})}
+    </tbody></table></div>
+  </section>;
 }
 
 function RolesPanel({data,onChanged}:{data:any;onChanged:()=>Promise<void>}){

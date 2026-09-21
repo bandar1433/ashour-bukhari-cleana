@@ -65,6 +65,7 @@ export type CenterRow = {
 };
 
 const ACCESS_KEY = 'ashour_access_code';
+const SESSION_KEY = 'ashour_admin_session';
 
 export function getAccessCode(): string {
   return localStorage.getItem(ACCESS_KEY) || '';
@@ -78,11 +79,32 @@ export function clearAccessCode() {
   localStorage.removeItem(ACCESS_KEY);
 }
 
+export function getSessionToken(): string {
+  return localStorage.getItem(SESSION_KEY) || '';
+}
+
+export function setSessionToken(token: string) {
+  localStorage.setItem(SESSION_KEY, token);
+}
+
+export function clearSessionToken() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function authHeaders(): Record<string,string> {
+  const headers: Record<string,string> = {};
+  const code = getAccessCode();
+  const session = getSessionToken();
+  if (code) headers['x-access-code'] = code;
+  if (session) headers.Authorization = `Bearer ${session}`;
+  return headers;
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     headers: {
       Accept: 'application/json',
-      'x-access-code': getAccessCode(),
+      ...authHeaders(),
     },
   });
 
@@ -107,13 +129,13 @@ export async function getStatus() {
   return response.json();
 }
 
-export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','x-access-code':getAccessCode()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(payload?.message||payload?.error||`HTTP ${response.status}`);return payload as T;}
+export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(payload?.message||payload?.error||`HTTP ${response.status}`);return payload as T;}
 
 
 export async function apiPut<T>(path:string,body:unknown):Promise<T>{
   const response=await fetch(path,{
     method:'PUT',
-    headers:{'Content-Type':'application/json','x-access-code':getAccessCode()},
+    headers:{'Content-Type':'application/json',...authHeaders()},
     body:JSON.stringify(body)
   });
   const text=await response.text();
