@@ -1,0 +1,1 @@
+import{json,requireAccess}from'../_lib/http.js';export default async function h(req:any,res:any){if(!requireAccess(req,res))return;return json(res,200,{success:true})}
