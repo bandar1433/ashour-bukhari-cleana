@@ -6,7 +6,7 @@ const imageKeys=['talqeen','hifz','itqan','qiraat','nationalities','madinah','ma
 async function legacyImages(){
   try{
     const origin='https://app-it055u.v2.appdeploy.ai';
-    const response=await fetch(origin+'/api/site-images',{headers:{Accept:'application/json'}});
+    const response=await fetch(origin+'/api/site-images-export',{headers:{Accept:'application/json'}});
     if(!response.ok)return {};
     const payload=await response.json();
     if(!payload||typeof payload!=='object'||Array.isArray(payload))return {};
