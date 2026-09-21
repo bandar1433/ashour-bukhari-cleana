@@ -5,6 +5,10 @@ export type Summary = {
   teachers: number;
   users: number;
   activeUsers: number;
+  attendance: number;
+  memorization: number;
+  plans: number;
+  news: number;
 };
 
 export type UserRow = {
