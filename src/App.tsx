@@ -17,7 +17,7 @@ type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 const roleLabel: Record<string, string> = {
   system_admin: 'مدير النظام',
-  center_admin: 'مدير مركز',
+  center_manager: 'مدير مركز',
   teacher: 'معلم',
   student: 'طالب',
 };
