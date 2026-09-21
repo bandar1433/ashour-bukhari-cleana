@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { api, auth } from './lib/compat';
-import { formatQuranTarget, getMadinahPage, planModes, surahs } from './quranReference';
+import { formatQuranTarget, getMadinahPage, planModes, surahs } from './lib/quranReference';
 import './index.css';
 
 type Row = { id: string; [key: string]: any };
