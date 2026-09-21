@@ -54,15 +54,8 @@ async function exchangeAuthSession(req:any,res:any){
   }
 
   if(!resolvedUser.is_active) return json(res,403,{error:'Inactive',message:'هذا الحساب غير نشط. راجع إدارة المنصة.'});
-  if(resolvedUser.role!=='system_admin'){
-    return json(res,403,{
-      error:'Role not enabled',
-      code:'ROLE_NOT_ENABLED',
-      message:'تم التحقق من الحساب وربطه، لكن الدخول إلى لوحة الإدارة متاح حاليًا لمدير النظام فقط أثناء مرحلة الانتقال.'
-    });
-  }
 
-  const session=issueAdminSession({sub:neon.id,userId:resolvedUser.id});
+  const session=issueAdminSession({sub:neon.id,userId:resolvedUser.id,role:resolvedUser.role});
   return json(res,200,{
     token:session,
     user:{id:resolvedUser.id,full_name:resolvedUser.full_name,email:resolvedUser.email,role:resolvedUser.role}
