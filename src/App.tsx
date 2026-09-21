@@ -142,9 +142,8 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (code) {
-      loadDashboard();
-    }
+    if (code) loadDashboard();
+    else finishSocialSession().catch(err=>{if(String(err?.message||'').includes('انتظار')){setError(err.message);setAuthOpen(true)}});
   }, [code]);
 
   async function handleLogin(event: React.FormEvent) {
@@ -169,6 +168,24 @@ export default function App() {
     } finally {
       setAuthBusy(false);
     }
+  }
+
+  async function finishSocialSession(){
+    const current:any=await authClient.getSession();
+    const neonSessionToken=current?.data?.session?.token||current?.data?.token||'';
+    if(!neonSessionToken)return false;
+    const response=await fetch('/api/status',{method:'POST',headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(payload?.message||payload?.error||'الحساب بانتظار اعتماد الإدارة.');
+    clearAccessCode(); setSessionToken(payload.token); setCode('session'); setAuthOpen(false); return true;
+  }
+
+  async function handleGoogleLogin(){
+    setAuthBusy(true); setError('');
+    try{
+      const result:any=await authClient.signIn.social({provider:'google',callbackURL:window.location.origin});
+      if(result?.error) throw new Error(result.error.message||'تعذر تسجيل الدخول عبر Google');
+    }catch(err){setError(err instanceof Error?err.message:'تعذر تسجيل الدخول عبر Google');setAuthBusy(false);}
   }
 
   async function handleAccountLogin(event:React.FormEvent){
@@ -352,24 +369,13 @@ export default function App() {
               <div className="authHeading">
                 <span className="authEyebrow">{authIntent==='signin'?'تسجيل الدخول':'تفعيل حساب الدخول'}</span>
                 <h2 id="auth-title">{authIntent==='signin'?'مرحبًا بعودتك':'تفعيل الدخول لأول مرة'}</h2>
-                <p className="authLead">{authIntent==='signin'?'استخدم البريد الإلكتروني وكلمة المرور المعتمدة لحسابك.':'أنشئ هوية الدخول، ثم تعتمد الإدارة ربطها بحسابك ودورك داخل المنصة.'}</p>
+                <p className="authLead">استخدم حساب Google الخاص بك، كما في المنصة السابقة. إذا كان الحساب جديدًا فسيظهر للإدارة لاعتماده وربطه بالدور المناسب.'</p>
               </div>
-              <form className="authForm authFormPro" onSubmit={handleAccountLogin}>
-                {authIntent==='signup'&&<label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} autoComplete="name" placeholder="الاسم الكامل" /></label>}
-                <label className="field"><span>البريد الإلكتروني</span><input type="email" required value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" placeholder="name@example.com" /></label>
-                <label className="field"><span>كلمة المرور</span><input type="password" required minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete={authIntent==='signup'?'new-password':'current-password'} placeholder="••••••••" /></label>
+              <div className="authForm authFormPro">
                 {error&&<div className="authNotice" role="alert">{error}</div>}
-                <button className="primary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':authIntent==='signup'?'إرسال طلب التفعيل':'دخول إلى المنصة'}</button>
-              </form>
-              <div className="authAlternate">
-                {authIntent==='signin'?<>
-                  <span>هذه أول مرة تستخدم حسابك؟</span>
-                  <button type="button" onClick={()=>{setAuthIntent('signup');setError('')}}>تفعيل حساب الدخول</button>
-                </>:<>
-                  <span>لديك حساب مفعّل بالفعل؟</span>
-                  <button type="button" onClick={()=>{setAuthIntent('signin');setError('')}}>العودة لتسجيل الدخول</button>
-                </>}
+                <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'الدخول باستخدام Google'}</button>
               </div>
+              <div className="authAlternate"><span>استخدم حساب Google المعتمد لديك للدخول إلى المنصة.</span></div>
               <div className="authSecurityNote">لا تُمنح أي صلاحية لحساب جديد قبل اعتماد الإدارة وربطه بالسجل الصحيح.</div>
               {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro">
                 <div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت خلال مرحلة نقل الحسابات.</span></div>
