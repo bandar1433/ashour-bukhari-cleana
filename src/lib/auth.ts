@@ -1,11 +1,13 @@
-import { createInternalNeonAuth } from '@neondatabase/auth';
+import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
 export const NEON_AUTH_URL='https://ep-withered-flower-aeyxaru7.neonauth.c-2.us-east-2.aws.neon.tech/ashour_bukhari/auth';
 
-const neonAuth=createInternalNeonAuth(NEON_AUTH_URL,{
+export const authClient=createAuthClient(NEON_AUTH_URL,{
   adapter: BetterAuthReactAdapter(),
 });
 
-export const authClient=neonAuth.adapter;
-export const getAuthToken=()=>neonAuth.getJWTToken();
+export async function getAuthToken(){
+  const session:any=await authClient.getSession();
+  return session?.data?.session?.token||null;
+}
