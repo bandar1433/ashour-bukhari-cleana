@@ -17,7 +17,14 @@ export default async function handler(req:any,res:any){
           full_name nulls last,email nulls last
         limit 500
       `);
-      return json(res,200,{items:rows});
+      const requests=await query(`
+        select id,auth_subject,email,full_name,status,requested_at
+        from login_requests
+        where status='pending'
+        order by requested_at desc
+        limit 200
+      `);
+      return json(res,200,{items:rows,requests});
     }
     if(req.method==='POST'){
       const b=req.body||{};
@@ -44,17 +51,23 @@ export default async function handler(req:any,res:any){
           role=coalesce($5::app_role,role),
           center_id=$6,
           is_active=coalesce($7,is_active),
+          auth_subject=$8,
           updated_at=now()
         where id=$1
-        returning id,full_name,email,phone,role,center_id,is_active
+        returning id,full_name,email,phone,role,center_id,is_active,
+          case when auth_subject is null then false else true end linked
       `,[
         b.id,b.full_name?.trim()||null,
         b.email===undefined?e.email:(b.email?.trim()||null),
         b.phone===undefined?e.phone:(b.phone?.trim()||null),
         b.role||null,
         b.center_id===undefined?e.center_id:(b.center_id||null),
-        b.is_active===undefined?e.is_active:Boolean(b.is_active)
+        b.is_active===undefined?e.is_active:Boolean(b.is_active),
+        b.auth_subject===undefined?e.auth_subject:(b.auth_subject||null)
       ]);
+      if(b.request_id&&b.auth_subject){
+        await query("update login_requests set status='approved' where id=$1 and auth_subject=$2",[b.request_id,b.auth_subject]);
+      }
       return json(res,200,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
