@@ -6,8 +6,8 @@ export default async function handler(req:any,res:any){
   if(req.method!=='GET') return json(res,405,{error:'Method not allowed'});
   try{
     const response=await fetch(LEGACY_IMAGES_URL,{
-      headers:{Accept:'application/json'},
-      signal:AbortSignal.timeout(8000)
+      headers:{Accept:'application/json'}
+
     });
     if(!response.ok) return json(res,200,{items:{},source:'legacy-unavailable'});
     const payload=await response.json();
