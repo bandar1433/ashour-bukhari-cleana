@@ -10,8 +10,8 @@ export function methodNotAllowed(res: any) {
   return json(res, 405, { error: 'Method not allowed' });
 }
 
-type AppRole='system_admin'|'center_manager'|'supervisor'|'teacher'|'student'|'guardian';
-type AppSessionPayload = { sub:string; userId:string; role:AppRole; exp:number };
+export type AppRole='system_admin'|'center_manager'|'supervisor'|'teacher'|'student'|'guardian';
+export type AppSessionPayload = { sub:string; userId:string; role:AppRole; exp:number };
 
 function sessionSecret() {
   const secret = process.env.ADMIN_ACCESS_CODE;
@@ -34,7 +34,7 @@ export function issueAdminSession(input: { sub: string; userId: string; role?: A
   return `ashour1.${encoded}.${signValue(encoded)}`;
 }
 
-function verifyAppSession(token: string): AppSessionPayload | null {
+export function verifyAppSession(token: string): AppSessionPayload | null {
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== 'ashour1') return null;
   const [, encoded, signature] = parts;
