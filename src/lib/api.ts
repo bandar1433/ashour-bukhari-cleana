@@ -91,6 +91,18 @@ export function clearSessionToken() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+export function getSessionRole(): string {
+  try {
+    const token=getSessionToken();
+    if(!token) return '';
+    const encoded=token.split('.')[1]||'';
+    const normalized=encoded.replace(/-/g,'+').replace(/_/g,'/');
+    const padded=normalized+'='.repeat((4-normalized.length%4)%4);
+    const payload=JSON.parse(atob(padded));
+    return String(payload?.role||'');
+  } catch { return ''; }
+}
+
 function authHeaders(): Record<string,string> {
   const headers: Record<string,string> = {};
   const code = getAccessCode();
