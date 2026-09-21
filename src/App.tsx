@@ -134,7 +134,7 @@ export default function App() {
     <main>
       <header className="header">
         <button className="brand" type="button">
-          <div className="brandLogo" style={{display:'grid',placeItems:'center',fontSize:28,fontWeight:800,color:'#176b32'}}>ع</div>
+          <img className="brandLogo" src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" />
           <div><b>حلقات عاشور بخاري</b><small>منصة إدارة الحلقات القرآنية</small></div>
         </button>
         <nav>
@@ -146,7 +146,7 @@ export default function App() {
       {!code ? <>
         {publicView==='الرئيسية'&&<><section className="hero">
           <div className="heroText reveal reveal-right"><span className="eyebrow">حلقات القرآن الكريم</span><h1>حلقات عاشور بخاري</h1><h2>تعليمٌ متقن، وتربيةٌ قرآنية، ومتابعةٌ مستمرة</h2><p>منصة موحدة لتنظيم الحلقات ومتابعة الطلاب والمعلمين والحفظ والمراجعة والحضور.</p></div>
-          <div className="heroArt reveal reveal-left"><div className="heroLogoCard"><div style={{minHeight:300,display:'grid',placeItems:'center',fontSize:110,fontWeight:900,color:'#176b32'}}>ع</div></div></div>
+          <div className="heroArt reveal reveal-left"><div className="heroLogoCard"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" /></div></div>
         </section>
         <section className="stats"><article><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span></article><article><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span></article><article><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span></article><article><b>{publicData.stats?.centers ?? '—'}</b><span>مركز</span></article></section></>}
         {publicView==='عن الحلقات'&&<section className="section sectionPro"><div className="sectionHead"><div><span>عن حلقات عاشور بخاري</span><h2>بيئة قرآنية تربوية متكاملة</h2></div></div><div className="featureGrid"><article><h3>الرؤية</h3><p>بيئة قرآنية رائدة في بناء قارئ متقن متصل بكتاب الله.</p></article><article><h3>الرسالة</h3><p>تعليم قرآني منظم يجمع الإتقان والتربية والمتابعة والتقنية.</p></article><article><h3>المتابعة</h3><p>متابعة الحفظ والمراجعة والحضور والتقدم بصورة مستمرة.</p></article></div></section>}
@@ -157,7 +157,7 @@ export default function App() {
       </> :
       <div className="workspace">
         <aside>
-          <div className="user"><span>ع</span><div><b>مدير النظام</b><small>حلقات عاشور بخاري</small></div></div>
+          <div className="user"><span><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></span><div><b>مدير النظام</b><small>حلقات عاشور بخاري</small></div></div>
           <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}>نظرة عامة</button>
           <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}>الطلاب</button>
           <button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}>الحلقات</button>
