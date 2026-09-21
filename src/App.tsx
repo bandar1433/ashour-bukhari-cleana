@@ -42,7 +42,7 @@ const fallbackAnnouncements=[
 const homeMediaCards=[
   ['talqeen','مسار التلقين والتهجي','تأسيس القراءة الصحيحة والتهيئة للحفظ.'],
   ['hifz','مسار حفظ القرآن','حفظ متدرج مع متابعة ومراجعة منتظمة.'],
-  ['qiraat','مسار القراءات','تأهيل متقدم في القراءات والإتقان.'],
+  ['itqan','مسار الإتقان','ضبط الحفظ وتحسين التلاوة والأداء.'],\n  ['qiraat','مسار القراءات','تأهيل متقدم في القراءات والإتقان.'],
   ['madinah-group','برامج ورحلات تربوية','تجارب إيمانية وتعليمية تصنع الأثر.']
 ] as const;
 function SitePhoto({src,alt,className=''}:{src?:string;alt:string;className?:string}){
@@ -369,7 +369,7 @@ export default function App() {
               <div className="authHeading">
                 <span className="authEyebrow">{authIntent==='signin'?'تسجيل الدخول':'تفعيل حساب الدخول'}</span>
                 <h2 id="auth-title">{authIntent==='signin'?'مرحبًا بعودتك':'تفعيل الدخول لأول مرة'}</h2>
-                <p className="authLead">استخدم حساب Google الخاص بك، كما في المنصة السابقة. إذا كان الحساب جديدًا فسيظهر للإدارة لاعتماده وربطه بالدور المناسب.'</p>
+                <p className="authLead">استخدم حساب Google الخاص بك، كما في المنصة السابقة. إذا كان الحساب جديدًا فسيظهر للإدارة لاعتماده وربطه بالدور المناسب.</p>
               </div>
               <div className="authForm authFormPro">
                 {error&&<div className="authNotice" role="alert">{error}</div>}
