@@ -177,7 +177,8 @@ export default function App() {
     if(!neonSessionToken)return false;
     const response=await fetch('/api/status',{method:'POST',headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}});
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok) throw new Error(payload?.message||payload?.error||'الحساب بانتظار اعتماد الإدارة.');
+    if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
+    if(payload?.pending){setError(payload.message||'الحساب بانتظار اعتماد الإدارة.');setAuthOpen(true);return false;}
     clearAccessCode(); setSessionToken(payload.token); setCode('session'); setAuthOpen(false); return true;
   }
 
