@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   apiGet,
   apiPost,
+  apiPut,
+  CenterRow,
   CircleRow,
   clearAccessCode,
   getAccessCode,
@@ -12,7 +14,7 @@ import {
   UserRow,
 } from './lib/api';
 
-type Tab = 'overview' | 'students' | 'circles' | 'users' | 'attendance' | 'memorization' | 'plans' | 'news';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'attendance' | 'memorization' | 'plans' | 'news';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -37,6 +39,7 @@ export default function App() {
   const [publicData,setPublicData]=useState<any>({stats:{},news:[],circles:[]});
   const [publicView,setPublicView]=useState('الرئيسية');
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [centers, setCenters] = useState<CenterRow[]>([]);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [circles, setCircles] = useState<CircleRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -61,8 +64,9 @@ export default function App() {
     setError('');
 
     try {
-      const [summaryData, studentsData, circlesData, usersData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
+      const [summaryData, centersData, studentsData, circlesData, usersData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
         apiGet<Summary>('/api/summary'),
+        apiGet<{ items: CenterRow[] }>('/api/centers'),
         apiGet<{ items: StudentRow[] }>('/api/students'),
         apiGet<{ items: CircleRow[] }>('/api/circles'),
         apiGet<{ items: UserRow[] }>('/api/users'),
@@ -70,6 +74,7 @@ export default function App() {
       ]);
 
       setSummary(summaryData);
+      setCenters(centersData.items || []);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
       setUsers(usersData.items || []); setAttendance(attendanceData.items||[]); setMemorization(memorizationData.items||[]); setPlans(plansData.items||[]); setNews(newsData.items||[]);
@@ -102,6 +107,7 @@ export default function App() {
     setCode('');
     setEnteredCode('');
     setSummary(null);
+    setCenters([]);
     setStudents([]);
     setCircles([]);
     setUsers([]);
@@ -181,6 +187,7 @@ export default function App() {
         <aside>
           <div className="user"><span><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></span><div><b>مدير النظام</b><small>حلقات عاشور بخاري</small></div></div>
           <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}>نظرة عامة</button>
+          <button className={activeTab==='centers'?'selected':''} onClick={()=>setActiveTab('centers')}>المراكز والفروع</button>
           <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}>الطلاب</button>
           <button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}>الحلقات</button>
           <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}>المستخدمون</button>
@@ -198,8 +205,9 @@ export default function App() {
             <div className="panelHead"><h2>{activeTab==='overview'?'مؤشرات التشغيل':'السجلات'}</h2>{activeTab!=='overview'&&<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث..." />}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
             {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
-            {loadState!=='loading'&&activeTab==='students'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/students',e)}><label className="field"><span>اسم الطالب</span><input name="full_name" required /></label><label className="field"><span>الحلقة</span><select name="circle_id" defaultValue=""><option value="">بدون حلقة</option>{circles.map((x:any)=><option key={x.id} value={x.id}>{x.name} — {x.center_name||''}</option>)}</select></label><label className="field"><span>الصف/المرحلة</span><input name="grade_level" /></label><button className="primary" type="submit">إضافة الطالب</button></form><StudentsTable rows={filteredStudents}/></>}
-            {loadState!=='loading'&&activeTab==='circles'&&<CirclesTable rows={filteredCircles}/>}
+            {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
+            {loadState!=='loading'&&activeTab==='students'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/students',e)}><label className="field"><span>اسم الطالب</span><input name="full_name" required /></label><label className="field"><span>الحلقة</span><select name="circle_id" defaultValue=""><option value="">بدون حلقة</option>{circles.map((x:any)=><option key={x.id} value={x.id}>{x.name} — {x.center_name||''}</option>)}</select></label><label className="field"><span>الصف/المرحلة</span><input name="grade_level" /></label><button className="primary" type="submit">إضافة الطالب</button></form><StudentsTable rows={filteredStudents} circles={circles} onChanged={loadDashboard}/></>}
+            {loadState!=='loading'&&activeTab==='circles'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/circles',e)}><label className="field"><span>اسم الحلقة</span><input name="name" required /></label><label className="field"><span>المركز</span><select name="center_id" required defaultValue=""><option value="" disabled>اختر المركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label className="field"><span>المعلم</span><select name="teacher_user_id" defaultValue=""><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>المسار الرئيس</span><select name="student_track" defaultValue="الطلاب من أهل مكة"><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></label><label className="field"><span>المسار القرآني</span><select name="quran_track" defaultValue="مسار حفظ القرآن للشباب"><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></label><label className="field"><span>الموعد</span><input name="schedule" /></label><button className="primary" type="submit">إضافة الحلقة</button></form><CirclesTable rows={filteredCircles} users={users} onChanged={loadDashboard}/></>}
             {loadState!=='loading'&&activeTab==='users'&&<UsersTable rows={filteredUsers}/>}
             {loadState!=='loading'&&activeTab==='attendance'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/attendance',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>التاريخ</span><input name="attendance_date" type="date" required defaultValue={new Date().toISOString().slice(0,10)} /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="present"><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue="0" /></label><button className="primary" type="submit">حفظ الحضور</button></form><GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/></>}
             {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option><option value="recitation">تسميع</option></select></label><label className="field"><span>رقم السورة</span><input name="surah_no" type="number" min="1" max="114" required /></label><label className="field"><span>من آية</span><input name="from_ayah" type="number" min="1" required /></label><label className="field"><span>إلى آية</span><input name="to_ayah" type="number" min="1" required /></label><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ التسميع</button></form><GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/></>}
@@ -226,59 +234,39 @@ function StatCard({ label, value }: { label: string; value?: number }) {
   );
 }
 
-function StudentsTable({ rows }: { rows: StudentRow[] }) {
+function StudentsTable({ rows, circles, onChanged }: { rows: StudentRow[]; circles: CircleRow[]; onChanged:()=>Promise<void> }) {
   if (!rows.length) return <div className="empty">لا توجد بيانات طلاب مطابقة.</div>;
+  async function updateStudent(id:string,body:any){await apiPut('/api/students',{id,...body});await onChanged();}
   return (
     <div className="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>الاسم</th>
-            <th>البريد</th>
-            <th>الحلقة</th>
-            <th>المركز</th>
-            <th>الحالة</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>{row.full_name}</td>
-              <td>{row.email || '—'}</td>
-              <td>{row.circle_name || '—'}</td>
-              <td>{row.center_name || '—'}</td>
-              <td>{row.is_active ? 'نشط' : 'غير نشط'}</td>
-            </tr>
-          ))}
-        </tbody>
+        <thead><tr><th>الاسم</th><th>البريد</th><th>الحلقة</th><th>المركز</th><th>الحالة</th><th>النقاط</th></tr></thead>
+        <tbody>{rows.map(row=><tr key={row.id}>
+          <td>{row.full_name}</td><td>{row.email||'—'}</td>
+          <td><select aria-label={`حلقة ${row.full_name}`} value={row.circle_id||''} onChange={e=>updateStudent(row.id,{circle_id:e.target.value||null,center_id:e.target.value?undefined:null})}><option value="">غير مسند</option>{circles.map(c=><option key={c.id} value={c.id}>{c.name} — {c.center_name||''}</option>)}</select></td>
+          <td>{row.center_name||'غير مسند'}</td>
+          <td><select aria-label={`حالة ${row.full_name}`} value={row.status||'active'} onChange={e=>updateStudent(row.id,{status:e.target.value})}><option value="active">نشط</option><option value="excused">مستأذن</option><option value="suspended">موقوف</option></select></td>
+          <td>{row.points_balance??0}</td>
+        </tr>)}</tbody>
       </table>
     </div>
   );
 }
 
-function CirclesTable({ rows }: { rows: CircleRow[] }) {
+function CirclesTable({ rows, users, onChanged }: { rows: CircleRow[]; users: UserRow[]; onChanged:()=>Promise<void> }) {
   if (!rows.length) return <div className="empty">لا توجد حلقات مطابقة.</div>;
+  async function updateCircle(id:string,body:any){await apiPut('/api/circles',{id,...body});await onChanged();}
   return (
     <div className="table-wrap">
       <table>
-        <thead>
-          <tr>
-            <th>الحلقة</th>
-            <th>المركز</th>
-            <th>المعلم</th>
-            <th>عدد الطلاب</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>{row.name}</td>
-              <td>{row.center_name || '—'}</td>
-              <td>{row.teacher_name || row.teacher_email || '—'}</td>
-              <td>{row.students_count}</td>
-            </tr>
-          ))}
-        </tbody>
+        <thead><tr><th>الحلقة</th><th>المركز</th><th>المعلم</th><th>المسار الرئيس</th><th>المسار القرآني</th><th>عدد الطلاب</th></tr></thead>
+        <tbody>{rows.map(row=><tr key={row.id}>
+          <td>{row.name}</td><td>{row.center_name||'—'}</td>
+          <td><select aria-label={`معلم ${row.name}`} value={row.teacher_user_id||''} onChange={e=>updateCircle(row.id,{teacher_user_id:e.target.value||null})}><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></td>
+          <td><select aria-label={`مسار رئيس ${row.name}`} value={row.student_track||''} onChange={e=>updateCircle(row.id,{student_track:e.target.value||null})}><option value="">غير مصنف</option><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></td>
+          <td><select aria-label={`مسار قرآني ${row.name}`} value={row.quran_track||''} onChange={e=>updateCircle(row.id,{quran_track:e.target.value||null})}><option value="">غير مصنف</option><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></td>
+          <td>{row.students_count}</td>
+        </tr>)}</tbody>
       </table>
     </div>
   );
