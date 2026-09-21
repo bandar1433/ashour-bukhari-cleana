@@ -100,8 +100,7 @@ export default function App() {
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
-    fetch('/api/public').then(r=>r.json()).then(setPublicData).catch(()=>{});
-    fetch('/api/site-images').then(r=>r.json()).then(x=>setSiteImages(x?.items||{})).catch(()=>{});
+    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages(x?.images||{});}).catch(()=>{});
   }, []);
 
   async function loadDashboard() {
