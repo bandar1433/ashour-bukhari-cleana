@@ -26,6 +26,8 @@ export default function App() {
   const [code, setCode] = useState(getAccessCode());
   const [enteredCode, setEnteredCode] = useState(getAccessCode());
   const [status, setStatus] = useState<any>(null);
+  const [publicData,setPublicData]=useState<any>({stats:{},news:[],circles:[]});
+  const [publicView,setPublicView]=useState('الرئيسية');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [circles, setCircles] = useState<CircleRow[]>([]);
@@ -43,6 +45,7 @@ export default function App() {
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
+    fetch('/api/public').then(r=>r.json()).then(setPublicData).catch(()=>{});
   }, []);
 
   async function loadDashboard() {
@@ -135,19 +138,21 @@ export default function App() {
           <div><b>حلقات عاشور بخاري</b><small>منصة إدارة الحلقات القرآنية</small></div>
         </button>
         <nav>
-          <button className="active">الرئيسية</button>
-          <button>عن الحلقات</button><button>الحلقات القرآنية</button><button>المعلمون</button>
-          <button>الطلاب</button><button>الإنجازات</button><button>الأخبار والفعاليات</button>
+          {['الرئيسية','عن الحلقات','الحلقات القرآنية','المعلمون','الطلاب','الإنجازات','الأخبار والفعاليات'].map(v=><button key={v} className={publicView===v?'active':''} onClick={()=>setPublicView(v)}>{v}</button>)}
         </nav>
         <div className="headerActions">{code ? <button className="login" onClick={handleLogout}>خروج</button> : null}</div>
       </header>
 
       {!code ? <>
-        <section className="hero">
+        {publicView==='الرئيسية'&&<><section className="hero">
           <div className="heroText reveal reveal-right"><span className="eyebrow">حلقات القرآن الكريم</span><h1>حلقات عاشور بخاري</h1><h2>تعليمٌ متقن، وتربيةٌ قرآنية، ومتابعةٌ مستمرة</h2><p>منصة موحدة لتنظيم الحلقات ومتابعة الطلاب والمعلمين والحفظ والمراجعة والحضور.</p></div>
           <div className="heroArt reveal reveal-left"><div className="heroLogoCard"><div style={{minHeight:300,display:'grid',placeItems:'center',fontSize:110,fontWeight:900,color:'#176b32'}}>ع</div></div></div>
         </section>
-        <section className="stats"><article><b>{summary?.students ?? '—'}</b><span>طالب</span></article><article><b>{summary?.teachers ?? '—'}</b><span>معلم</span></article><article><b>{summary?.circles ?? '—'}</b><span>حلقة</span></article><article><b>{summary?.centers ?? '—'}</b><span>مركز</span></article></section>
+        <section className="stats"><article><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span></article><article><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span></article><article><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span></article><article><b>{publicData.stats?.centers ?? '—'}</b><span>مركز</span></article></section></>}
+        {publicView==='عن الحلقات'&&<section className="section sectionPro"><div className="sectionHead"><div><span>عن حلقات عاشور بخاري</span><h2>بيئة قرآنية تربوية متكاملة</h2></div></div><div className="featureGrid"><article><h3>الرؤية</h3><p>بيئة قرآنية رائدة في بناء قارئ متقن متصل بكتاب الله.</p></article><article><h3>الرسالة</h3><p>تعليم قرآني منظم يجمع الإتقان والتربية والمتابعة والتقنية.</p></article><article><h3>المتابعة</h3><p>متابعة الحفظ والمراجعة والحضور والتقدم بصورة مستمرة.</p></article></div></section>}
+        {publicView==='الحلقات القرآنية'&&<section className="section"><div className="sectionHead"><div><span>الحلقات</span><h2>الحلقات القرآنية</h2></div></div><div className="roleGrid">{publicData.circles?.map((x:any)=><article className="roleCard" key={x.id}><b>{x.name}</b><small>{x.center_name||'—'}</small><em>{x.teacher_name||'لم يحدد المعلم'}</em></article>)}</div></section>}
+        {publicView==='الأخبار والفعاليات'&&<section className="section"><div className="sectionHead"><div><span>المستجدات</span><h2>الأخبار والفعاليات</h2></div></div><div className="newsGrid">{publicData.news?.length?publicData.news.map((n:any)=><article key={n.id}><time>{n.event_date?new Date(n.event_date).toLocaleDateString('ar-SA'):''}</time><h3>{n.title}</h3><p>{n.body}</p></article>):<article><h3>لا توجد أخبار منشورة حاليًا</h3></article>}</div></section>}
+        {['المعلمون','الطلاب','الإنجازات'].includes(publicView)&&<section className="simplePage"><h1>{publicView}</h1><p>يعرض هذا القسم محتوى {publicView} ضمن هوية المنصة.</p></section>}
         <section className="section"><div className="sectionHead"><div><span>بوابة الإدارة</span><h2>الدخول إلى المنصة</h2></div></div><div className="panel" style={{maxWidth:520,margin:'0 auto'}}><form onSubmit={handleLogin}><label className="field"><span>رمز الدخول</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="أدخل رمز الدخول" autoFocus /></label><button className="primary" type="submit">دخول</button></form>{error&&<div className="notice">{error}</div>}</div></section>
       </> :
       <div className="workspace">
