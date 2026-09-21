@@ -23,15 +23,23 @@ type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' |
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
 const legacyStaticImages:Record<string,string>={
-  madinah:'https://app-it055u.v2.appdeploy.ai/resources/report-madinah.png',
-  iftar:'https://app-it055u.v2.appdeploy.ai/resources/report-iftar.png',
-  recreation:'https://app-it055u.v2.appdeploy.ai/resources/report-recreation.png',
-  khatm:'https://app-it055u.v2.appdeploy.ai/resources/report-khatm.png',
-  eid:'https://app-it055u.v2.appdeploy.ai/resources/report-eid.png',
-  'achievement-anas':'https://app-it055u.v2.appdeploy.ai/resources/report-achievement-anas.png',
-  'achievement-russia':'https://app-it055u.v2.appdeploy.ai/resources/report-achievement-russia.png',
-  'achievement-tanzania':'https://app-it055u.v2.appdeploy.ai/resources/report-achievement-tanzania.png',
-  'achievement-omar':'https://app-it055u.v2.appdeploy.ai/resources/report-achievement-omar.png'
+  talqeen:'/resources/report-talqeen.jpg',
+  hifz:'/resources/report-hifz.jpg',
+  itqan:'/resources/report-itqan.jpg',
+  qiraat:'/resources/report-qiraat.jpg',
+  nationalities:'/resources/report-nationalities.jpg',
+  madinah:'/resources/report-madinah.jpg',
+  'madinah-group':'/resources/report-madinah-group.jpg',
+  iftar:'/resources/report-iftar.jpg',
+  recreation:'/resources/report-recreation.jpg',
+  khatm:'/resources/report-khatm.jpg',
+  eid:'/resources/report-eid.jpg',
+  'achievement-anas':'/resources/report-achievement-anas.jpg',
+  'achievement-russia':'/resources/report-achievement-russia.jpg',
+  'achievement-tanzania':'/resources/report-achievement-tanzania.jpg',
+  'achievement-omar':'/resources/report-achievement-omar.jpg',
+  'photo-1':'/resources/report-photo-1.jpg',
+  'photo-2':'/resources/report-photo-2.jpg'
 };
 const fallbackAnnouncements=[
   {id:'madinah',kind:'event',title:'رحلة المدينة المنورة',body:'رحلة إيمانية علمية تربوية لطلاب الحلقات، جمعت الزيارة والتعلم والتربية.',published_at:'1447هـ',imageKey:'madinah'},
@@ -112,7 +120,7 @@ export default function App() {
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
-    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages({...legacyStaticImages,...(x?.images||{})});}).catch(()=>setSiteImages(legacyStaticImages));
+    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages({...((x?.images||{}) as Record<string,string>),...legacyStaticImages});}).catch(()=>setSiteImages(legacyStaticImages));
   }, []);
 
   async function loadDashboard() {
