@@ -197,15 +197,22 @@ export default function App() {
   }
 
   async function finishSocialSession(){
-    const current:any=await authClient.getSession();
+    let headerJwt='';
+    const current:any=await authClient.getSession({
+      fetchOptions:{
+        credentials:'include',
+        headers:{'X-Force-Fetch':'1'},
+        onSuccess:(ctx:any)=>{
+          headerJwt=ctx?.response?.headers?.get('set-auth-jwt')||'';
+        }
+      }
+    });
     if(current?.error) throw new Error(current.error.message||'تعذر قراءة جلسة Google.');
     const user=current?.data?.user||current?.data?.session?.user;
     if(!current?.data?.session||!user)return false;
 
-    const tokenResult:any=await authClient.token();
-    if(tokenResult?.error) throw new Error(tokenResult.error.message||'تعذر إصدار رمز الدخول الآمن.');
-    const jwt=tokenResult?.data?.token||current?.data?.session?.access_token||'';
-    if(!jwt) throw new Error('اكتمل تسجيل Google ولكن تعذر إنشاء رمز جلسة المنصة.');
+    const jwt=headerJwt||current?.data?.session?.token||current?.data?.session?.access_token||'';
+    if(!jwt) throw new Error('اكتمل تسجيل Google ولكن تعذر قراءة رمز الجلسة الآمن. أعد المحاولة مرة واحدة.');
 
     const response=await fetch('/api/status',{
       method:'POST',
