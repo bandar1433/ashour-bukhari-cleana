@@ -1,1 +1,0 @@
-import{query}from'./_lib/db.js';import{json,requireAccess,handleError}from'./_lib/http.js';export default async function h(req:any,res:any){if(!requireAccess(req,res))return;try{return json(res,200,await query("select * from login_requests order by requested_at desc limit 200"))}catch(e){return handleError(res,e)}}
