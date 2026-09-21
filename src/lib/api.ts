@@ -103,6 +103,40 @@ export function getSessionRole(): string {
   } catch { return ''; }
 }
 
+function readableError(value:any,fallback='حدث خطأ غير متوقع'):string{
+  if(value===null||value===undefined||value==='') return fallback;
+  if(typeof value==='string') return value;
+  if(value instanceof Error) return value.message||fallback;
+  if(typeof value==='object'){
+    const candidates=[
+      value.message,
+      value.error_description,
+      value.detail,
+      value.details,
+      value.reason,
+      value.title,
+      value?.error?.message,
+      value?.error?.detail,
+      value?.cause?.message,
+      Array.isArray(value.issues)?value.issues.map((x:any)=>x?.message||x).filter(Boolean).join('، '):null,
+      Array.isArray(value.errors)?value.errors.map((x:any)=>x?.message||x).filter(Boolean).join('، '):null,
+    ];
+    for(const item of candidates){
+      if(typeof item==='string'&&item.trim()) return item.trim();
+    }
+    try{
+      const json=JSON.stringify(value);
+      if(json&&json!=='{}') return json.length>700?json.slice(0,700)+'…':json;
+    }catch{}
+  }
+  return String(value)==='[object Object]'?fallback:String(value);
+}
+
+function responseError(payload:any,status:number){
+  const raw=payload?.message ?? payload?.error ?? payload;
+  return readableError(raw,`تعذر تنفيذ الطلب (HTTP ${status})`);
+}
+
 function authHeaders(): Record<string,string> {
   const headers: Record<string,string> = {};
   const code = getAccessCode();
@@ -130,7 +164,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 
   if (!response.ok) {
-    throw new Error(payload?.message || payload?.error || `HTTP ${response.status}`);
+    throw new Error(responseError(payload,response.status));
   }
 
   return payload as T;
@@ -141,7 +175,7 @@ export async function getStatus() {
   return response.json();
 }
 
-export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(payload?.message||payload?.error||`HTTP ${response.status}`);return payload as T;}
+export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(responseError(payload,response.status));return payload as T;}
 
 
 export async function apiPut<T>(path:string,body:unknown):Promise<T>{
@@ -153,6 +187,6 @@ export async function apiPut<T>(path:string,body:unknown):Promise<T>{
   const text=await response.text();
   let payload:any;
   try{payload=text?JSON.parse(text):null}catch{payload={error:text}}
-  if(!response.ok)throw new Error(payload?.message||payload?.error||`HTTP ${response.status}`);
+  if(!response.ok)throw new Error(responseError(payload,response.status));
   return payload as T;
 }

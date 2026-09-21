@@ -83,7 +83,23 @@ export function requireAccess(req: any, res: any): boolean {
   return false;
 }
 
+function safeErrorMessage(error:unknown){
+  if(error instanceof Error && typeof error.message==='string' && error.message.trim()) return error.message;
+  if(typeof error==='string' && error.trim()) return error;
+  if(error && typeof error==='object'){
+    const e=error as any;
+    for(const value of [e.message,e.detail,e.details,e.reason,e?.cause?.message,e?.error?.message]){
+      if(typeof value==='string'&&value.trim()) return value.trim();
+    }
+    try{
+      const encoded=JSON.stringify(error);
+      if(encoded&&encoded!=='{}') return encoded.length>700?encoded.slice(0,700)+'…':encoded;
+    }catch{}
+  }
+  return 'حدث خطأ غير متوقع في الخادم.';
+}
+
 export function handleError(res: any, error: unknown) {
-  const message = error instanceof Error ? error.message : 'Unknown error';
-  return json(res, 500, { error: message });
+  const message = safeErrorMessage(error);
+  return json(res, 500, { error: message, message });
 }
