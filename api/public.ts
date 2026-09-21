@@ -1,12 +1,22 @@
 import { query } from './_lib/db.js';
 import { handleError,json } from './_lib/http.js';
 
+const imageKeys=['talqeen','hifz','itqan','qiraat','nationalities','madinah','madinah-group','iftar','recreation','khatm','eid','achievement-anas','achievement-russia','achievement-tanzania','achievement-omar','photo-1','photo-2'];
+
 async function legacyImages(){
   try{
-    const response=await fetch('https://app-it055u.v2.appdeploy.ai/api/site-images',{headers:{Accept:'application/json'}});
+    const origin='https://app-it055u.v2.appdeploy.ai';
+    const response=await fetch(origin+'/api/site-images',{headers:{Accept:'application/json'}});
     if(!response.ok)return {};
     const payload=await response.json();
-    return payload&&typeof payload==='object'&&!Array.isArray(payload)?payload:{};
+    if(!payload||typeof payload!=='object'||Array.isArray(payload))return {};
+    const images:Record<string,string>={};
+    for(const key of imageKeys){
+      const raw=String((payload as any)[key]||'').trim();
+      if(!raw)continue;
+      try{images[key]=new URL(raw,origin).toString();}catch{}
+    }
+    return images;
   }catch{return {};}
 }
 
