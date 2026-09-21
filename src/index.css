@@ -316,3 +316,10 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+.brand-row{display:flex;align-items:center;gap:18px}
+.brand-mark{width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-size:34px;font-weight:800;flex:none}
+.login-card{text-align:center}
+.login-icon{width:58px;height:58px;margin:0 auto 16px;border-radius:18px;background:#edf5ee;color:#185c37;display:grid;place-items:center;font-size:30px;font-weight:800}
+.login-card form{text-align:right}
+@media(max-width:640px){.brand-row{align-items:flex-start}.brand-mark{width:52px;height:52px;border-radius:16px;font-size:28px}.status-card{min-width:0}}
