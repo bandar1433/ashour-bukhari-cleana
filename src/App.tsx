@@ -128,94 +128,61 @@ export default function App() {
   }, [circles, query]);
 
   return (
-    <div className="app-shell">
-      <header className="hero">
-        <div>
-          <div className="brand-row"><div className="brand-mark">ع</div><div><p className="eyebrow">حلقات القرآن الكريم</p><h1>حلقات عاشور بخاري</h1><p className="hero-subtitle">منصة متكاملة لإدارة الحلقات والطلاب والمتابعة التعليمية.</p></div></div>
-        </div>
-        <div className="status-card">
-          <span className={status?.database === 'connected' ? 'dot good' : 'dot bad'} />
-          <div>
-            <strong>{status?.database === 'connected' ? 'قاعدة البيانات متصلة' : 'بانتظار الاتصال'}</strong>
-            <small>{status?.database === 'connected' ? 'النظام متصل وجاهز للعمل' : 'جارٍ فحص الاتصال...'}</small>
-          </div>
-        </div>
+    <main>
+      <header className="header">
+        <button className="brand" type="button">
+          <div className="brandLogo" style={{display:'grid',placeItems:'center',fontSize:28,fontWeight:800,color:'#176b32'}}>ع</div>
+          <div><b>حلقات عاشور بخاري</b><small>منصة إدارة الحلقات القرآنية</small></div>
+        </button>
+        <nav>
+          <button className="active">الرئيسية</button>
+          <button>عن الحلقات</button><button>الحلقات القرآنية</button><button>المعلمون</button>
+          <button>الطلاب</button><button>الإنجازات</button><button>الأخبار والفعاليات</button>
+        </nav>
+        <div className="headerActions">{code ? <button className="login" onClick={handleLogout}>خروج</button> : null}</div>
       </header>
 
-      {!code ? (
-        <main className="login-card">
-          <div className="login-icon">⌁</div><h2>دخول لوحة الإدارة</h2><p>أدخل رمز الدخول للوصول إلى لوحة إدارة الحلقات.</p>
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              value={enteredCode}
-              onChange={(event) => setEnteredCode(event.target.value)}
-              placeholder="رمز الدخول"
-              autoFocus
-            />
-            <button type="submit">دخول</button>
-          </form>
-          {error && <div className="alert">{error}</div>}
-        </main>
-      ) : (
-        <main className="dashboard-shell">
-          <div className="dashboard-top"><div><span className="section-kicker">الإدارة الذكية للحلقات</span><h2>لوحة التحكم</h2></div><div className="toolbar">
-            <button onClick={loadDashboard} disabled={loadState === 'loading'}>
-              {loadState === 'loading' ? 'جارٍ التحديث...' : 'تحديث البيانات'}
-            </button>
-            <button className="secondary" onClick={handleLogout}>خروج</button></div></div>
-
-          {error && <div className="alert">{error}</div>}
-
-          <section className="welcome-strip"><div><span>لوحة مدير النظام</span><h2>نظرة عامة على المنصة</h2><p>متابعة الحلقات والطلاب والمعلمين والسجلات التعليمية من مكان واحد.</p></div><div className="quick-badge">● النظام يعمل</div></section>
-          <section className="cards-grid">
-            <StatCard label="الطلاب" value={summary?.students} />
-            <StatCard label="المعلمون" value={summary?.teachers} />
-            <StatCard label="الحلقات" value={summary?.circles} />
-            <StatCard label="المراكز" value={summary?.centers} />
-            <StatCard label="الحضور المسجل" value={summary?.attendance} />
-            <StatCard label="سجلات التسميع" value={summary?.memorization} />
-          </section>
-          <section className="module-grid">
-            <ModuleCard icon="◉" title="الحضور والانصراف" value={summary?.attendance} note="سجلات الحضور المسجلة" />
-            <ModuleCard icon="۞" title="التسميع والمراجعة" value={summary?.memorization} note="سجلات القرآن الكريم" />
-            <ModuleCard icon="▤" title="الخطط الأسبوعية" value={summary?.plans} note="خطط الطلاب التعليمية" />
-            <ModuleCard icon="◆" title="الأخبار والمحتوى" value={summary?.news} note="المحتوى المنشور بالموقع" />
-          </section>
-
-          <section className="panel data-panel">
-            <div className="panel-header"><div className="panel-title"><span>سجل الإدارة</span><strong>البيانات والتشغيل</strong></div>
-              <div className="tabs">
-                <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>الرئيسية</button>
-                <button className={activeTab === 'students' ? 'active' : ''} onClick={() => setActiveTab('students')}>الطلاب</button>
-                <button className={activeTab === 'circles' ? 'active' : ''} onClick={() => setActiveTab('circles')}>الحلقات</button>
-                <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>المستخدمون</button>
-                <button className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}>الحضور</button>
-                <button className={activeTab === 'memorization' ? 'active' : ''} onClick={() => setActiveTab('memorization')}>التسميع</button>
-                <button className={activeTab === 'plans' ? 'active' : ''} onClick={() => setActiveTab('plans')}>الخطط</button>
-                <button className={activeTab === 'news' ? 'active' : ''} onClick={() => setActiveTab('news')}>الأخبار</button>
-              </div>
-              <input
-                className="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="بحث..."
-              />
-            </div>
-
-            {loadState === 'loading' && <div className="empty">جارٍ تحميل البيانات...</div>}
-            {loadState !== 'loading' && activeTab === 'overview' && <div className="overview-copy"><h3>إدارة المنصة</h3><p>اختر من التبويبات الطلاب أو الحلقات أو المستخدمين. وستضاف هنا تباعًا شاشات الحضور والتسميع والخطط والمحتوى مع المحافظة على البيانات الحالية.</p></div>}
-            {loadState !== 'loading' && activeTab === 'students' && <StudentsTable rows={filteredStudents} />}
-            {loadState !== 'loading' && activeTab === 'circles' && <CirclesTable rows={filteredCircles} />}
-            {loadState !== 'loading' && activeTab === 'users' && <UsersTable rows={filteredUsers} />}
-            {loadState !== 'loading' && activeTab === 'attendance' && <GenericTable rows={attendance} columns={[['full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]} />}
-            {loadState !== 'loading' && activeTab === 'memorization' && <GenericTable rows={memorization} columns={[['full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة'],['approved','معتمد']]} />}
-            {loadState !== 'loading' && activeTab === 'plans' && <GenericTable rows={plans} columns={[['full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]} />}
-            {loadState !== 'loading' && activeTab === 'news' && <GenericTable rows={news} columns={[['title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]} />}
-          </section>
-        </main>
-      )}
-    </div>
+      {!code ? <>
+        <section className="hero">
+          <div className="heroText reveal reveal-right"><span className="eyebrow">حلقات القرآن الكريم</span><h1>حلقات عاشور بخاري</h1><h2>تعليمٌ متقن، وتربيةٌ قرآنية، ومتابعةٌ مستمرة</h2><p>منصة موحدة لتنظيم الحلقات ومتابعة الطلاب والمعلمين والحفظ والمراجعة والحضور.</p></div>
+          <div className="heroArt reveal reveal-left"><div className="heroLogoCard"><div style={{minHeight:300,display:'grid',placeItems:'center',fontSize:110,fontWeight:900,color:'#176b32'}}>ع</div></div></div>
+        </section>
+        <section className="stats"><article><b>{summary?.students ?? '—'}</b><span>طالب</span></article><article><b>{summary?.teachers ?? '—'}</b><span>معلم</span></article><article><b>{summary?.circles ?? '—'}</b><span>حلقة</span></article><article><b>{summary?.centers ?? '—'}</b><span>مركز</span></article></section>
+        <section className="section"><div className="sectionHead"><div><span>بوابة الإدارة</span><h2>الدخول إلى المنصة</h2></div></div><div className="panel" style={{maxWidth:520,margin:'0 auto'}}><form onSubmit={handleLogin}><label className="field"><span>رمز الدخول</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="أدخل رمز الدخول" autoFocus /></label><button className="primary" type="submit">دخول</button></form>{error&&<div className="notice">{error}</div>}</div></section>
+      </> :
+      <div className="workspace">
+        <aside>
+          <div className="user"><span>ع</span><div><b>مدير النظام</b><small>حلقات عاشور بخاري</small></div></div>
+          <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}>نظرة عامة</button>
+          <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}>الطلاب</button>
+          <button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}>الحلقات</button>
+          <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}>المستخدمون</button>
+          <button className={activeTab==='attendance'?'selected':''} onClick={()=>setActiveTab('attendance')}>الحضور</button>
+          <button className={activeTab==='memorization'?'selected':''} onClick={()=>setActiveTab('memorization')}>التسميع والمراجعة</button>
+          <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}>الخطط الأسبوعية</button>
+          <button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}>الأخبار والفعاليات</button>
+          <button className="exit" onClick={handleLogout}>تسجيل الخروج</button>
+        </aside>
+        <section className="dashboardContent">
+          <div className="crumb"><div><span>لوحة التحكم</span><h1>{activeTab==='overview'?'نظرة عامة':'إدارة المنصة'}</h1></div><button className="secondary" onClick={loadDashboard}>تحديث البيانات</button></div>
+          {error&&<div className="notice">{error}</div>}
+          <div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b></article></div>
+          <div className="panel">
+            <div className="panelHead"><h2>{activeTab==='overview'?'مؤشرات التشغيل':'السجلات'}</h2>{activeTab!=='overview'&&<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث..." />}</div>
+            {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
+            {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
+            {loadState!=='loading'&&activeTab==='students'&&<StudentsTable rows={filteredStudents}/>}
+            {loadState!=='loading'&&activeTab==='circles'&&<CirclesTable rows={filteredCircles}/>}
+            {loadState!=='loading'&&activeTab==='users'&&<UsersTable rows={filteredUsers}/>}
+            {loadState!=='loading'&&activeTab==='attendance'&&<GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/>}
+            {loadState!=='loading'&&activeTab==='memorization'&&<GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>}
+            {loadState!=='loading'&&activeTab==='plans'&&<GenericTable rows={plans} columns={[[ 'full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>}
+            {loadState!=='loading'&&activeTab==='news'&&<GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/>}
+          </div>
+        </section>
+      </div>}
+      <footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>
+    </main>
   );
 }
 
