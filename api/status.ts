@@ -1,19 +1,23 @@
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { hasDatabaseUrl, query } from './_lib/db.js';
 import { handleError, issueAdminSession, json } from './_lib/http.js';
 
+const NEON_AUTH_BASE_URL=process.env.NEON_AUTH_BASE_URL||'https://ep-withered-flower-aeyxaru7.neonauth.c-2.us-east-2.aws.neon.tech/ashour_bukhari/auth';
+const AUTH_ORIGIN=new URL(NEON_AUTH_BASE_URL).origin;
+const JWKS=createRemoteJWKSet(new URL(`${NEON_AUTH_BASE_URL}/.well-known/jwks.json`));
+
 async function exchangeAuthSession(req:any,res:any){
-  const sessionToken=String(req.headers['x-neon-session-token']||'').trim();
-  if(!sessionToken) return json(res,401,{error:'Unauthorized',message:'جلسة Neon Auth غير موجودة.'});
+  const authorization=String(req.headers.authorization||'');
+  const token=authorization.startsWith('Bearer ')?authorization.slice(7).trim():'';
+  if(!token) return json(res,401,{error:'Unauthorized',message:'رمز جلسة Google غير موجود.'});
 
-  const neon=(await query<any>(`
-    select u.id::text id,u.email,u.name,s."expiresAt"
-    from neon_auth.session s
-    join neon_auth."user" u on u.id=s."userId"
-    where s.token=$1 and s."expiresAt">now()
-    limit 1
-  `,[sessionToken]))[0];
-
-  if(!neon) return json(res,401,{error:'Unauthorized',message:'جلسة الدخول غير صالحة أو انتهت.'});
+  const {payload}=await jwtVerify(token,JWKS,{issuer:AUTH_ORIGIN});
+  const neon={
+    id:String(payload.sub||payload.id||''),
+    email:String(payload.email||''),
+    name:String(payload.name||'')
+  };
+  if(!neon.id) return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من هوية حساب Google.'});
 
   const appUser=(await query<any>(`
     select id,full_name,email,role::text role,is_active
@@ -45,7 +49,7 @@ async function exchangeAuthSession(req:any,res:any){
         full_name=excluded.full_name,
         status='pending',
         requested_at=now()
-    `,[neon.id,neon.email,neon.name||null]);
+    `,[neon.id,neon.email||null,neon.name||null]);
     return json(res,200,{
       pending:true,
       code:'PENDING_APPROVAL',
@@ -62,38 +66,23 @@ async function exchangeAuthSession(req:any,res:any){
   });
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req:any,res:any){
   if(req.method==='POST'){
     try{return await exchangeAuthSession(req,res)}
-    catch(error){return handleError(res,error)}
+    catch(error){
+      console.error('[auth-exchange] failed',error);
+      return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من جلسة Google. أعد تسجيل الدخول.'});
+    }
   }
 
-  if (req.method !== 'GET') {
-    return json(res, 405, { error: 'Method not allowed' });
-  }
-
-  const configured = hasDatabaseUrl();
-
-  if (!configured) {
-    return json(res, 200, {
-      configured: false,
-      database: 'missing DATABASE_URL',
-    });
-  }
-
-  try {
+  if(req.method!=='GET') return json(res,405,{error:'Method not allowed'});
+  const configured=hasDatabaseUrl();
+  if(!configured) return json(res,200,{configured:false,database:'missing DATABASE_URL'});
+  try{
     await query('select 1 as ok');
-    return json(res, 200, {
-      configured: true,
-      database: 'connected',
-      app: 'ashour-clean-platform-v1',
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return json(res, 500, {
-      configured: true,
-      database: 'error',
-      error: message,
-    });
+    return json(res,200,{configured:true,database:'connected',app:'ashour-clean-platform-v1'});
+  }catch(error){
+    const message=error instanceof Error?error.message:'Unknown database error';
+    return json(res,500,{configured:true,database:'error',error:message});
   }
 }

@@ -161,8 +161,15 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (code) loadDashboard();
-    else finishSocialSession().catch(err=>{if(String(err?.message||'').includes('انتظار')){setError(err.message);setAuthOpen(true)}});
+    if (code) {
+      loadDashboard();
+      return;
+    }
+    finishSocialSession().catch(err=>{
+      const message=err instanceof Error?err.message:'تعذر استكمال تسجيل الدخول.';
+      setError(message);
+      setAuthOpen(true);
+    });
   }, [code]);
 
   async function handleLogin(event: React.FormEvent) {
@@ -191,13 +198,28 @@ export default function App() {
 
   async function finishSocialSession(){
     const current:any=await authClient.getSession();
-    const neonSessionToken=current?.data?.session?.token||current?.data?.token||'';
-    if(!neonSessionToken)return false;
-    const response=await fetch('/api/status',{method:'POST',headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}});
+    if(current?.error) throw new Error(current.error.message||'تعذر قراءة جلسة Google.');
+    const user=current?.data?.user||current?.data?.session?.user;
+    if(!current?.data?.session||!user)return false;
+
+    const tokenResult:any=await authClient.token();
+    if(tokenResult?.error) throw new Error(tokenResult.error.message||'تعذر إصدار رمز الدخول الآمن.');
+    const jwt=tokenResult?.data?.token||current?.data?.session?.access_token||'';
+    if(!jwt) throw new Error('اكتمل تسجيل Google ولكن تعذر إنشاء رمز جلسة المنصة.');
+
+    const response=await fetch('/api/status',{
+      method:'POST',
+      headers:{Accept:'application/json',Authorization:`Bearer ${jwt}`}
+    });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
     if(payload?.pending){setError(payload.message||'الحساب بانتظار اعتماد الإدارة.');setAuthOpen(true);return false;}
-    clearAccessCode(); setSessionToken(payload.token); setCode('session'); setAuthOpen(false); return true;
+    clearAccessCode();
+    setSessionToken(payload.token);
+    setCode('session');
+    setAuthOpen(false);
+    setError('');
+    return true;
   }
 
   async function handleGoogleLogin(){
