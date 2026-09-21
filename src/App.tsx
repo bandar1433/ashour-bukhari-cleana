@@ -147,7 +147,7 @@ export default function App() {
       const root=role==='system_admin';
       const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
       const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
-        staff?apiGet<Summary>('/api/summary'):Promise.resolve(null),
+        staff?apiGet<Summary>('/api/ops?action=summary'):Promise.resolve(null),
         staff?apiGet<{ items: CenterRow[] }>('/api/centers'):Promise.resolve({items:[]}),
         staff?apiGet<{ items: StudentRow[] }>('/api/students'):Promise.resolve({items:[]}),
         staff?apiGet<{ items: CircleRow[] }>('/api/circles'):Promise.resolve({items:[]}),
@@ -195,7 +195,7 @@ export default function App() {
     clearSessionToken();
     setAccessCode(cleaned);
     try {
-      await apiGet<Summary>('/api/summary');
+      await apiGet<Summary>('/api/ops?action=summary');
       setCode(cleaned);
       setAuthOpen(false);
     } catch (err) {
@@ -322,23 +322,23 @@ export default function App() {
   }
 
   async function loadTeacherToday(date=dailyDate){
-    try{setError('');const data=await apiGet<any>(`/api/teacher-today?date=${date}`);setTeacherToday(data)}
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=teacher-today&date=${date}`);setTeacherToday(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل لوحة اليوم')}
   }
   async function loadCircleRegister(month=recordMonth){
-    try{setError('');const data=await apiGet<any>(`/api/circle-register?month=${month}`);setCircleRegister(data)}
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=circle-register&month=${month}`);setCircleRegister(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل سجل الحلقة')}
   }
   async function loadEvaluations(range=evaluationRange){
-    try{setError('');const data=await apiGet<any>(`/api/evaluations?from=${range.from}&to=${range.to}`);setEvaluations(data)}
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=evaluations&from=${range.from}&to=${range.to}`);setEvaluations(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
   }
   async function openStudentProfile(id:string){
-    try{setError('');const data=await apiGet<any>(`/api/student-profile?id=${id}?month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
   }
   async function approveDay(circleId:string){
-    try{setError('');await apiPost('/api/day-approvals',{circle_id:circleId,approval_date:dailyDate});await loadTeacherToday(dailyDate)}
+    try{setError('');await apiPost('/api/ops?action=day-approve',{circle_id:circleId,approval_date:dailyDate});await loadTeacherToday(dailyDate)}
     catch(err){setError(err instanceof Error?err.message:'تعذر اعتماد اليوم')}
   }
 
