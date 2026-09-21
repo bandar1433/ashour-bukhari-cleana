@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
         case when auth_subject is null then false else true end as linked
       from users
       order by
-        case role
+        case role::text
           when 'system_admin' then 1
           when 'center_manager' then 2
           when 'supervisor' then 3
