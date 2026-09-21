@@ -379,20 +379,27 @@ export default function App() {
       {!code ? <>
         {publicView==='الرئيسية'&&<>
         <section className="topNews reveal reveal-up">
-          <div className="topNewsMeta">
-            <div><span className="eyebrow">الأخبار والفعاليات</span><strong>آخر أخبار الحلقات</strong></div>
-            <small>{announcementIndex%announcements.length+1} / {announcements.length}</small>
+          <div className="topNewsRail">
+            <div className="topNewsRailTitle"><span className="newsPulse"></span><b>آخر الأخبار</b></div>
+            <span>مستجدات حلقات عاشور بخاري</span>
+            <small>{String(announcementIndex%announcements.length+1).padStart(2,'0')} / {String(announcements.length).padStart(2,'0')}</small>
+          </div>
+          <div className="topNewsMedia">
+            <SitePhoto src={announcementImage(activeAnnouncement)} alt={activeAnnouncement?.title||'آخر أخبار الحلقات'} />
           </div>
           <article className="topNewsSlide" key={activeAnnouncement?.id||announcementIndex}>
-            <time>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'حديثًا'}</time>
+            <div className="topNewsInfo">
+              <span className="newsBadge">{activeAnnouncement?.kind==='achievement'?'إنجاز':activeAnnouncement?.kind==='event'?'فعالية':'خبر'}</span>
+              <time>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'حديثًا'}</time>
+            </div>
             <h2>{activeAnnouncement?.title}</h2>
             <p>{activeAnnouncement?.body}</p>
           </article>
           <div className="topNewsControls">
-            <button type="button" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>السابق</button>
+            <button className="newsArrow" type="button" aria-label="الخبر السابق" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>→</button>
             <div className="newsDots">{announcements.map((_:any,i:number)=><button type="button" aria-label={`الخبر ${i+1}`} key={i} className={i===announcementIndex%announcements.length?'active':''} onClick={()=>setAnnouncementIndex(i)} />)}</div>
-            <button type="button" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>التالي</button>
-            <button type="button" className="allNewsButton" onClick={()=>setPublicView('الأخبار والفعاليات')}>عرض كل الأخبار</button>
+            <button className="newsArrow" type="button" aria-label="الخبر التالي" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>←</button>
+            <button type="button" className="allNewsButton" onClick={()=>setPublicView('الأخبار والفعاليات')}>جميع الأخبار <span>←</span></button>
           </div>
         </section>
 
