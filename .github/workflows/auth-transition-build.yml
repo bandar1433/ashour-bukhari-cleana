@@ -1,0 +1,19 @@
+name: Auth transition build check
+
+on:
+  push:
+    branches:
+      - auth-transition-20260921
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npx tsc --noEmit
