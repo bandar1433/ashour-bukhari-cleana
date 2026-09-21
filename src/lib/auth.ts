@@ -6,8 +6,3 @@ export const NEON_AUTH_URL='https://ep-withered-flower-aeyxaru7.neonauth.c-2.us-
 export const authClient=createAuthClient(NEON_AUTH_URL,{
   adapter: BetterAuthReactAdapter(),
 });
-
-export async function getAuthToken(){
-  const session:any=await authClient.getSession();
-  return session?.data?.session?.token||null;
-}
