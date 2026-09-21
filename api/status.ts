@@ -22,7 +22,21 @@ async function exchangeAuthSession(req:any,res:any){
     limit 1
   `,[neon.id]))[0];
 
-  if(!appUser){
+  let resolvedUser=appUser;
+  if(!resolvedUser && neon.email){
+    const byEmail=(await query<any>(`
+      select id,full_name,email,role::text role,is_active
+      from public.users
+      where lower(email)=lower($1)
+      limit 1
+    `,[neon.email]))[0];
+    if(byEmail){
+      await query('update public.users set auth_subject=$1 where id=$2',[neon.id,byEmail.id]);
+      resolvedUser=byEmail;
+    }
+  }
+
+  if(!resolvedUser){
     await query(`
       insert into login_requests(auth_subject,email,full_name,status,requested_at)
       values($1,$2,$3,'pending',now())
@@ -32,15 +46,15 @@ async function exchangeAuthSession(req:any,res:any){
         status='pending',
         requested_at=now()
     `,[neon.id,neon.email,neon.name||null]);
-    return json(res,403,{
-      error:'Pending approval',
+    return json(res,200,{
+      pending:true,
       code:'PENDING_APPROVAL',
-      message:'تم إنشاء حساب الدخول بنجاح، وهو الآن بانتظار اعتماد الإدارة وربطه بحساب المنصة.'
+      message:'تم تسجيل الدخول بحساب Google، والحساب بانتظار اعتماد الإدارة وربطه بالصلاحية المناسبة.'
     });
   }
 
-  if(!appUser.is_active) return json(res,403,{error:'Inactive',message:'هذا الحساب غير نشط. راجع إدارة المنصة.'});
-  if(appUser.role!=='system_admin'){
+  if(!resolvedUser.is_active) return json(res,403,{error:'Inactive',message:'هذا الحساب غير نشط. راجع إدارة المنصة.'});
+  if(resolvedUser.role!=='system_admin'){
     return json(res,403,{
       error:'Role not enabled',
       code:'ROLE_NOT_ENABLED',
@@ -48,10 +62,10 @@ async function exchangeAuthSession(req:any,res:any){
     });
   }
 
-  const session=issueAdminSession({sub:neon.id,userId:appUser.id});
+  const session=issueAdminSession({sub:neon.id,userId:resolvedUser.id});
   return json(res,200,{
     token:session,
-    user:{id:appUser.id,full_name:appUser.full_name,email:appUser.email,role:appUser.role}
+    user:{id:resolvedUser.id,full_name:resolvedUser.full_name,email:resolvedUser.email,role:resolvedUser.role}
   });
 }
 
