@@ -15,6 +15,7 @@ export type UserRow = {
   id: string;
   full_name: string;
   email: string | null;
+  phone?: string | null;
   role: string;
   center_id: string | null;
   is_active: boolean;
