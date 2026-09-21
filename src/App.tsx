@@ -322,7 +322,7 @@ export default function App() {
   }
 
   async function loadTeacherToday(date=dailyDate){
-    try{setError('');const data=await apiGet<any>(`/api/teacher/today?date=${date}`);setTeacherToday(data)}
+    try{setError('');const data=await apiGet<any>(`/api/teacher-today?date=${date}`);setTeacherToday(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل لوحة اليوم')}
   }
   async function loadCircleRegister(month=recordMonth){
@@ -334,7 +334,7 @@ export default function App() {
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
   }
   async function openStudentProfile(id:string){
-    try{setError('');const data=await apiGet<any>(`/api/student-profile/${id}?month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
+    try{setError('');const data=await apiGet<any>(`/api/student-profile?id=${id}?month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
   }
   async function approveDay(circleId:string){

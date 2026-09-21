@@ -1,6 +1,6 @@
-import { query } from '../_lib/db.js';
-import { getActor,isStaff,validDate } from '../_lib/actor.js';
-import { handleError,json } from '../_lib/http.js';
+import { query } from './_lib/db.js';
+import { getActor,isStaff,validDate } from './_lib/actor.js';
+import { handleError,json } from './_lib/http.js';
 
 export default async function handler(req:any,res:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
