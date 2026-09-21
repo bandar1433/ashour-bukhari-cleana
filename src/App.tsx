@@ -11,7 +11,7 @@ import {
   UserRow,
 } from './lib/api';
 
-type Tab = 'students' | 'circles' | 'users';
+type Tab = 'overview' | 'students' | 'circles' | 'users';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -30,7 +30,7 @@ export default function App() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [circles, setCircles] = useState<CircleRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>('students');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
@@ -163,18 +163,26 @@ export default function App() {
 
           {error && <div className="alert">{error}</div>}
 
+          <section className="welcome-strip"><div><span>لوحة مدير النظام</span><h2>نظرة عامة على المنصة</h2><p>متابعة الحلقات والطلاب والمعلمين والسجلات التعليمية من مكان واحد.</p></div><div className="quick-badge">● النظام يعمل</div></section>
           <section className="cards-grid">
             <StatCard label="الطلاب" value={summary?.students} />
             <StatCard label="المعلمون" value={summary?.teachers} />
             <StatCard label="الحلقات" value={summary?.circles} />
             <StatCard label="المراكز" value={summary?.centers} />
-            <StatCard label="المستخدمون" value={summary?.users} />
-            <StatCard label="الحسابات النشطة" value={summary?.activeUsers} />
+            <StatCard label="الحضور المسجل" value={summary?.attendance} />
+            <StatCard label="سجلات التسميع" value={summary?.memorization} />
+          </section>
+          <section className="module-grid">
+            <ModuleCard icon="◉" title="الحضور والانصراف" value={summary?.attendance} note="سجلات الحضور المسجلة" />
+            <ModuleCard icon="۞" title="التسميع والمراجعة" value={summary?.memorization} note="سجلات القرآن الكريم" />
+            <ModuleCard icon="▤" title="الخطط الأسبوعية" value={summary?.plans} note="خطط الطلاب التعليمية" />
+            <ModuleCard icon="◆" title="الأخبار والمحتوى" value={summary?.news} note="المحتوى المنشور بالموقع" />
           </section>
 
           <section className="panel">
             <div className="panel-header">
               <div className="tabs">
+                <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>الرئيسية</button>
                 <button className={activeTab === 'students' ? 'active' : ''} onClick={() => setActiveTab('students')}>الطلاب</button>
                 <button className={activeTab === 'circles' ? 'active' : ''} onClick={() => setActiveTab('circles')}>الحلقات</button>
                 <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>المستخدمون</button>
@@ -188,6 +196,7 @@ export default function App() {
             </div>
 
             {loadState === 'loading' && <div className="empty">جارٍ تحميل البيانات...</div>}
+            {loadState !== 'loading' && activeTab === 'overview' && <div className="overview-copy"><h3>إدارة المنصة</h3><p>اختر من التبويبات الطلاب أو الحلقات أو المستخدمين. وستضاف هنا تباعًا شاشات الحضور والتسميع والخطط والمحتوى مع المحافظة على البيانات الحالية.</p></div>}
             {loadState !== 'loading' && activeTab === 'students' && <StudentsTable rows={filteredStudents} />}
             {loadState !== 'loading' && activeTab === 'circles' && <CirclesTable rows={filteredCircles} />}
             {loadState !== 'loading' && activeTab === 'users' && <UsersTable rows={filteredUsers} />}
@@ -197,6 +206,8 @@ export default function App() {
     </div>
   );
 }
+
+function ModuleCard({ icon, title, value, note }: { icon:string; title:string; value?:number; note:string }) { return <div className="module-card"><div className="module-icon">{icon}</div><div><strong>{title}</strong><p>{note}</p></div><b>{typeof value==='number'?value.toLocaleString('ar-SA'):'—'}</b></div>; }
 
 function StatCard({ label, value }: { label: string; value?: number }) {
   return (
