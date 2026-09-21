@@ -11,7 +11,7 @@ import {
   UserRow,
 } from './lib/api';
 
-type Tab = 'overview' | 'students' | 'circles' | 'users';
+type Tab = 'overview' | 'students' | 'circles' | 'users' | 'attendance' | 'memorization' | 'plans' | 'news';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -30,6 +30,10 @@ export default function App() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [circles, setCircles] = useState<CircleRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [attendance, setAttendance] = useState<any[]>([]);
+  const [memorization, setMemorization] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [news, setNews] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
@@ -46,17 +50,18 @@ export default function App() {
     setError('');
 
     try {
-      const [summaryData, studentsData, circlesData, usersData] = await Promise.all([
+      const [summaryData, studentsData, circlesData, usersData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
         apiGet<Summary>('/api/summary'),
         apiGet<{ items: StudentRow[] }>('/api/students'),
         apiGet<{ items: CircleRow[] }>('/api/circles'),
         apiGet<{ items: UserRow[] }>('/api/users'),
+        apiGet<{ items: any[] }>('/api/attendance'), apiGet<{ items:any[] }>('/api/memorization'), apiGet<{ items:any[] }>('/api/plans'), apiGet<{ items:any[] }>('/api/news'),
       ]);
 
       setSummary(summaryData);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
-      setUsers(usersData.items || []);
+      setUsers(usersData.items || []); setAttendance(attendanceData.items||[]); setMemorization(memorizationData.items||[]); setPlans(plansData.items||[]); setNews(newsData.items||[]);
       setLoadState('ready');
     } catch (err) {
       setLoadState('error');
@@ -186,6 +191,10 @@ export default function App() {
                 <button className={activeTab === 'students' ? 'active' : ''} onClick={() => setActiveTab('students')}>الطلاب</button>
                 <button className={activeTab === 'circles' ? 'active' : ''} onClick={() => setActiveTab('circles')}>الحلقات</button>
                 <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setActiveTab('users')}>المستخدمون</button>
+                <button className={activeTab === 'attendance' ? 'active' : ''} onClick={() => setActiveTab('attendance')}>الحضور</button>
+                <button className={activeTab === 'memorization' ? 'active' : ''} onClick={() => setActiveTab('memorization')}>التسميع</button>
+                <button className={activeTab === 'plans' ? 'active' : ''} onClick={() => setActiveTab('plans')}>الخطط</button>
+                <button className={activeTab === 'news' ? 'active' : ''} onClick={() => setActiveTab('news')}>الأخبار</button>
               </div>
               <input
                 className="search"
@@ -200,12 +209,18 @@ export default function App() {
             {loadState !== 'loading' && activeTab === 'students' && <StudentsTable rows={filteredStudents} />}
             {loadState !== 'loading' && activeTab === 'circles' && <CirclesTable rows={filteredCircles} />}
             {loadState !== 'loading' && activeTab === 'users' && <UsersTable rows={filteredUsers} />}
+            {loadState !== 'loading' && activeTab === 'attendance' && <GenericTable rows={attendance} columns={[['full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]} />}
+            {loadState !== 'loading' && activeTab === 'memorization' && <GenericTable rows={memorization} columns={[['full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة'],['approved','معتمد']]} />}
+            {loadState !== 'loading' && activeTab === 'plans' && <GenericTable rows={plans} columns={[['full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]} />}
+            {loadState !== 'loading' && activeTab === 'news' && <GenericTable rows={news} columns={[['title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]} />}
           </section>
         </main>
       )}
     </div>
   );
 }
+
+function GenericTable({rows,columns}:{rows:any[];columns:[string,string][]}){if(!rows.length)return <div className="empty">لا توجد بيانات مسجلة حتى الآن.</div>;return <div className="table-wrap"><table><thead><tr>{columns.map(([k,l])=><th key={k}>{l}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([k])=><td key={k}>{typeof r[k]==='boolean'?(r[k]?'نعم':'لا'):(r[k]??'—')}</td>)}</tr>)}</tbody></table></div>}
 
 function ModuleCard({ icon, title, value, note }: { icon:string; title:string; value?:number; note:string }) { return <div className="module-card"><div className="module-icon">{icon}</div><div><strong>{title}</strong><p>{note}</p></div><b>{typeof value==='number'?value.toLocaleString('ar-SA'):'—'}</b></div>; }
 
