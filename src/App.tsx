@@ -126,23 +126,20 @@ export default function App() {
     <div className="app-shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">نسخة نظيفة مستقرة</p>
-          <h1>منصة حلقات عاشور بخاري</h1>
-          <p className="hero-subtitle">لوحة تشغيل أولية متصلة بقاعدة Neon الحالية.</p>
+          <div className="brand-row"><div className="brand-mark">ع</div><div><p className="eyebrow">حلقات القرآن الكريم</p><h1>حلقات عاشور بخاري</h1><p className="hero-subtitle">منصة متكاملة لإدارة الحلقات والطلاب والمتابعة التعليمية.</p></div></div>
         </div>
         <div className="status-card">
           <span className={status?.database === 'connected' ? 'dot good' : 'dot bad'} />
           <div>
             <strong>{status?.database === 'connected' ? 'قاعدة البيانات متصلة' : 'بانتظار الاتصال'}</strong>
-            <small>{status ? JSON.stringify(status) : 'جارٍ الفحص...'}</small>
+            <small>{status?.database === 'connected' ? 'النظام متصل وجاهز للعمل' : 'جارٍ فحص الاتصال...'}</small>
           </div>
         </div>
       </header>
 
       {!code ? (
         <main className="login-card">
-          <h2>دخول لوحة الإدارة</h2>
-          <p>أدخل رمز الدخول الذي وضعته في متغير Vercel باسم ADMIN_ACCESS_CODE.</p>
+          <div className="login-icon">⌁</div><h2>دخول لوحة الإدارة</h2><p>أدخل رمز الدخول للوصول إلى لوحة إدارة الحلقات.</p>
           <form onSubmit={handleLogin}>
             <input
               type="password"
