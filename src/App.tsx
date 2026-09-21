@@ -9,6 +9,7 @@ import {
   clearSessionToken,
   getAccessCode,
   getSessionToken,
+  getSessionRole,
   getStatus,
   setAccessCode,
   setSessionToken,
@@ -115,6 +116,9 @@ export default function App() {
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
+  const currentRole=getAccessCode()?'system_admin':getSessionRole();
+  const isRoot=currentRole==='system_admin';
+  const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
 
   useEffect(() => {
     getStatus()
@@ -128,17 +132,23 @@ export default function App() {
     setError('');
 
     try {
+      const role=getAccessCode()?'system_admin':getSessionRole();
+      const root=role==='system_admin';
+      const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
       const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
-        apiGet<Summary>('/api/summary'),
-        apiGet<{ items: CenterRow[] }>('/api/centers'),
-        apiGet<{ items: StudentRow[] }>('/api/students'),
-        apiGet<{ items: CircleRow[] }>('/api/circles'),
-        apiGet<{ items: UserRow[]; requests?: any[] }>('/api/users'),
-        apiGet<any>('/api/roles'),
-        apiGet<{ items: any[] }>('/api/attendance'), apiGet<{ items:any[] }>('/api/memorization'), apiGet<{ items:any[] }>('/api/plans'), apiGet<{ items:any[] }>('/api/news'),
+        staff?apiGet<Summary>('/api/summary'):Promise.resolve(null),
+        staff?apiGet<{ items: CenterRow[] }>('/api/centers'):Promise.resolve({items:[]}),
+        staff?apiGet<{ items: StudentRow[] }>('/api/students'):Promise.resolve({items:[]}),
+        staff?apiGet<{ items: CircleRow[] }>('/api/circles'):Promise.resolve({items:[]}),
+        (root||role==='center_manager')?apiGet<{ items: UserRow[]; requests?: any[] }>('/api/users'):Promise.resolve({items:[],requests:[]}),
+        root?apiGet<any>('/api/roles'):Promise.resolve({roles:[],permissions:[]}),
+        staff?apiGet<{ items: any[] }>('/api/attendance'):Promise.resolve({items:[]}),
+        staff?apiGet<{ items:any[] }>('/api/memorization'):Promise.resolve({items:[]}),
+        staff?apiGet<{ items:any[] }>('/api/plans'):Promise.resolve({items:[]}),
+        root?apiGet<{ items:any[] }>('/api/news'):Promise.resolve({items:[]}),
       ]);
 
-      setSummary(summaryData);
+      setSummary(summaryData as Summary | null);
       setCenters(centersData.items || []);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
@@ -193,9 +203,23 @@ export default function App() {
   async function handleGoogleLogin(){
     setAuthBusy(true); setError('');
     try{
-      const result:any=await authClient.signIn.social({provider:'google',callbackURL:window.location.origin});
-      if(result?.error) throw new Error(result.error.message||'تعذر تسجيل الدخول عبر Google');
-    }catch(err){setError(err instanceof Error?err.message:'تعذر تسجيل الدخول عبر Google');setAuthBusy(false);}
+      const result:any=await authClient.signIn.social({
+        provider:'google',
+        callbackURL:'/',
+        errorCallbackURL:'/?auth_error=google',
+        disableRedirect:true
+      });
+      if(result?.error){
+        const detail=result.error.message||result.error.code||result.error.statusText||'تعذر تسجيل الدخول عبر Google';
+        throw new Error(detail);
+      }
+      const url=result?.data?.url||result?.url;
+      if(!url) throw new Error('تعذر بدء تسجيل الدخول عبر Google.');
+      window.location.assign(url);
+    }catch(err){
+      setError(err instanceof Error?err.message:'تعذر تسجيل الدخول عبر Google');
+      setAuthBusy(false);
+    }
   }
 
   async function handleAccountLogin(event:React.FormEvent){
@@ -414,10 +438,10 @@ export default function App() {
           <button className={activeTab==='memorization'?'selected':''} onClick={()=>setActiveTab('memorization')}><span className="navDot">◌</span>التسميع والمراجعة</button>
           <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}><span className="navDot">▤</span>الخطط الأسبوعية</button>
           <div className="sidebarSectionLabel">النظام والمحتوى</div>
-          <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>
-          <button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
-          <button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button>
-          <div className="sidebarAccount"><span className="onlineDot"></span><div><b>مدير النظام</b><small>جلسة إدارية نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
+          {isRoot&&<button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>}
+          {isRoot&&<button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>}
+          {isRoot&&<button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button>}
+          <div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>جلسة دخول نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
           <div className="adminTopbar">
