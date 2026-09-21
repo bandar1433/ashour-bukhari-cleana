@@ -1,0 +1,2 @@
+import { query } from './_lib/db.js'; import { handleError,json,requireAccess } from './_lib/http.js';
+export default async function handler(req:any,res:any){if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});if(!requireAccess(req,res))return;try{const rows=await query(`select id,kind,title,body,image_url,video_url,event_date,status,published_at from news_events order by coalesce(event_date,created_at) desc limit 200`);return json(res,200,{items:rows})}catch(e){return handleError(res,e)}}
