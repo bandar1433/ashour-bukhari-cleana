@@ -38,6 +38,19 @@ const roleLabel: Record<string, string> = {
   guardian: 'ولي أمر',
 };
 
+const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> = {
+  overview: { title: 'نظرة عامة', subtitle: 'ملخص مباشر لأهم مؤشرات المنصة وتشغيل الحلقات.', short: 'الرئيسية' },
+  centers: { title: 'المراكز والفروع', subtitle: 'إدارة المراكز وربطها بالمديرين والحلقات.', short: 'المراكز' },
+  students: { title: 'الطلاب', subtitle: 'إدارة سجلات الطلاب وإسنادهم إلى الحلقات ومتابعة حالتهم.', short: 'الطلاب' },
+  circles: { title: 'الحلقات القرآنية', subtitle: 'تنظيم الحلقات والمعلمين والمسارات التعليمية.', short: 'الحلقات' },
+  users: { title: 'الحسابات والدخول', subtitle: 'إدارة المستخدمين واعتماد طلبات ربط الدخول.', short: 'الحسابات' },
+  roles: { title: 'الأدوار والصلاحيات', subtitle: 'ضبط الصلاحيات الوظيفية مع بقاء مدير النظام بصلاحية الجذر.', short: 'الصلاحيات' },
+  attendance: { title: 'الحضور', subtitle: 'تسجيل الحضور والتأخر والاستئذان والغياب.', short: 'الحضور' },
+  memorization: { title: 'التسميع والمراجعة', subtitle: 'توثيق الحفظ الجديد والمراجعة والتقييم.', short: 'القرآن' },
+  plans: { title: 'الخطط الأسبوعية', subtitle: 'متابعة أهداف الطلاب وخطط الحفظ والمراجعة.', short: 'الخطط' },
+  news: { title: 'الأخبار والفعاليات', subtitle: 'إدارة محتوى الموقع العام والأخبار والإنجازات.', short: 'المحتوى' },
+};
+
 export default function App() {
   const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
   const [enteredCode, setEnteredCode] = useState(getAccessCode());
@@ -254,65 +267,86 @@ export default function App() {
         {publicView==='الحلقات القرآنية'&&<section className="section"><div className="innerHero"><span className="sectionLabel">الحلقات القرآنية</span><h1>مسارات تعليمية تناسب مراحل الطلاب</h1><p>من التهجي والتلقين إلى الحفظ والإتقان والقراءات.</p></div><div className="roleGrid">{['مسار التهجي والتلقين','مسار حفظ القرآن للأشبال','مسار حفظ القرآن للشباب','مسار حفظ القرآن والمتون','مسار القراءات'].map((x,i)=><article className="roleCard" key={x}><i>◈</i><b>{x}</b><small>{i===0?'تأسيس القراءة والتلقين الصحيح':'حفظ ومراجعة وتسميع وفق خطة متدرجة'}</small></article>)}</div><div className="sectionHead reportSubhead"><div><span>الحلقات المسجلة</span><h2>الحلقات النشطة في المنصة</h2></div></div><div className="roleGrid">{publicData.circles?.map((x:any)=><article className="roleCard" key={x.id}><b>{x.name}</b><small>{x.center_name||'—'}</small><em>{x.teacher_name||'لم يحدد المعلم'}</em></article>)}</div></section>}
         {publicView==='الأخبار والفعاليات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">أخبار الحلقات</span><h1>برامج وفعاليات تصنع الأثر</h1><p>نماذج من البرامج المصاحبة والفعاليات الموثقة في تقرير حلقات عاشور بخاري لعام 1447هـ.</p></div><div className="reportCards publicCards">{report1447.news.map(([t,b])=><article key={t}><div><span className="sectionLabel">خبر وفعالية</span><h3>{t}</h3><p>{b}</p></div></article>)}</div>{publicData.news?.length>0&&<><div className="sectionHead reportSubhead"><div><span>آخر المستجدات</span><h2>أخبار منشورة من إدارة المنصة</h2></div></div><div className="reportCards publicCards">{publicData.news.map((n:any)=><article key={n.id}><div><span className="sectionLabel">{n.kind==='achievement'?'إنجاز':n.kind==='event'?'فعالية':'خبر'}</span><h3>{n.title}</h3><p>{n.body}</p></div></article>)}</div></>}</section>}
         {publicView==='الإنجازات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">إنجازات 1447هـ</span><h1>طلاب الحلقات في ميادين التميز</h1><p>نماذج من الإنجازات العالمية والدولية والمحلية الواردة في التقرير السنوي.</p></div><div className="reportCards achievements publicCards">{report1447.achievements.map(([t,b])=><article key={t}><div><span className="sectionLabel">إنجاز</span><h3>{t}</h3><p>{b}</p></div></article>)}</div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='المعلمون'&&<section className="simplePage richSimplePage"><span className="sectionLabel">المعلمون</span><h1>معلمون يصنعون أثرًا قرآنيًا</h1><p>يقوم المعلم بإدارة الحلقة ومتابعة الحفظ والمراجعة والتسميع والحضور ضمن مسار تعليمي واضح.</p></section>}{publicView==='الطلاب'&&<section className="simplePage richSimplePage"><span className="sectionLabel">الطلاب</span><h1>رحلة الطالب مع كتاب الله</h1><p>تبدأ بالتهيئة وتحديد المستوى، ثم التعلم والتثبيت والقياس والمتابعة المستمرة.</p></section>}{publicView==='الوسائط'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">الوسائط</span><h1>من ذاكرة الحلقات</h1><p>سيعرض هذا القسم الصور الموثقة للمسارات والبرامج والإنجازات بعد استكمال نقل ملفات الوسائط الأصلية.</p></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='تواصل معنا'&&<section className="simplePage richSimplePage"><span className="sectionLabel">تواصل معنا</span><h1>حلقات عاشور بخاري</h1><p>للتواصل والاستفسارات المتعلقة بالحلقات والبرامج، يتم تحديث بيانات التواصل من إدارة المنصة.</p></section>}
-        {authOpen&&<div className="authOverlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setAuthOpen(false)}}>
-          <section className="authDialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-            <button className="authClose" type="button" aria-label="إغلاق" onClick={()=>{setAuthOpen(false);setError('')}}>×</button>
+        {authOpen&&<div className="authOverlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!authBusy)setAuthOpen(false)}}>
+          <section className="authDialog authDialogPro" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+            <button className="authClose" type="button" aria-label="إغلاق نافذة الدخول" onClick={()=>{if(!authBusy){setAuthOpen(false);setError('')}}}>×</button>
             <div className="authBrandPanel">
-              <img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" />
-              <span>حلقات عاشور بخاري</span>
-              <h2>بوابة الدخول الموحدة</h2>
-              <p>وصول آمن إلى المساحة المخصصة لكل مستخدم وفق حسابه وصلاحياته المعتمدة.</p>
-              <div className="authBrandPoints"><span>حساب موحد</span><span>صلاحيات معتمدة</span><span>جلسة دخول آمنة</span></div>
+              <div className="authBrandMark"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" /></div>
+              <div>
+                <span className="authKicker">منصة الإدارة التعليمية</span>
+                <h2>حلقات عاشور بخاري</h2>
+                <p>منصة موحدة لإدارة الحلقات ومتابعة الحضور والحفظ والمراجعة والتقارير.</p>
+              </div>
+              <div className="authTrust">
+                <span><b>01</b> حساب واحد</span>
+                <span><b>02</b> صلاحيات حسب الدور</span>
+                <span><b>03</b> بيانات محفوظة وآمنة</span>
+              </div>
             </div>
             <div className="authDialogBody">
-              <span className="authEyebrow">منصة إدارة الحلقات القرآنية</span>
-              <h2 id="auth-title">{authIntent==='signin'?'مرحبًا بعودتك':'إنشاء حساب دخول'}</h2>
-              <p className="authLead">{authIntent==='signin'?'أدخل بيانات حسابك للوصول إلى المنصة.':'أنشئ حساب الدخول، ثم تعتمد الإدارة ربطه بالحساب والدور المناسب.'}</p>
-              <div className="authSwitch" role="tablist">
-                <button type="button" className={authIntent==='signin'?'active':''} onClick={()=>{setAuthIntent('signin');setError('')}}>تسجيل الدخول</button>
-                <button type="button" className={authIntent==='signup'?'active':''} onClick={()=>{setAuthIntent('signup');setError('')}}>حساب جديد</button>
+              <div className="authHeading">
+                <span className="authEyebrow">{authIntent==='signin'?'تسجيل الدخول':'تفعيل حساب الدخول'}</span>
+                <h2 id="auth-title">{authIntent==='signin'?'مرحبًا بعودتك':'تفعيل الدخول لأول مرة'}</h2>
+                <p className="authLead">{authIntent==='signin'?'استخدم البريد الإلكتروني وكلمة المرور المعتمدة لحسابك.':'أنشئ هوية الدخول، ثم تعتمد الإدارة ربطها بحسابك ودورك داخل المنصة.'}</p>
               </div>
-              <form className="authForm" onSubmit={handleAccountLogin}>
-                {authIntent==='signup'&&<label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} autoComplete="name" placeholder="الاسم كما سيظهر في المنصة" /></label>}
+              <form className="authForm authFormPro" onSubmit={handleAccountLogin}>
+                {authIntent==='signup'&&<label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} autoComplete="name" placeholder="الاسم الكامل" /></label>}
                 <label className="field"><span>البريد الإلكتروني</span><input type="email" required value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" placeholder="name@example.com" /></label>
-                <label className="field"><span>كلمة المرور</span><input type="password" required minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete={authIntent==='signup'?'new-password':'current-password'} placeholder="8 أحرف على الأقل" /></label>
-                {error&&<div className="authNotice">{error}</div>}
-                <button className="primary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':authIntent==='signup'?'إنشاء الحساب':'دخول إلى المنصة'}</button>
+                <label className="field"><span>كلمة المرور</span><input type="password" required minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete={authIntent==='signup'?'new-password':'current-password'} placeholder="••••••••" /></label>
+                {error&&<div className="authNotice" role="alert">{error}</div>}
+                <button className="primary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':authIntent==='signup'?'إرسال طلب التفعيل':'دخول إلى المنصة'}</button>
               </form>
-              <div className="authMeta">{authIntent==='signup'?'الحساب الجديد لا يكتسب أي صلاحية قبل اعتماد الإدارة وربطه بالحساب الصحيح.':'تظهر لك الوظائف المسموح بها بحسب حسابك بعد اعتماده.'}</div>
-              <details className="legacyAccess">
-                <summary>دخول إداري مؤقت</summary>
-                <p>خاص بمدير النظام خلال مرحلة نقل الحسابات القديمة.</p>
+              <div className="authAlternate">
+                {authIntent==='signin'?<>
+                  <span>هذه أول مرة تستخدم حسابك؟</span>
+                  <button type="button" onClick={()=>{setAuthIntent('signup');setError('')}}>تفعيل حساب الدخول</button>
+                </>:<>
+                  <span>لديك حساب مفعّل بالفعل؟</span>
+                  <button type="button" onClick={()=>{setAuthIntent('signin');setError('')}}>العودة لتسجيل الدخول</button>
+                </>}
+              </div>
+              <div className="authSecurityNote">لا تُمنح أي صلاحية لحساب جديد قبل اعتماد الإدارة وربطه بالسجل الصحيح.</div>
+              {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro">
+                <div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت خلال مرحلة نقل الحسابات.</span></div>
                 <form className="authForm legacyForm" onSubmit={handleLogin}>
-                  <label className="field"><span>رمز مدير النظام</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز الإدارة" /></label>
-                  <button className="secondary" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':'دخول إداري'}</button>
+                  <label className="field"><span>رمز الإدارة</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز مدير النظام" /></label>
+                  <button className="secondary" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':'دخول الإدارة'}</button>
                 </form>
-              </details>
+              </div>}
             </div>
           </section>
         </div>}
       </> :
-      <div className="workspace">
-        <aside>
-          <div className="user"><span><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></span><div><b>لوحة الإدارة</b><small>حلقات عاشور بخاري</small></div></div>
-          <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}>نظرة عامة</button>
-          <button className={activeTab==='centers'?'selected':''} onClick={()=>setActiveTab('centers')}>المراكز والفروع</button>
-          <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}>الطلاب</button>
-          <button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}>الحلقات</button>
-          <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}>المستخدمون</button>
-          <button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}>الأدوار والصلاحيات</button>
-          <button className={activeTab==='attendance'?'selected':''} onClick={()=>setActiveTab('attendance')}>الحضور</button>
-          <button className={activeTab==='memorization'?'selected':''} onClick={()=>setActiveTab('memorization')}>التسميع والمراجعة</button>
-          <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}>الخطط الأسبوعية</button>
-          <button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}>الأخبار والفعاليات</button>
-          <button className="exit" onClick={handleLogout}>تسجيل الخروج</button>
+      <div className="workspace workspacePro">
+        <aside className="adminSidebar">
+          <div className="sidebarBrand">
+            <div className="sidebarLogo"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></div>
+            <div><b>حلقات عاشور بخاري</b><small>منصة الإدارة التعليمية</small></div>
+          </div>
+          <div className="sidebarSectionLabel">الإدارة</div>
+          <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}><span className="navDot">⌂</span>نظرة عامة</button>
+          <button className={activeTab==='centers'?'selected':''} onClick={()=>setActiveTab('centers')}><span className="navDot">◇</span>المراكز والفروع</button>
+          <button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}><span className="navDot">◫</span>الحلقات القرآنية</button>
+          <div className="sidebarSectionLabel">التعليم والمتابعة</div>
+          <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}><span className="navDot">◉</span>الطلاب</button>
+          <button className={activeTab==='attendance'?'selected':''} onClick={()=>setActiveTab('attendance')}><span className="navDot">✓</span>الحضور</button>
+          <button className={activeTab==='memorization'?'selected':''} onClick={()=>setActiveTab('memorization')}><span className="navDot">◌</span>التسميع والمراجعة</button>
+          <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}><span className="navDot">▤</span>الخطط الأسبوعية</button>
+          <div className="sidebarSectionLabel">النظام والمحتوى</div>
+          <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>
+          <button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
+          <button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button>
+          <div className="sidebarAccount"><span className="onlineDot"></span><div><b>مدير النظام</b><small>جلسة إدارية نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
-          <div className="adminTopbar"><div className="crumb"><div><span>لوحة التحكم</span><h1>{activeTab==='overview'?'نظرة عامة':'إدارة المنصة'}</h1></div></div><div className="adminTopActions"><button className="secondary" onClick={loadDashboard}>تحديث البيانات</button><button className="adminLogout" onClick={handleLogout}>تسجيل الخروج</button></div></div>
+          <div className="adminTopbar">
+            <div className="crumb"><span className="crumbPath">لوحة التحكم / {tabMeta[activeTab].short}</span><h1>{tabMeta[activeTab].title}</h1><p>{tabMeta[activeTab].subtitle}</p></div>
+            <div className="adminTopActions"><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
+          </div>
           {error&&<div className="notice">{error}</div>}
-          <div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b></article></div>
-          <div className="panel">
-            <div className="panelHead"><h2>{activeTab==='overview'?'مؤشرات التشغيل':'السجلات'}</h2>{activeTab!=='overview'&&activeTab!=='roles'&&<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث..." />}</div>
+          {activeTab==='overview'&&<div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b><small>مركز وفرع</small></article></div>}
+          <div className="panel mainPanel">
+            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{activeTab!=='overview'&&activeTab!=='roles'&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
             {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
