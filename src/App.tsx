@@ -158,13 +158,12 @@ export default function App() {
           {error && <div className="alert">{error}</div>}
         </main>
       ) : (
-        <main>
-          <div className="toolbar">
+        <main className="dashboard-shell">
+          <div className="dashboard-top"><div><span className="section-kicker">الإدارة الذكية للحلقات</span><h2>لوحة التحكم</h2></div><div className="toolbar">
             <button onClick={loadDashboard} disabled={loadState === 'loading'}>
               {loadState === 'loading' ? 'جارٍ التحديث...' : 'تحديث البيانات'}
             </button>
-            <button className="secondary" onClick={handleLogout}>خروج</button>
-          </div>
+            <button className="secondary" onClick={handleLogout}>خروج</button></div></div>
 
           {error && <div className="alert">{error}</div>}
 
@@ -184,8 +183,8 @@ export default function App() {
             <ModuleCard icon="◆" title="الأخبار والمحتوى" value={summary?.news} note="المحتوى المنشور بالموقع" />
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
+          <section className="panel data-panel">
+            <div className="panel-header"><div className="panel-title"><span>سجل الإدارة</span><strong>البيانات والتشغيل</strong></div>
               <div className="tabs">
                 <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setActiveTab('overview')}>الرئيسية</button>
                 <button className={activeTab === 'students' ? 'active' : ''} onClick={() => setActiveTab('students')}>الطلاب</button>
