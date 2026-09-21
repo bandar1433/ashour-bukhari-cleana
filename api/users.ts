@@ -19,10 +19,12 @@ export default async function handler(req: any, res: any) {
       order by
         case role
           when 'system_admin' then 1
-          when 'center_admin' then 2
-          when 'teacher' then 3
-          when 'student' then 4
-          else 5
+          when 'center_manager' then 2
+          when 'supervisor' then 3
+          when 'teacher' then 4
+          when 'student' then 5
+          when 'guardian' then 6
+          else 7
         end,
         full_name nulls last,
         email nulls last
