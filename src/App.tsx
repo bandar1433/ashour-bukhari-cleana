@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   apiGet,
+  apiPost,
   CircleRow,
   clearAccessCode,
   getAccessCode,
@@ -107,6 +108,20 @@ export default function App() {
     setLoadState('idle');
   }
 
+  async function submitForm(path:string,event:React.FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    setError('');
+    const form=event.currentTarget;
+    try{
+      const body=Object.fromEntries(new FormData(form).entries());
+      await apiPost(path,body);
+      form.reset();
+      await loadDashboard();
+    }catch(err){
+      setError(err instanceof Error?err.message:'تعذر حفظ البيانات');
+    }
+  }
+
   const filteredStudents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return students;
@@ -183,13 +198,13 @@ export default function App() {
             <div className="panelHead"><h2>{activeTab==='overview'?'مؤشرات التشغيل':'السجلات'}</h2>{activeTab!=='overview'&&<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث..." />}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
             {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
-            {loadState!=='loading'&&activeTab==='students'&&<StudentsTable rows={filteredStudents}/>}
+            {loadState!=='loading'&&activeTab==='students'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/students',e)}><label className="field"><span>اسم الطالب</span><input name="full_name" required /></label><label className="field"><span>الحلقة</span><select name="circle_id" defaultValue=""><option value="">بدون حلقة</option>{circles.map((x:any)=><option key={x.id} value={x.id}>{x.name} — {x.center_name||''}</option>)}</select></label><label className="field"><span>الصف/المرحلة</span><input name="grade_level" /></label><button className="primary" type="submit">إضافة الطالب</button></form><StudentsTable rows={filteredStudents}/></>}
             {loadState!=='loading'&&activeTab==='circles'&&<CirclesTable rows={filteredCircles}/>}
             {loadState!=='loading'&&activeTab==='users'&&<UsersTable rows={filteredUsers}/>}
-            {loadState!=='loading'&&activeTab==='attendance'&&<GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/>}
-            {loadState!=='loading'&&activeTab==='memorization'&&<GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>}
+            {loadState!=='loading'&&activeTab==='attendance'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/attendance',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>التاريخ</span><input name="attendance_date" type="date" required defaultValue={new Date().toISOString().slice(0,10)} /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="present"><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue="0" /></label><button className="primary" type="submit">حفظ الحضور</button></form><GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/></>}
+            {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option><option value="recitation">تسميع</option></select></label><label className="field"><span>رقم السورة</span><input name="surah_no" type="number" min="1" max="114" required /></label><label className="field"><span>من آية</span><input name="from_ayah" type="number" min="1" required /></label><label className="field"><span>إلى آية</span><input name="to_ayah" type="number" min="1" required /></label><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ التسميع</button></form><GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/></>}
             {loadState!=='loading'&&activeTab==='plans'&&<GenericTable rows={plans} columns={[[ 'full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>}
-            {loadState!=='loading'&&activeTab==='news'&&<GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/>}
+            {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>
       </div>}
