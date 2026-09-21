@@ -134,7 +134,7 @@ export default function App() {
       }
       const neonSessionToken=authResult?.data?.token;
       if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول.');
-      const response=await fetch('/api/auth-session',{
+      const response=await fetch('/api/status',{
         method:'POST',
         headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}
       });
