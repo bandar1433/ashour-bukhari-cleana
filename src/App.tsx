@@ -22,6 +22,23 @@ type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' |
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
+const fallbackAnnouncements=[
+  {id:'madinah',kind:'event',title:'رحلة المدينة المنورة',body:'رحلة إيمانية علمية تربوية لطلاب الحلقات، جمعت الزيارة والتعلم والتربية.',published_at:'1447هـ',imageKey:'madinah'},
+  {id:'khatm',kind:'event',title:'مجالس ختم القرآن والقراءات',body:'مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.',published_at:'1447هـ',imageKey:'khatm'},
+  {id:'achievement-russia',kind:'achievement',title:'إنجاز عالمي لطلاب الحلقات',body:'نماذج مشرّفة من مشاركة طلاب الحلقات في المسابقات القرآنية الدولية.',published_at:'1447هـ',imageKey:'achievement-russia'},
+  {id:'iftar',kind:'event',title:'البرامج الإيمانية والاجتماعية',body:'برامج مصاحبة تعزز الأخوة والتواصل والقيم التربوية بين طلاب الحلقات.',published_at:'1447هـ',imageKey:'iftar'}
+];
+const homeMediaCards=[
+  ['talqeen','مسار التلقين والتهجي','تأسيس القراءة الصحيحة والتهيئة للحفظ.'],
+  ['hifz','مسار حفظ القرآن','حفظ متدرج مع متابعة ومراجعة منتظمة.'],
+  ['qiraat','مسار القراءات','تأهيل متقدم في القراءات والإتقان.'],
+  ['madinah-group','برامج ورحلات تربوية','تجارب إيمانية وتعليمية تصنع الأثر.']
+] as const;
+function SitePhoto({src,alt,className=''}:{src?:string;alt:string;className?:string}){
+  const [failed,setFailed]=useState(false);
+  if(!src||failed)return <div className={`sitePhotoPlaceholder ${className}`}><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /><span>{alt}</span></div>;
+  return <img className={className} src={src} alt={alt} loading="lazy" onError={()=>setFailed(true)} />;
+}
 const objectives = [
 ['01','إتقان التلاوة والحفظ','بناء قراءة صحيحة وحفظ متدرج يقوم على الإتقان والمراجعة المستمرة.'],['02','تعميق الصلة بالقرآن','تربية الطالب على ملازمة كتاب الله وتعظيمه وتحويل التعلم إلى أثر في السلوك.'],['03','متابعة فردية دقيقة','خطة واضحة لكل طالب مع رصد الحضور والإنجاز والتسميع بصورة منتظمة.'],['04','تمكين المعلم','توفير أدوات عملية تساعد المعلم على إدارة الحلقة وقياس تقدم طلابه بوضوح.'],['05','تعزيز شراكة الأسرة','إتاحة تقارير مختصرة وواضحة تعين الأسرة على متابعة مسيرة الطالب وتشجيعه.'],['06','التحفيز والاستدامة','بناء بيئة مشجعة بالنقاط والجوائز والإنجازات بما يحافظ على الدافعية والاستمرار.']];
 const values=[['الإخلاص','نستحضر شرف خدمة كتاب الله وابتغاء الأجر في التعليم والتعلم.'],['الإتقان','نعتمد الجودة والدقة في التلاوة والحفظ والمتابعة والتقويم.'],['الرحمة','نبني علاقة تعليمية راشدة تجمع الرفق والاحتواء والتوجيه.'],['القدوة','نجعل السلوك القرآني جزءاً أصيلاً من شخصية المعلم والمتعلم.'],['الانضباط','نلتزم بالمواعيد والخطط والمتابعة المنتظمة لتحقيق نتائج قابلة للقياس.'],['التعاون','نعزز الشراكة بين الإدارة والمعلم والطالب والأسرة لخدمة المسيرة القرآنية.']];
@@ -60,6 +77,8 @@ export default function App() {
   const [accountForm,setAccountForm]=useState({name:'',email:'',password:''});
   const [status, setStatus] = useState<any>(null);
   const [publicData,setPublicData]=useState<any>({stats:{},news:[],circles:[]});
+  const [siteImages,setSiteImages]=useState<Record<string,string>>({});
+  const [announcementIndex,setAnnouncementIndex]=useState(0);
   const [publicView,setPublicView]=useState('الرئيسية');
   const [summary, setSummary] = useState<Summary | null>(null);
   const [centers, setCenters] = useState<CenterRow[]>([]);
@@ -81,7 +100,7 @@ export default function App() {
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
-    fetch('/api/public').then(r=>r.json()).then(setPublicData).catch(()=>{});
+    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages(x?.images||{});}).catch(()=>{});
   }, []);
 
   async function loadDashboard() {
@@ -214,6 +233,15 @@ export default function App() {
     }
   }
 
+  const announcements=useMemo(()=>publicData.news?.length?publicData.news:fallbackAnnouncements,[publicData.news]);
+  const activeAnnouncement=announcements.length?announcements[announcementIndex%announcements.length]:fallbackAnnouncements[0];
+  useEffect(()=>{
+    if(publicView!=='الرئيسية'||announcements.length<2)return;
+    const timer=window.setInterval(()=>setAnnouncementIndex(i=>(i+1)%announcements.length),6000);
+    return()=>window.clearInterval(timer);
+  },[publicView,announcements.length]);
+  const announcementImage=(item:any)=>item?.image_url||siteImages[item?.imageKey||item?.id]||'';
+
   const filteredStudents = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return students;
@@ -258,15 +286,41 @@ export default function App() {
       </header>}
 
       {!code ? <>
-        {publicView==='الرئيسية'&&<><section className="hero">
-          <div className="heroText reveal reveal-right"><span className="eyebrow">حلقات القرآن الكريم</span><h1>حلقات عاشور بخاري</h1><h2>تعليمٌ متقن، وتربيةٌ قرآنية، ومتابعةٌ مستمرة</h2><p>منصة موحدة لتنظيم الحلقات ومتابعة الطلاب والمعلمين والحفظ والمراجعة والحضور.</p><div className="actions"><button className="primary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button><button className="secondary" type="button" onClick={()=>setPublicView('عن الحلقات')}>تعرف على الحلقات</button></div></div>
-          <div className="heroArt reveal reveal-left"><div className="heroLogoCard"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" /></div></div>
+        {publicView==='الرئيسية'&&<>
+        <section className="hero homeHero">
+          <div className="heroText reveal reveal-right">
+            <span className="eyebrow">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ</span>
+            <div className="heroKicker">قرآن • تربية • متابعة • أثر</div>
+            <h1>حلقات عاشور بخاري</h1>
+            <h2>تعليمٌ متقن، وتربيةٌ قرآنية، ومتابعةٌ مستمرة</h2>
+            <p>منظومة تعليمية متكاملة لخدمة حلقات القرآن الكريم، تجمع الطالب والمعلم والأسرة والإدارة في مسار واضح ومترابط.</p>
+            <div className="heroHighlights"><span>✓ متابعة يومية</span><span>✓ حفظ ومراجعة</span><span>✓ تقارير دقيقة</span></div>
+            <div className="actions"><button className="primary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button><button className="secondary" type="button" onClick={()=>setPublicView('عن الحلقات')}>تعرف على الحلقات</button></div>
+          </div>
+          <div className="heroVisual reveal reveal-left">
+            <div className="heroVisualMain"><SitePhoto src={siteImages['photo-1']||siteImages['hifz']||siteImages['madinah-group']} alt="من أنشطة حلقات عاشور بخاري" /></div>
+            <div className="heroVisualSide"><SitePhoto src={siteImages['talqeen']} alt="مسار التلقين والتهجي" /><SitePhoto src={siteImages['madinah']} alt="رحلة المدينة المنورة" /></div>
+            <div className="heroLogoFloat"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" /></div>
+          </div>
         </section>
-        <section className="stats"><article><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span></article><article><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span></article><article><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span></article><article><b>{publicData.stats?.centers ?? '—'}</b><span>مركز</span></article></section></>}
-        {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<><AboutSections/><section className="report1447"><div className="sectionHead"><div><span>حصاد 1447هـ</span><h2>حلقات تمتد من مكة إلى العالم</h2></div></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div><div className="sectionHead reportSubhead"><div><span>أخبار الحلقات</span><h2>برامج مصاحبة تصنع الأثر</h2></div></div><div className="reportCards">{report1447.news.map(([t,b])=><article key={t}><div><h3>{t}</h3><p>{b}</p></div></article>)}</div></section></>}
+        <section className="stats homeStats"><article><b>{publicData.stats?.students ?? '—'}</b><span>طالب</span><small>في المسارات القرآنية</small></article><article><b>{publicData.stats?.teachers ?? '—'}</b><span>معلم</span><small>تعليم ومتابعة</small></article><article><b>{publicData.stats?.circles ?? '—'}</b><span>حلقة</span><small>حلقة نشطة</small></article><article><b>{publicData.stats?.centers ?? '—'}</b><span>مركز</span><small>مركز وفرع</small></article></section>
+        <section className="announcementBoard reveal reveal-up">
+          <div className="announcementMedia"><SitePhoto src={announcementImage(activeAnnouncement)} alt={activeAnnouncement?.title||'إعلان الحلقات'} /></div>
+          <div className="announcementContent">
+            <div className="announcementTop"><div><span className="sectionLabel">لوحة الإعلانات</span><small>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'آخر المستجدات'}</small></div><b>{announcementIndex%announcements.length+1} / {announcements.length}</b></div>
+            <h2>{activeAnnouncement?.title}</h2><p>{activeAnnouncement?.body}</p>
+            <div className="announcementControls"><button type="button" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>السابق</button><div className="announcementDots">{announcements.map((_:any,i:number)=><button aria-label={`الإعلان ${i+1}`} key={i} className={i===announcementIndex%announcements.length?'active':''} onClick={()=>setAnnouncementIndex(i)} />)}</div><button type="button" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>التالي</button><button className="allNewsButton" type="button" onClick={()=>setPublicView('الأخبار والفعاليات')}>عرض الأخبار والفعاليات</button></div>
+          </div>
+        </section>
+        <section className="homeMediaSection">
+          <div className="sectionHead"><div><span>من بيئة الحلقات</span><h2>مسارات وبرامج بصورة أقرب</h2></div><button type="button" onClick={()=>setPublicView('الوسائط')}>عرض الوسائط</button></div>
+          <div className="homeMediaGrid">{homeMediaCards.map(([key,title,text])=><article key={key}><SitePhoto src={siteImages[key]} alt={title} /><div><h3>{title}</h3><p>{text}</p></div></article>)}</div>
+        </section>
+        </>}
+        {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<><AboutSections/><section className="report1447"><div className="sectionHead"><div><span>حصاد 1447هـ</span><h2>حلقات تمتد من مكة إلى العالم</h2></div></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div><div className="sectionHead reportSubhead"><div><span>أخبار الحلقات</span><h2>برامج مصاحبة تصنع الأثر</h2></div></div><div className="reportCards">{report1447.news.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['madinah','iftar','recreation','khatm','eid'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div></section></>}
         {publicView==='الحلقات القرآنية'&&<section className="section"><div className="innerHero"><span className="sectionLabel">الحلقات القرآنية</span><h1>مسارات تعليمية تناسب مراحل الطلاب</h1><p>من التهجي والتلقين إلى الحفظ والإتقان والقراءات.</p></div><div className="roleGrid">{['مسار التهجي والتلقين','مسار حفظ القرآن للأشبال','مسار حفظ القرآن للشباب','مسار حفظ القرآن والمتون','مسار القراءات'].map((x,i)=><article className="roleCard" key={x}><i>◈</i><b>{x}</b><small>{i===0?'تأسيس القراءة والتلقين الصحيح':'حفظ ومراجعة وتسميع وفق خطة متدرجة'}</small></article>)}</div><div className="sectionHead reportSubhead"><div><span>الحلقات المسجلة</span><h2>الحلقات النشطة في المنصة</h2></div></div><div className="roleGrid">{publicData.circles?.map((x:any)=><article className="roleCard" key={x.id}><b>{x.name}</b><small>{x.center_name||'—'}</small><em>{x.teacher_name||'لم يحدد المعلم'}</em></article>)}</div></section>}
-        {publicView==='الأخبار والفعاليات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">أخبار الحلقات</span><h1>برامج وفعاليات تصنع الأثر</h1><p>نماذج من البرامج المصاحبة والفعاليات الموثقة في تقرير حلقات عاشور بخاري لعام 1447هـ.</p></div><div className="reportCards publicCards">{report1447.news.map(([t,b])=><article key={t}><div><span className="sectionLabel">خبر وفعالية</span><h3>{t}</h3><p>{b}</p></div></article>)}</div>{publicData.news?.length>0&&<><div className="sectionHead reportSubhead"><div><span>آخر المستجدات</span><h2>أخبار منشورة من إدارة المنصة</h2></div></div><div className="reportCards publicCards">{publicData.news.map((n:any)=><article key={n.id}><div><span className="sectionLabel">{n.kind==='achievement'?'إنجاز':n.kind==='event'?'فعالية':'خبر'}</span><h3>{n.title}</h3><p>{n.body}</p></div></article>)}</div></>}</section>}
-        {publicView==='الإنجازات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">إنجازات 1447هـ</span><h1>طلاب الحلقات في ميادين التميز</h1><p>نماذج من الإنجازات العالمية والدولية والمحلية الواردة في التقرير السنوي.</p></div><div className="reportCards achievements publicCards">{report1447.achievements.map(([t,b])=><article key={t}><div><span className="sectionLabel">إنجاز</span><h3>{t}</h3><p>{b}</p></div></article>)}</div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='المعلمون'&&<section className="simplePage richSimplePage"><span className="sectionLabel">المعلمون</span><h1>معلمون يصنعون أثرًا قرآنيًا</h1><p>يقوم المعلم بإدارة الحلقة ومتابعة الحفظ والمراجعة والتسميع والحضور ضمن مسار تعليمي واضح.</p></section>}{publicView==='الطلاب'&&<section className="simplePage richSimplePage"><span className="sectionLabel">الطلاب</span><h1>رحلة الطالب مع كتاب الله</h1><p>تبدأ بالتهيئة وتحديد المستوى، ثم التعلم والتثبيت والقياس والمتابعة المستمرة.</p></section>}{publicView==='الوسائط'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">الوسائط</span><h1>من ذاكرة الحلقات</h1><p>سيعرض هذا القسم الصور الموثقة للمسارات والبرامج والإنجازات بعد استكمال نقل ملفات الوسائط الأصلية.</p></div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='تواصل معنا'&&<section className="simplePage richSimplePage"><span className="sectionLabel">تواصل معنا</span><h1>حلقات عاشور بخاري</h1><p>للتواصل والاستفسارات المتعلقة بالحلقات والبرامج، يتم تحديث بيانات التواصل من إدارة المنصة.</p></section>}
+        {publicView==='الأخبار والفعاليات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">أخبار الحلقات</span><h1>برامج وفعاليات تصنع الأثر</h1><p>نماذج من البرامج المصاحبة والفعاليات الموثقة في تقرير حلقات عاشور بخاري لعام 1447هـ.</p></div><div className="reportCards publicCards">{report1447.news.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['madinah','iftar','recreation','khatm','eid'][i]]} alt={t} /><div><span className="sectionLabel">خبر وفعالية</span><h3>{t}</h3><p>{b}</p></div></article>)}</div>{publicData.news?.length>0&&<><div className="sectionHead reportSubhead"><div><span>آخر المستجدات</span><h2>أخبار منشورة من إدارة المنصة</h2></div></div><div className="reportCards publicCards">{publicData.news.map((n:any)=><article key={n.id}><div><span className="sectionLabel">{n.kind==='achievement'?'إنجاز':n.kind==='event'?'فعالية':'خبر'}</span><h3>{n.title}</h3><p>{n.body}</p></div></article>)}</div></>}</section>}
+        {publicView==='الإنجازات'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">إنجازات 1447هـ</span><h1>طلاب الحلقات في ميادين التميز</h1><p>نماذج من الإنجازات العالمية والدولية والمحلية الواردة في التقرير السنوي.</p></div><div className="reportCards achievements publicCards">{report1447.achievements.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-tanzania','achievement-omar'][i]]} alt={t} /><div><span className="sectionLabel">إنجاز</span><h3>{t}</h3><p>{b}</p></div></article>)}</div><div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div></section>}{publicView==='المعلمون'&&<section className="simplePage richSimplePage"><span className="sectionLabel">المعلمون</span><h1>معلمون يصنعون أثرًا قرآنيًا</h1><p>يقوم المعلم بإدارة الحلقة ومتابعة الحفظ والمراجعة والتسميع والحضور ضمن مسار تعليمي واضح.</p></section>}{publicView==='الطلاب'&&<section className="simplePage richSimplePage"><span className="sectionLabel">الطلاب</span><h1>رحلة الطالب مع كتاب الله</h1><p>تبدأ بالتهيئة وتحديد المستوى، ثم التعلم والتثبيت والقياس والمتابعة المستمرة.</p></section>}{publicView==='الوسائط'&&<section className="report1447 publicReportPage"><div className="innerHero reportPageHero"><span className="sectionLabel">الوسائط</span><h1>من ذاكرة الحلقات</h1><p>صور من المسارات القرآنية والبرامج والرحلات والإنجازات.</p></div><div className="mediaGallery">{[['talqeen','مسار التلقين والتهجي'],['hifz','مسار حفظ القرآن'],['itqan','مسار الإتقان'],['qiraat','مسار القراءات'],['madinah','رحلة المدينة'],['madinah-group','طلاب الحلقات في المدينة'],['iftar','إفطار صائم'],['recreation','البرنامج الترويحي'],['khatm','مجالس الختم'],['eid','برنامج المعايدة'],['nationalities','جنسيات طلاب الحلقات'],['photo-1','من أنشطة الحلقات'],['photo-2','من أنشطة الحلقات']].map(([key,title])=><figure key={key}><SitePhoto src={siteImages[key]} alt={title} /><figcaption>{title}</figcaption></figure>)}</div></section>}{publicView==='تواصل معنا'&&<section className="simplePage richSimplePage"><span className="sectionLabel">تواصل معنا</span><h1>حلقات عاشور بخاري</h1><p>للتواصل والاستفسارات المتعلقة بالحلقات والبرامج، يتم تحديث بيانات التواصل من إدارة المنصة.</p></section>}
         {authOpen&&<div className="authOverlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!authBusy)setAuthOpen(false)}}>
           <section className="authDialog authDialogPro" role="dialog" aria-modal="true" aria-labelledby="auth-title">
             <button className="authClose" type="button" aria-label="إغلاق نافذة الدخول" onClick={()=>{if(!authBusy){setAuthOpen(false);setError('')}}}>×</button>
