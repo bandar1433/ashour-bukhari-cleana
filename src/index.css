@@ -276,3 +276,30 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
   .workspace{display:block!important}.dashboardContent{padding:0!important}.panel{box-shadow:none;border:0;padding:0}
   body,main{background:#fff!important;color:#000!important}.tableWrap,.table-wrap{overflow:visible!important}table{min-width:0!important}td,th{border:1px solid #aaa;padding:6px}
 }
+
+/* transferred operational screens from the legacy platform */
+.opsToolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-bottom:18px;padding:14px;border:1px solid var(--line);border-radius:13px;background:#f8faf9}
+.opsToolbar .field{min-width:180px}.opsToolbar button{min-height:40px}
+.compactOpsKpis{margin:0 0 18px}
+.dailyApprovalGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:0 0 18px}
+.dailyApprovalGrid article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px;border:1px solid var(--line);border-radius:13px;background:#fff}
+.dailyApprovalGrid b,.dailyApprovalGrid small{display:block}.dailyApprovalGrid small{margin-top:4px;color:#7a8680;font-size:10px}
+.approvedDay{padding:9px 12px;border-radius:9px;background:#e8f3eb;color:#176b32;font-weight:800}
+.tableAction{padding:7px 10px;border-radius:8px;background:var(--green-soft);color:var(--green);font-weight:700}
+.registerCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.registerCards article{padding:18px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 8px 22px rgba(20,61,54,.045)}
+.registerCards article>div:first-child span{font-size:10px;color:var(--gold);font-weight:800}.registerCards h3{margin:5px 0 13px;color:var(--green-deep)}
+.registerMetrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:13px}.registerMetrics span{padding:10px 7px;border-radius:10px;background:#f5f8f6;text-align:center;font-size:9px;color:#728079}.registerMetrics b{display:block;color:var(--green-deep);font-size:17px;margin-bottom:2px}
+.evaluationSummary{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px;margin-bottom:18px;border-radius:15px;background:linear-gradient(135deg,#eef5ef,#fff);border:1px solid #dfe9e2}
+.evaluationSummary span{display:block;color:#6d7c75;font-size:11px}.evaluationSummary b{display:block;margin-top:4px;font-size:31px;color:var(--green-deep)}.evaluationSummary p{margin:0;color:#65736d;font-size:12px}
+.studentProfileHero{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:19px;margin-bottom:18px;border-radius:15px;background:linear-gradient(135deg,rgba(23,107,50,.08),rgba(200,155,60,.07));border:1px solid var(--line)}
+.studentProfileHero span{font-size:10px;color:var(--gold);font-weight:800}.studentProfileHero h2{margin:4px 0;color:var(--green-deep)}.studentProfileHero p{margin:0;color:#718079}.studentProfileHero .field{min-width:180px}
+.profileSelect{min-width:min(420px,100%)!important}.profileSubhead{margin-top:24px}
+@media(max-width:600px){
+  .opsToolbar{display:grid;grid-template-columns:1fr;padding:12px}.opsToolbar .field{min-width:0}.opsToolbar button{width:100%}
+  .compactOpsKpis{grid-template-columns:repeat(2,1fr)!important}
+  .dailyApprovalGrid{grid-template-columns:1fr}.dailyApprovalGrid article{align-items:flex-start;flex-direction:column}.dailyApprovalGrid button{width:100%}
+  .registerCards{grid-template-columns:1fr}.registerMetrics{grid-template-columns:repeat(3,1fr)}
+  .evaluationSummary{align-items:flex-start;flex-direction:column}
+  .studentProfileHero{align-items:stretch;flex-direction:column}.studentProfileHero .field{min-width:0}
+}

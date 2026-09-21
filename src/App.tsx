@@ -19,7 +19,7 @@ import {
 } from './lib/api';
 import { authClient } from './lib/auth';
 
-type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -87,6 +87,10 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   memorization: { title: 'التسميع والمراجعة', subtitle: 'توثيق الحفظ الجديد والمراجعة والتقييم.', short: 'القرآن' },
   plans: { title: 'الخطط الأسبوعية', subtitle: 'متابعة أهداف الطلاب وخطط الحفظ والمراجعة.', short: 'الخطط' },
   news: { title: 'الأخبار والفعاليات', subtitle: 'إدارة محتوى الموقع العام والأخبار والإنجازات.', short: 'المحتوى' },
+  teacherToday: { title: 'لوحة المعلم اليومية', subtitle: 'مراجعة اكتمال الحضور والحفظ والمراجعة قبل اعتماد اليوم.', short: 'اليوم' },
+  circleRegister: { title: 'سجل الحلقة', subtitle: 'كشف شهري موحد للحضور والمراجعة والحفظ والاعتماد.', short: 'السجل' },
+  evaluations: { title: 'التقييم والإنجاز', subtitle: 'قياس الإنجاز اليومي وفق الخطة والحضور والمراجعة.', short: 'التقييم' },
+  studentProfile: { title: 'ملف الطالب القرآني', subtitle: 'ملف متكامل للحضور والحفظ والمراجعة والخطط والنقاط.', short: 'ملف الطالب' },
 };
 
 export default function App() {
@@ -112,6 +116,13 @@ export default function App() {
   const [memorization, setMemorization] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
+  const [dailyDate,setDailyDate]=useState(new Date().toISOString().slice(0,10));
+  const [recordMonth,setRecordMonth]=useState(new Date().toISOString().slice(0,7));
+  const [teacherToday,setTeacherToday]=useState<any>({students:[],approvals:[]});
+  const [circleRegister,setCircleRegister]=useState<any>({students:[]});
+  const [evaluationRange,setEvaluationRange]=useState({from:new Date().toISOString().slice(0,10),to:new Date().toISOString().slice(0,10)});
+  const [evaluations,setEvaluations]=useState<any>({rows:[],average:0,weights:{new:30,review:40,attendance:30}});
+  const [studentProfile,setStudentProfile]=useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
@@ -309,6 +320,35 @@ export default function App() {
     setRoleData({roles:[],permissions:[]});
     setLoadState('idle');
   }
+
+  async function loadTeacherToday(date=dailyDate){
+    try{setError('');const data=await apiGet<any>(`/api/teacher/today?date=${date}`);setTeacherToday(data)}
+    catch(err){setError(err instanceof Error?err.message:'تعذر تحميل لوحة اليوم')}
+  }
+  async function loadCircleRegister(month=recordMonth){
+    try{setError('');const data=await apiGet<any>(`/api/circle-register?month=${month}`);setCircleRegister(data)}
+    catch(err){setError(err instanceof Error?err.message:'تعذر تحميل سجل الحلقة')}
+  }
+  async function loadEvaluations(range=evaluationRange){
+    try{setError('');const data=await apiGet<any>(`/api/evaluations?from=${range.from}&to=${range.to}`);setEvaluations(data)}
+    catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
+  }
+  async function openStudentProfile(id:string){
+    try{setError('');const data=await apiGet<any>(`/api/student-profile/${id}?month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
+    catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
+  }
+  async function approveDay(circleId:string){
+    try{setError('');await apiPost('/api/day-approvals',{circle_id:circleId,approval_date:dailyDate});await loadTeacherToday(dailyDate)}
+    catch(err){setError(err instanceof Error?err.message:'تعذر اعتماد اليوم')}
+  }
+
+  useEffect(()=>{
+    if(!code)return;
+    if(activeTab==='teacherToday')loadTeacherToday();
+    if(activeTab==='circleRegister')loadCircleRegister();
+    if(activeTab==='evaluations')loadEvaluations();
+    if(activeTab==='studentProfile'&&currentRole==='student'&&!studentProfile)openStudentProfile('me');
+  },[activeTab]);
 
   async function submitForm(path:string,event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();
@@ -518,6 +558,10 @@ export default function App() {
           <button className={activeTab==='attendance'?'selected':''} onClick={()=>setActiveTab('attendance')}><span className="navDot">✓</span>الحضور</button>
           <button className={activeTab==='memorization'?'selected':''} onClick={()=>setActiveTab('memorization')}><span className="navDot">◌</span>التسميع والمراجعة</button>
           <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}><span className="navDot">▤</span>الخطط الأسبوعية</button>
+          {isStaff&&<button className={activeTab==='teacherToday'?'selected':''} onClick={()=>setActiveTab('teacherToday')}><span className="navDot">◈</span>لوحة المعلم اليومية</button>}
+          {isStaff&&<button className={activeTab==='circleRegister'?'selected':''} onClick={()=>setActiveTab('circleRegister')}><span className="navDot">▦</span>سجل الحلقة</button>}
+          <button className={activeTab==='evaluations'?'selected':''} onClick={()=>setActiveTab('evaluations')}><span className="navDot">◎</span>التقييم والإنجاز</button>
+          <button className={activeTab==='studentProfile'?'selected':''} onClick={()=>setActiveTab('studentProfile')}><span className="navDot">◇</span>ملف الطالب القرآني</button>
           <div className="sidebarSectionLabel">النظام والمحتوى</div>
           {isRoot&&<button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>}
           {isRoot&&<button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>}
@@ -532,7 +576,7 @@ export default function App() {
           {error&&<div className="notice">{error}</div>}
           {activeTab==='overview'&&<div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b><small>مركز وفرع</small></article></div>}
           <div className="panel mainPanel">
-            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{activeTab!=='overview'&&activeTab!=='roles'&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
+            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
             {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
@@ -543,6 +587,30 @@ export default function App() {
             {loadState!=='loading'&&activeTab==='attendance'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/attendance',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>التاريخ</span><input name="attendance_date" type="date" required defaultValue={new Date().toISOString().slice(0,10)} /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="present"><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue="0" /></label><button className="primary" type="submit">حفظ الحضور</button></form><GenericTable rows={attendance} columns={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_date','التاريخ'],['status','الحالة'],['late_minutes','دقائق التأخر']]}/></>}
             {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option><option value="recitation">تسميع</option></select></label><label className="field"><span>رقم السورة</span><input name="surah_no" type="number" min="1" max="114" required /></label><label className="field"><span>من آية</span><input name="from_ayah" type="number" min="1" required /></label><label className="field"><span>إلى آية</span><input name="to_ayah" type="number" min="1" required /></label><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ التسميع</button></form><GenericTable rows={memorization} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/></>}
             {loadState!=='loading'&&activeTab==='plans'&&<GenericTable rows={plans} columns={[[ 'full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>}
+            {activeTab==='teacherToday'&&<>
+              <div className="opsToolbar"><label className="field"><span>التاريخ</span><input type="date" value={dailyDate} onChange={e=>{setDailyDate(e.target.value);loadTeacherToday(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadTeacherToday()}>تحديث اليوم</button></div>
+              <div className="kpis compactOpsKpis"><article><span>طلاب اليوم</span><b>{teacherToday.students?.length||0}</b><small>ضمن نطاق الحساب</small></article><article><span>الحضور المسجل</span><b>{(teacherToday.students||[]).filter((x:any)=>x.attendance_status).length}</b><small>سجل حضور</small></article><article><span>حفظ جديد</span><b>{(teacherToday.students||[]).reduce((n:number,x:any)=>n+Number(x.new_records||0),0)}</b><small>سجل</small></article><article><span>المراجعة</span><b>{(teacherToday.students||[]).reduce((n:number,x:any)=>n+Number(x.review_records||0),0)}</b><small>سجل</small></article></div>
+              <div className="dailyApprovalGrid">{Array.from(new Map((teacherToday.students||[]).map((x:any)=>[x.circle_id,{id:x.circle_id,name:x.circle_name}])).values()).map((c:any)=>{const done=(teacherToday.approvals||[]).some((a:any)=>a.circle_id===c.id);return <article key={c.id}><div><b>{c.name}</b><small>{done?'تم اعتماد سجل اليوم':'بانتظار اعتماد اليوم'}</small></div><button className={done?'approvedDay':'primary'} disabled={done} onClick={()=>approveDay(c.id)}>{done?'معتمد ✓':'اعتماد اليوم'}</button></article>})}</div>
+              <div className="table-wrap"><table><thead><tr><th>الطالب</th><th>الحلقة</th><th>الحضور</th><th>حفظ جديد</th><th>مراجعة</th><th>متوسط الأداء</th><th>الملف</th></tr></thead><tbody>{(teacherToday.students||[]).map((r:any)=><tr key={r.id}><td>{r.full_name}</td><td>{r.circle_name}</td><td>{r.attendance_status||'لم يسجل'}</td><td>{r.new_records}</td><td>{r.review_records}</td><td>{r.grade||0}%</td><td><button className="tableAction" onClick={()=>openStudentProfile(r.id)}>فتح</button></td></tr>)}</tbody></table></div>
+            </>}
+            {activeTab==='circleRegister'&&<>
+              <div className="opsToolbar"><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{setRecordMonth(e.target.value);loadCircleRegister(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadCircleRegister()}>تحديث السجل</button></div>
+              <div className="registerCards">{(circleRegister.students||[]).map((s:any)=>{const days=s.days||[];const attended=days.filter((d:any)=>d.status==='present'||d.status==='late').length;const approved=days.filter((d:any)=>d.approved).length;return <article key={s.id}><div><span>{s.circle_name}</span><h3>{s.full_name}</h3></div><div className="registerMetrics"><span><b>{days.length}</b> أيام مسجلة</span><span><b>{attended}</b> حضور</span><span><b>{approved}</b> أيام معتمدة</span></div><button className="secondary" onClick={()=>openStudentProfile(s.id)}>فتح ملف الطالب</button></article>})}</div>
+            </>}
+            {activeTab==='evaluations'&&<>
+              <div className="opsToolbar"><label className="field"><span>من</span><input type="date" value={evaluationRange.from} onChange={e=>setEvaluationRange(x=>({...x,from:e.target.value}))} /></label><label className="field"><span>إلى</span><input type="date" value={evaluationRange.to} onChange={e=>setEvaluationRange(x=>({...x,to:e.target.value}))} /></label><button className="primary" type="button" onClick={()=>loadEvaluations()}>حساب التقييم</button></div>
+              <div className="evaluationSummary"><div><span>المتوسط العام</span><b>{evaluations.average||0}%</b></div><p><strong>المعادلة:</strong> الحفظ الجديد 30% • المراجعة 40% • الحضور والانضباط 30%</p></div>
+              <GenericTable rows={evaluations.rows||[]} columns={[[ 'full_name','الطالب'],['day','التاريخ'],['new_grade','الحفظ %'],['review_grade','المراجعة %'],['attendance_score','الانضباط'],['daily_score','النتيجة']]}/>
+            </>}
+            {activeTab==='studentProfile'&&<>
+              {isStaff&&<div className="opsToolbar"><label className="field profileSelect"><span>اختر الطالب</span><select defaultValue="" onChange={e=>e.target.value&&openStudentProfile(e.target.value)}><option value="">اختر طالبًا...</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name} — {s.circle_name||'بدون حلقة'}</option>)}</select></label></div>}
+              {!studentProfile?<div className="emptyState">اختر طالبًا لعرض ملفه القرآني.</div>:<>
+                <div className="studentProfileHero"><div><span>الطالب</span><h2>{studentProfile.student?.full_name}</h2><p>{studentProfile.student?.center_name||'—'} • {studentProfile.student?.circle_name||'بدون حلقة'}</p></div><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{setRecordMonth(e.target.value);openStudentProfile(studentProfile.student.id)}} /></label></div>
+                <div className="kpis compactOpsKpis"><article><span>الحضور</span><b>{studentProfile.attendance?.total?Math.round(100*Number(studentProfile.attendance.attended||0)/Number(studentProfile.attendance.total)):0}%</b><small>غياب {studentProfile.attendance?.absent||0}</small></article><article><span>الحفظ الجديد</span><b>{studentProfile.quran?.new_sessions||0}</b><small>{studentProfile.quran?.new_ayahs||0} آية</small></article><article><span>المراجعة</span><b>{studentProfile.quran?.review_sessions||0}</b><small>{studentProfile.quran?.review_ayahs||0} آية</small></article><article><span>متوسط الأداء</span><b>{studentProfile.quran?.average_grade||0}%</b><small>خلال الشهر</small></article></div>
+                <h3>السجل القرآني الأخير</h3><GenericTable rows={studentProfile.recent||[]} columns={[[ 'record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>
+                <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
+              </>}
+            </>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>
