@@ -16,7 +16,7 @@ import {
   Summary,
   UserRow,
 } from './lib/api';
-import { authClient, getAuthToken } from './lib/auth';
+import { authClient } from './lib/auth';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news';
 
@@ -122,20 +122,21 @@ export default function App() {
       const email=accountForm.email.trim();
       const password=accountForm.password;
       if(!email||!password) throw new Error('أدخل البريد الإلكتروني وكلمة المرور.');
+      let authResult:any;
       if(authIntent==='signup'){
         const name=accountForm.name.trim();
         if(!name) throw new Error('أدخل الاسم.');
-        const result:any=await authClient.signUp.email({email,password,name});
-        if(result?.error) throw new Error(result.error.message||'تعذر إنشاء الحساب');
+        authResult=await authClient.signUp.email({email,password,name});
+        if(authResult?.error) throw new Error(authResult.error.message||'تعذر إنشاء الحساب');
       }else{
-        const result:any=await authClient.signIn.email({email,password});
-        if(result?.error) throw new Error(result.error.message||'بيانات الدخول غير صحيحة');
+        authResult=await authClient.signIn.email({email,password});
+        if(authResult?.error) throw new Error(authResult.error.message||'بيانات الدخول غير صحيحة');
       }
-      const neonToken=await getAuthToken();
-      if(!neonToken) throw new Error('تعذر إنشاء جلسة الدخول.');
+      const neonSessionToken=authResult?.data?.token;
+      if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول.');
       const response=await fetch('/api/auth-session',{
         method:'POST',
-        headers:{Accept:'application/json',Authorization:`Bearer ${neonToken}`}
+        headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}
       });
       const payload=await response.json().catch(()=>({}));
       if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
