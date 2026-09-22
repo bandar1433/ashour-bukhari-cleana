@@ -30,13 +30,13 @@ export async function selfService(req:any,res:any,u:any){
       if(approved)return json(res,403,{error:'تم اعتماد سجل اليوم ولا يمكن إضافة تسميع جديد'});
       const b=req.body||{},recordType=String(b.record_type||'new');
       if(!['new','review','recitation'].includes(recordType))return json(res,400,{error:'نوع السجل غير صالح'});
-      const surah=int(b.surah_no,1,114),from=int(b.from_ayah,1,286),to=int(b.to_ayah,from,286);
+      const surah=int(b.surah_no,1,114),toSurah=int(b.to_surah_no||b.surah_no,1,114),from=int(b.from_ayah,1,286),to=int(b.to_ayah,1,286);
       const fromPage=b.from_page?int(b.from_page,1,604):null,toPage=b.to_page?int(b.to_page,fromPage||1,604):null;
       const pages=fromPage&&toPage?Math.max(1,toPage-fromPage+1):null;
       const notes=[txt(b.notes,800),pages?`— ${pages} صفحة`:''].filter(Boolean).join(' ');
-      const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date)
-        values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'حفص عن عاصم',false,current_date) returning *`,
-        [s.id,recordType,surah,from,to,fromPage,toPage,to-from+1,b.grade?Number(b.grade):null,notes||null]))[0];
+      const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_surah_no,to_ayah,from_page,to_page,page_count,ayah_count,grade,notes,qiraah,approved,record_date)
+        values($1,$2,$3,$4,$5,$6,$7,$8,$9,case when $7::int is not null and $8::int is not null then greatest(1,$8::int-$7::int+1) else null end,case when $5::int=$3::int then $6::int-$4::int+1 else null end,$10,$11,'حفص عن عاصم',false,current_date) returning *`,
+        [s.id,recordType,surah,from,toSurah,to,fromPage,toPage,b.grade?Number(b.grade):null,notes||null]))[0];
       return json(res,201,row);
     }
   }
