@@ -18,7 +18,7 @@ export default async function handler(req:any,res:any){
       `,[u.role,u.center_id,u.id]);
       return json(res,200,{items:rows});
     }
-    if(req.method==='POST'){
+    if(req.method==='POST'||req.method==='PUT'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};
       const recordDate=String(b.record_date||new Date().toISOString().slice(0,10));
@@ -29,6 +29,14 @@ export default async function handler(req:any,res:any){
       const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
       if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
+      if(req.method==='PUT'){
+        if(!b.id)return json(res,400,{error:'معرف سجل التسميع مطلوب'});
+        const existing=(await query<any>('select * from memorization_records where id=$1 and student_id=$2',[b.id,b.student_id]))[0];
+        if(!existing)return json(res,404,{error:'سجل التسميع غير موجود'});
+        const rows=await query(`update memorization_records set record_type=coalesce($3,record_type),surah_no=coalesce($4,surah_no),from_ayah=coalesce($5,from_ayah),to_ayah=coalesce($6,to_ayah),from_page=$7,to_page=$8,ayah_count=coalesce($6,to_ayah)-coalesce($5,from_ayah)+1,grade=$9,notes=$10,qiraah=coalesce($11,qiraah),recorded_by=$12 where id=$1 and student_id=$2 returning *`,
+          [b.id,b.student_id,b.record_type||null,b.surah_no?Number(b.surah_no):null,b.from_ayah?Number(b.from_ayah):null,b.to_ayah?Number(b.to_ayah):null,b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
+        return json(res,200,rows[0]);
+      }
       const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning *`,
         [b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,Number(b.to_ayah)-Number(b.from_ayah)+1,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,recordDate,u.id]);
       return json(res,201,rows[0]);
