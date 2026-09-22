@@ -103,7 +103,7 @@ export function getSessionRole(): string {
   } catch { return ''; }
 }
 
-function readableError(value:any,fallback='حدث خطأ غير متوقع'):string{
+export function readableError(value:any,fallback='حدث خطأ غير متوقع'):string{
   if(value===null||value===undefined||value==='') return fallback;
   if(typeof value==='string') return value;
   if(value instanceof Error) return value.message||fallback;
