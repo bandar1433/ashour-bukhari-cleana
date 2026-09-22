@@ -103,9 +103,11 @@ async function evaluations(req:any,res:any,u:any){
   case when coalesce(plans.review_daily_target,0)>0 then least(100,round(100*coalesce(done.review_pages,0)/plans.review_daily_target))::int else 0 end review_grade,
   case when att.status='excused' then null when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,100+coalesce(att.points_penalty,0)) else 0 end attendance_score,
   case when att.status='excused' then null else
-    round(($6::numeric*least(1,coalesce(done.new_pages,0)/nullif(plans.new_daily_target,0)))+
-          ($7::numeric*least(1,coalesce(done.review_pages,0)/nullif(plans.review_daily_target,0)))+
-          ($8::numeric*(case when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,least(1,(100+coalesce(att.points_penalty,0))/100.0)) else 0 end)))::int
+    round(
+      ($6::numeric * case when coalesce(plans.new_daily_target,0)>0 then least(1,coalesce(done.new_pages,0)/plans.new_daily_target) else 0 end)+
+      ($7::numeric * case when coalesce(plans.review_daily_target,0)>0 then least(1,coalesce(done.review_pages,0)/plans.review_daily_target) else 0 end)+
+      ($8::numeric * case when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,least(1,(100+coalesce(att.points_penalty,0))/100.0)) else 0 end)
+    )::int
   end daily_score
   from days left join plans on plans.student_id=days.student_id and plans.week_start=days.week_start
   left join done on done.student_id=days.student_id and done.record_date=days.record_day left join att on att.student_id=days.student_id and att.attendance_date=days.record_day
