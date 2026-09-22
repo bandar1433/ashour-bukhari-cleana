@@ -1,7 +1,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {apiGet,apiPost,apiPut,CenterRow,CircleRow,StudentRow} from './lib/api';
 
-type Mode='selfService'|'motivation'|'competitions'|'notifications'|'reports'|'operations';
+type Mode='selfService'|'motivation'|'competitions'|'notifications'|'reports'|'operations'|'joinRequests';
 export default function ExtendedOperations({mode,currentRole,students,circles,centers}:{mode:Mode;currentRole:string;students:StudentRow[];circles:CircleRow[];centers:CenterRow[]}){
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
   const isManager=['system_admin','center_manager','supervisor'].includes(currentRole);
@@ -15,6 +15,7 @@ export default function ExtendedOperations({mode,currentRole,students,circles,ce
     if(mode==='notifications')setData(await apiGet('/api/ops?action=notifications'));
     if(mode==='reports')setData(await apiGet(`/api/ops?action=management-report&from=${range.from}&to=${range.to}`));
     if(mode==='operations')setData(await apiGet('/api/ops?action=admin-operations&sub=dashboard'));
+    if(mode==='joinRequests')setData(await apiGet('/api/ops?action=join-requests&sub=list'));
   }catch(e){setError(e instanceof Error?e.message:'تعذر تحميل البيانات')}finally{setBusy(false)}}
   useEffect(()=>{load()},[mode]);
   async function post(path:string,body:any,reload=true){setError('');try{setBusy(true);await apiPost(path,body);if(reload)await load()}catch(e){setError(e instanceof Error?e.message:'تعذر تنفيذ العملية')}finally{setBusy(false)}}
@@ -22,6 +23,7 @@ export default function ExtendedOperations({mode,currentRole,students,circles,ce
   const formBody=(e:FormEvent<HTMLFormElement>)=>Object.fromEntries(new FormData(e.currentTarget).entries());
   if(busy&&!data)return <div className="emptyState">جارٍ تحميل البيانات...</div>;
   return <div className="extendedOps">{error&&<div className="notice">{error}</div>}
+    {mode==='joinRequests'&&<><h3>طلبات الانضمام للحلقات</h3><div className="requestList">{(data?.items||[]).map((r:any)=><article key={r.id}><div><b>{r.applicant_name}</b><span>{r.circle_name} • {r.center_name}</span><small>{r.email||'—'}</small></div><div><button className="primary" onClick={()=>post('/api/ops?action=join-requests&sub=decide',{request_id:r.id,decision:'approved'})}>قبول</button><button className="secondary" onClick={()=>post('/api/ops?action=join-requests&sub=decide',{request_id:r.id,decision:'rejected'})}>رفض</button></div></article>)}</div></>}
     {mode==='selfService'&&<>{!data?.student?<div className="emptyState">لم يتم ربط الحساب بسجل طالب.</div>:<>
       <div className="studentProfileHero"><div><span>بوابة الطالب</span><h2>{data.student.full_name}</h2><p>{data.student.center_name||'—'} • {data.student.circle_name||'—'}</p></div><div className="studentPoints"><b>{data.student.points_balance||0}</b><span>نقطة</span></div></div>
       <div className="selfPunch"><div><span>حضور اليوم</span><b>{data.attendance?.status||'لم يسجل بعد'}</b><small>{data.attendance?.check_in_at?'تم تسجيل الحضور':''}{data.attendance?.check_out_at?' • تم تسجيل الانصراف':''}</small></div><div className="selfPunchActions"><button className="primary" disabled={!!data.attendance?.check_in_at||busy} onClick={()=>post('/api/ops?action=self-service&kind=punch',{action:'check_in'})}>تسجيل الحضور</button><button className="secondary" disabled={!data.attendance?.check_in_at||!!data.attendance?.check_out_at||busy} onClick={()=>post('/api/ops?action=self-service&kind=punch',{action:'check_out'})}>تسجيل الانصراف</button></div></div>
