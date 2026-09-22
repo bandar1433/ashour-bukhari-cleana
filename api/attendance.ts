@@ -8,7 +8,7 @@ export default async function handler(req:any,res:any){
     if(req.method==='GET'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const rows=await query(`
-        select a.id,a.attendance_date,a.status,a.late_minutes,a.points_penalty,coalesce(s.full_name,us.full_name,'بدون اسم') full_name,c.name circle_name
+        select a.id,a.student_id,a.circle_id,a.attendance_date,a.status,a.late_minutes,a.points_penalty,a.check_in_at,a.check_out_at,a.notes,coalesce(s.full_name,us.full_name,'بدون اسم') full_name,c.name circle_name
         from attendance a join students s on s.id=a.student_id left join users us on us.id=s.user_id left join circles c on c.id=a.circle_id
         where $1='system_admin'
           or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid)
@@ -28,8 +28,8 @@ export default async function handler(req:any,res:any){
       const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
       if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
-      const rows=await query(`insert into attendance(student_id,circle_id,attendance_date,status,late_minutes,points_penalty,notes,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(student_id,attendance_date) do update set status=excluded.status,late_minutes=excluded.late_minutes,points_penalty=excluded.points_penalty,notes=excluded.notes,recorded_by=excluded.recorded_by returning *`,
-        [b.student_id,s.circle_id,b.attendance_date,b.status||'present',Number(b.late_minutes||0),Number(b.points_penalty||0),b.notes||null,u.id]);
+      const rows=await query(`insert into attendance(student_id,circle_id,attendance_date,status,late_minutes,points_penalty,notes,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(student_id,attendance_date) do update set status=excluded.status,late_minutes=excluded.late_minutes,points_penalty=excluded.points_penalty,notes=excluded.notes,recorded_by=excluded.recorded_by,check_in_at=coalesce($9::timestamptz,attendance.check_in_at),check_out_at=coalesce($10::timestamptz,attendance.check_out_at) returning *`,
+        [b.student_id,s.circle_id,recordDate,b.status||'present',Number(b.late_minutes||0),Number(b.points_penalty||0),b.notes||null,u.id,b.check_in_at||null,b.check_out_at||null]);
       return json(res,200,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
