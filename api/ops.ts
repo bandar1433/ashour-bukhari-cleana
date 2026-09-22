@@ -69,8 +69,8 @@ async function circleRegister(req:any,res:any,u:any){
   const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,
     coalesce(json_agg(json_build_object('date',d.day,'approved',exists(select 1 from day_approvals da where da.circle_id=h.id and da.approval_date=d.day),
     'status',a.status,'late_minutes',coalesce(a.late_minutes,0),'check_in_at',a.check_in_at,'check_out_at',a.check_out_at,
-    'review',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='review' order by m.created_at desc limit 1),
-    'new',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='new' order by m.created_at desc limit 1))
+    'review',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',case when m.from_page is not null and m.to_page is not null then greatest(1,m.to_page-m.from_page+1) else null end,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='review' order by m.created_at desc limit 1),
+    'new',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',case when m.from_page is not null and m.to_page is not null then greatest(1,m.to_page-m.from_page+1) else null end,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='new' order by m.created_at desc limit 1))
     order by d.day) filter(where a.id is not null or exists(select 1 from memorization_records mm where mm.student_id=s.id and mm.record_date=d.day)),'[]'::json) days
     from students s join circles h on h.id=s.circle_id cross join generate_series(($4||'-01')::date,(($4||'-01')::date+interval '1 month-1 day')::date,interval '1 day') d(day)
     left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.status='active' and
@@ -175,9 +175,12 @@ async function selfService(req:any,res:any,u:any){
       const b=req.body||{},recordType=String(b.record_type||'new');
       if(!['new','review','recitation'].includes(recordType))return json(res,400,{error:'نوع السجل غير صالح'});
       const surah=int(b.surah_no,1,114),from=int(b.from_ayah,1,286),to=int(b.to_ayah,from,286);
-      const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,ayah_count,grade,notes,qiraah,approved,record_date)
-        values($1,$2,$3,$4,$5,$6,$7,$8,'حفص عن عاصم',false,current_date) returning *`,
-        [s.id,recordType,surah,from,to,to-from+1,b.grade?Number(b.grade):null,txt(b.notes,1000)||null]))[0];
+      const fromPage=b.from_page?int(b.from_page,1,604):null,toPage=b.to_page?int(b.to_page,fromPage||1,604):null;
+      const pages=fromPage&&toPage?Math.max(1,toPage-fromPage+1):null;
+      const notes=[txt(b.notes,800),pages?`— ${pages} صفحة`:''].filter(Boolean).join(' ');
+      const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date)
+        values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'حفص عن عاصم',false,current_date) returning *`,
+        [s.id,recordType,surah,from,to,fromPage,toPage,to-from+1,b.grade?Number(b.grade):null,notes||null]))[0];
       return json(res,201,row);
     }
   }
@@ -244,7 +247,7 @@ async function motivation(req:any,res:any,u:any){
     const b=req.body||{},circleId=validUuid(b.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
     const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
     if(!allowed)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
-    return json(res,201,(await query<any>('insert into rewards(name,points_cost,stock,circle_id) values($1,$2,$3,$4) returning *',[txt(b.name,200),int(b.points_cost,1,100000),int(b.stock,0,100000),circleId]))[0]);
+    return json(res,201,(await query<any>('insert into rewards(name,description,points_cost,stock,circle_id,image_path) values($1,$2,$3,$4,$5,$6) returning *',[txt(b.name,200),txt(b.description,1000)||null,int(b.points_cost,1,100000),int(b.stock,0,100000),circleId,txt(b.image_path,1000)||null]))[0]);
   }
   if(sub==='reward-request'&&req.method==='POST'){
     if(u.role!=='student')return json(res,403,{error:'هذه الخدمة للطالب'});
@@ -259,20 +262,30 @@ async function motivation(req:any,res:any,u:any){
   if(sub==='reward-approve'&&req.method==='POST'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const requestId=validUuid(req.body?.request_id);if(!requestId)return json(res,400,{error:'طلب غير صالح'});
+    const rr=(await query<any>(`select rr.*,r.circle_id,c.teacher_user_id,c.center_id from reward_requests rr join rewards r on r.id=rr.reward_id join circles c on c.id=r.circle_id where rr.id=$1`,[requestId]))[0];
+    if(!rr||rr.status!=='pending')return json(res,400,{error:'الطلب غير متاح'});
+    const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===rr.center_id)||(u.role==='teacher'&&u.id===rr.teacher_user_id);
+    if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
+    await query(`update reward_requests set status='approved',decided_by=$1,decided_at=now() where id=$2`,[u.id,requestId]);
+    return json(res,200,{success:true,status:'approved'});
+  }
+  if(sub==='reward-deliver'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const requestId=validUuid(req.body?.request_id);if(!requestId)return json(res,400,{error:'طلب غير صالح'});
     const client=await getPool().connect();
     try{
       await client.query('begin');
       const rr=(await client.query(`select rr.*,r.points_cost,r.stock,r.circle_id,c.teacher_user_id,c.center_id from reward_requests rr join rewards r on r.id=rr.reward_id join circles c on c.id=r.circle_id where rr.id=$1 for update`,[requestId])).rows[0];
-      if(!rr||rr.status!=='pending')throw new Error('الطلب غير متاح');
+      if(!rr||rr.status!=='approved')throw new Error('يجب اعتماد الطلب أولاً');
       const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===rr.center_id)||(u.role==='teacher'&&u.id===rr.teacher_user_id);
       if(!allowed)throw new Error('الطلب خارج نطاق صلاحيتك');
       if(Number(rr.stock)<1)throw new Error('نفدت الكمية');
       const changed=await client.query('update students set points_balance=points_balance-$1 where id=$2 and points_balance>=$1 returning id',[rr.points_cost,rr.student_id]);
       if(!changed.rowCount)throw new Error('رصيد الطالب لم يعد كافيًا');
       await client.query('update rewards set stock=stock-1 where id=$1',[rr.reward_id]);
-      await client.query(`update reward_requests set status='approved',decided_by=$1,decided_at=now() where id=$2`,[u.id,requestId]);
-      await client.query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,'استبدال جائزة','reward',$3)`,[rr.student_id,-rr.points_cost,u.id]);
-      await client.query('commit');return json(res,200,{success:true});
+      await client.query(`update reward_requests set status='delivered',delivered_by=$1,delivered_at=now() where id=$2`,[u.id,requestId]);
+      await client.query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,'تسليم جائزة','reward',$3)`,[rr.student_id,-rr.points_cost,u.id]);
+      await client.query('commit');return json(res,200,{success:true,status:'delivered'});
     }catch(e){await client.query('rollback');throw e}finally{client.release()}
   }
   return json(res,405,{error:'Method not allowed'});
