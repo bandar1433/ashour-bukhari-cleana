@@ -8,7 +8,7 @@ export default async function handler(req:any,res:any){
     if(req.method==='GET'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const rows=await query(`
-        select m.id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_ayah,m.from_page,m.to_page,m.grade,m.qiraah,m.approved,
+        select m.id,m.student_id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_ayah,m.from_page,m.to_page,m.grade,m.notes,m.qiraah,m.approved,
           coalesce(s.full_name,us.full_name,'بدون اسم') full_name
         from memorization_records m join students s on s.id=m.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id
         where $1='system_admin'
