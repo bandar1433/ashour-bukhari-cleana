@@ -8,7 +8,7 @@ export default async function handler(req:any,res:any){
     if(req.method==='GET'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const rows=await query(`
-        select m.id,m.student_id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_ayah,m.from_page,m.to_page,m.grade,m.notes,m.qiraah,m.approved,
+        select m.id,m.student_id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_surah_no,m.to_ayah,m.from_page,m.to_page,m.page_count,m.grade,m.notes,m.qiraah,m.approved,
           coalesce(s.full_name,us.full_name,'بدون اسم') full_name
         from memorization_records m join students s on s.id=m.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id
         where $1='system_admin'
@@ -33,12 +33,12 @@ export default async function handler(req:any,res:any){
         if(!b.id)return json(res,400,{error:'معرف سجل التسميع مطلوب'});
         const existing=(await query<any>('select * from memorization_records where id=$1 and student_id=$2',[b.id,b.student_id]))[0];
         if(!existing)return json(res,404,{error:'سجل التسميع غير موجود'});
-        const rows=await query(`update memorization_records set record_type=coalesce($3,record_type),surah_no=coalesce($4,surah_no),from_ayah=coalesce($5,from_ayah),to_ayah=coalesce($6,to_ayah),from_page=$7,to_page=$8,ayah_count=coalesce($6,to_ayah)-coalesce($5,from_ayah)+1,grade=$9,notes=$10,qiraah=coalesce($11,qiraah),recorded_by=$12 where id=$1 and student_id=$2 returning *`,
-          [b.id,b.student_id,b.record_type||null,b.surah_no?Number(b.surah_no):null,b.from_ayah?Number(b.from_ayah):null,b.to_ayah?Number(b.to_ayah):null,b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
+        const rows=await query(`update memorization_records set record_type=coalesce($3,record_type),surah_no=coalesce($4,surah_no),from_ayah=coalesce($5,from_ayah),to_surah_no=coalesce($6,to_surah_no,surah_no),to_ayah=coalesce($7,to_ayah),from_page=$8,to_page=$9,page_count=case when $8::int is not null and $9::int is not null then greatest(1,$9::int-$8::int+1) else null end,ayah_count=case when coalesce($6,to_surah_no,surah_no)=coalesce($4,surah_no) then coalesce($7,to_ayah)-coalesce($5,from_ayah)+1 else ayah_count end,grade=$10,notes=$11,qiraah=coalesce($12,qiraah),recorded_by=$13 where id=$1 and student_id=$2 returning *`,
+          [b.id,b.student_id,b.record_type||null,b.surah_no?Number(b.surah_no):null,b.from_ayah?Number(b.from_ayah):null,b.to_surah_no?Number(b.to_surah_no):null,b.to_ayah?Number(b.to_ayah):null,b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
         return json(res,200,rows[0]);
       }
-      const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning *`,
-        [b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,Number(b.to_ayah)-Number(b.from_ayah)+1,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,recordDate,u.id]);
+      const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_surah_no,to_ayah,from_page,to_page,page_count,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8,case when $7::int is not null and $8::int is not null then greatest(1,$8::int-$7::int+1) else null end,case when $5::int=$3::int then $6::int-$4::int+1 else null end,$9,$10,$11,$12,$13,$14) returning *`,
+        [b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_surah_no||b.surah_no),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,recordDate,u.id]);
       return json(res,201,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
