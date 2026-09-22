@@ -97,6 +97,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   competitions: { title: 'المسابقات', subtitle: 'إنشاء المسابقات وتسجيل النتائج وعرض المتصدرين.', short: 'المسابقات' },
   notifications: { title: 'الإشعارات', subtitle: 'إشعارات داخل المنصة للمستخدمين والمراكز.', short: 'الإشعارات' },
   reports: { title: 'التقارير الإدارية', subtitle: 'مؤشرات الحلقات والطلاب الذين يحتاجون متابعة.', short: 'التقارير' },
+  joinRequests: { title: 'طلبات الانضمام', subtitle: 'اعتماد طلبات الطلاب للانضمام إلى الحلقات.', short: 'طلبات الانضمام' },
   operations: { title: 'التشغيل والإعدادات', subtitle: 'الجاهزية والإجازات والاستثناءات وإعدادات التقييم وسجل العمليات.', short: 'التشغيل' },
 };
 
@@ -570,6 +571,7 @@ export default function App() {
           <button className={activeTab==='circleRegister'?'selected':''} onClick={()=>setActiveTab('circleRegister')}><span className="navDot">▦</span>سجل الحلقة</button>
           <button className={activeTab==='evaluations'?'selected':''} onClick={()=>setActiveTab('evaluations')}><span className="navDot">◎</span>التقييم والإنجاز</button>
           <button className={activeTab==='studentProfile'?'selected':''} onClick={()=>setActiveTab('studentProfile')}><span className="navDot">◇</span>ملف الطالب القرآني</button>
+          <button className={activeTab==='joinRequests'?'selected':''} onClick={()=>setActiveTab('joinRequests')}><span className="navDot">＋</span>طلبات الانضمام</button>
           <div className="sidebarSectionLabel">التحفيز والإدارة</div>
           <button className={activeTab==='motivation'?'selected':''} onClick={()=>setActiveTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button>
           <button className={activeTab==='competitions'?'selected':''} onClick={()=>setActiveTab('competitions')}><span className="navDot">♛</span>المسابقات</button>
@@ -597,7 +599,7 @@ export default function App() {
           {error&&<div className="notice">{error}</div>}
           {activeTab==='overview'&&<div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b><small>مركز وفرع</small></article></div>}
           <div className="panel mainPanel">
-            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile','selfService','motivation','competitions','notifications','reports','operations'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
+            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile','selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
             {loadState!=='loading'&&activeTab==='overview'&&<div className="featureGrid"><article><b>الحضور والانصراف</b><p>{summary?.attendance??0} سجل</p></article><article><b>التسميع والمراجعة</b><p>{summary?.memorization??0} سجل</p></article><article><b>الخطط الأسبوعية</b><p>{summary?.plans??0} خطة</p></article></div>}
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
@@ -632,7 +634,7 @@ export default function App() {
                 <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
               </>}
             </>}
-            {['selfService','motivation','competitions','notifications','reports','operations'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>}
+            {['selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>
