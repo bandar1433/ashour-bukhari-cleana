@@ -367,7 +367,15 @@ export default function App() {
       const body=Object.fromEntries(new FormData(form).entries());
       await apiPost(path,body);
       form.reset();
-      await loadDashboard();
+      if(path==='/api/attendance'){
+        const x=await apiGet<{items:any[]}>('/api/attendance');setAttendance(x.items||[]);
+        if(activeTab==='teacherToday')await loadTeacherToday();
+      }else if(path==='/api/memorization'){
+        const x=await apiGet<{items:any[]}>('/api/memorization');setMemorization(x.items||[]);
+        if(activeTab==='teacherToday')await loadTeacherToday();
+      }else{
+        await loadDashboard();
+      }
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر حفظ البيانات');
     }
