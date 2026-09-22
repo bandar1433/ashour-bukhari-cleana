@@ -186,6 +186,44 @@ async function selfService(req:any,res:any,u:any){
   }
   return json(res,405,{error:'Method not allowed'});
 }
+async function joinRequests(req:any,res:any,u:any){
+  const sub=String(req.query?.sub||'list');
+  if(sub==='circles'&&req.method==='GET'){
+    return json(res,200,{items:await query<any>("select h.id,h.name,c.name center_name from circles h join centers c on c.id=h.center_id where h.is_active order by c.name,h.name")});
+  }
+  if(sub==='request'&&req.method==='POST'){
+    if(!['student','guardian'].includes(u.role))return json(res,403,{error:'هذه الخدمة للطالب أو ولي الأمر'});
+    const circleId=validUuid(req.body?.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+    const exists=(await query<any>("select id from circle_join_requests where user_id=$1 and circle_id=$2 and status='pending'",[u.id,circleId]))[0];
+    if(exists)return json(res,400,{error:'يوجد طلب قائم لهذه الحلقة'});
+    return json(res,201,(await query<any>("insert into circle_join_requests(user_id,circle_id,requested_role,status) values($1,$2,$3,'pending') returning *",[u.id,circleId,u.role]))[0]);
+  }
+  if(sub==='list'&&req.method==='GET'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const rows=await query<any>(`select jr.*,coalesce(us.full_name,us.email) applicant_name,us.email,h.name circle_name,c.name center_name
+      from circle_join_requests jr join users us on us.id=jr.user_id join circles h on h.id=jr.circle_id join centers c on c.id=h.center_id
+      where jr.status='pending' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and c.id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
+      order by jr.requested_at desc`,[u.role,u.center_id,u.id]);
+    return json(res,200,{items:rows});
+  }
+  if(sub==='decide'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const id=validUuid(req.body?.request_id),decision=String(req.body?.decision||'');
+    if(!id||!['approved','rejected'].includes(decision))return json(res,400,{error:'بيانات القرار غير صالحة'});
+    const jr=(await query<any>(`select jr.*,h.center_id,h.teacher_user_id,us.full_name from circle_join_requests jr join circles h on h.id=jr.circle_id join users us on us.id=jr.user_id where jr.id=$1`,[id]))[0];
+    if(!jr)return json(res,404,{error:'الطلب غير موجود'});
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===jr.center_id)||(u.role==='teacher'&&u.id===jr.teacher_user_id);
+    if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
+    if(decision==='approved'&&jr.requested_role==='student'){
+      let st=(await query<any>('select * from students where user_id=$1',[jr.user_id]))[0];
+      if(st)await query('update students set center_id=$1,circle_id=$2,status=\'active\',updated_at=now() where id=$3',[jr.center_id,jr.circle_id,st.id]);
+      else await query('insert into students(user_id,center_id,circle_id,full_name,status) values($1,$2,$3,$4,\'active\')',[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب']);
+    }
+    await query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
+    return json(res,200,{success:true});
+  }
+  return json(res,405,{error:'Method not allowed'});
+}
 async function motivation(req:any,res:any,u:any){
   await ensureExtendedSchema();
   const sub=String(req.query?.sub||'list');
@@ -407,6 +445,7 @@ export default async function handler(req:any,res:any){
     if(action==='student-profile')return studentProfile(req,res,u);
     if(action==='day-approve')return dayApprove(req,res,u);
     if(action==='self-service')return selfService(req,res,u);
+    if(action==='join-requests')return joinRequests(req,res,u);
     if(action==='motivation')return motivation(req,res,u);
     if(action==='notifications')return notifications(req,res,u);
     if(action==='competitions')return competitions(req,res,u);
