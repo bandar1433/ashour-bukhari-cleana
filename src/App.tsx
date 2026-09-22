@@ -653,6 +653,17 @@ export default function App() {
   );
 }
 
+function AttendanceEditor({rows,onChanged}:{rows:any[];onChanged:()=>Promise<void>}){
+ const [edit,setEdit]=useState<any>(null);
+ async function save(e:any){e.preventDefault();const b:any=Object.fromEntries(new FormData(e.currentTarget).entries());b.student_id=edit.student_id;await apiPut('/api/attendance',b);setEdit(null);await onChanged()}
+ return <><GenericTable rows={rows} columns={[[ 'attendance_date','التاريخ'],['full_name','الطالب'],['circle_name','الحلقة'],['status','الحالة'],['late_minutes','التأخر'],['points_penalty','الخصم']]}/>{rows.length>0&&<div className="editPicker"><label className="field"><span>اختر سجلًا للتعديل</span><select value={edit?.id||''} onChange={e=>setEdit(rows.find(x=>x.id===e.target.value)||null)}><option value="">اختر الطالب والتاريخ</option>{rows.map(r=><option key={r.id} value={r.id}>{r.full_name} — {String(r.attendance_date).slice(0,10)}</option>)}</select></label></div>}{edit&&<form className="quickForm" onSubmit={save}><input type="hidden" name="attendance_date" value={String(edit.attendance_date).slice(0,10)}/><label className="field"><span>الحالة</span><select name="status" defaultValue={edit.status}><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue={edit.late_minutes||0}/></label><label className="field"><span>الخصم</span><input name="points_penalty" type="number" defaultValue={edit.points_penalty||0}/></label><label className="field"><span>وقت الحضور</span><input name="check_in_at" type="datetime-local" defaultValue={edit.check_in_at?String(edit.check_in_at).slice(0,16):''}/></label><label className="field"><span>وقت الانصراف</span><input name="check_out_at" type="datetime-local" defaultValue={edit.check_out_at?String(edit.check_out_at).slice(0,16):''}/></label><label className="field"><span>ملاحظات</span><input name="notes" defaultValue={edit.notes||''}/></label><button className="primary">حفظ تعديل الحضور</button></form>}</>
+}
+function MemorizationEditor({rows,onChanged}:{rows:any[];onChanged:()=>Promise<void>}){
+ const [edit,setEdit]=useState<any>(null);
+ async function save(e:any){e.preventDefault();const b:any=Object.fromEntries(new FormData(e.currentTarget).entries());b.id=edit.id;b.student_id=edit.student_id;await apiPut('/api/memorization',b);setEdit(null);await onChanged()}
+ return <><GenericTable rows={rows} columns={[[ 'record_date','التاريخ'],['full_name','الطالب'],['record_type','النوع'],['surah_no','السورة'],['from_page','من صفحة'],['to_page','إلى صفحة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>{rows.length>0&&<div className="editPicker"><label className="field"><span>اختر تسميعًا للتعديل</span><select value={edit?.id||''} onChange={e=>setEdit(rows.find(x=>x.id===e.target.value)||null)}><option value="">اختر السجل</option>{rows.map(r=><option key={r.id} value={r.id}>{r.full_name} — {String(r.record_date).slice(0,10)} — {r.record_type}</option>)}</select></label></div>}{edit&&<form className="quickForm" onSubmit={save}><input type="hidden" name="record_date" value={String(edit.record_date).slice(0,10)}/><label className="field"><span>النوع</span><select name="record_type" defaultValue={edit.record_type}><option value="new">حفظ جديد</option><option value="review">مراجعة</option><option value="recitation">تلاوة</option></select></label><label className="field"><span>السورة</span><input name="surah_no" type="number" min="1" max="114" defaultValue={edit.surah_no}/></label><label className="field"><span>من صفحة</span><input name="from_page" type="number" min="1" max="604" defaultValue={edit.from_page||''}/></label><label className="field"><span>إلى صفحة</span><input name="to_page" type="number" min="1" max="604" defaultValue={edit.to_page||''}/></label><label className="field"><span>من آية</span><input name="from_ayah" type="number" min="1" defaultValue={edit.from_ayah}/></label><label className="field"><span>إلى آية</span><input name="to_ayah" type="number" min="1" defaultValue={edit.to_ayah}/></label><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" defaultValue={edit.grade||''}/></label><label className="field"><span>ملاحظات</span><input name="notes" defaultValue={edit.notes||''}/></label><button className="primary">حفظ تعديل التسميع</button></form>}</>
+}
+
 function GenericTable({rows,columns}:{rows:any[];columns:[string,string][]}){if(!rows.length)return <div className="empty">لا توجد بيانات مسجلة حتى الآن.</div>;return <div className="table-wrap"><table><thead><tr>{columns.map(([k,l])=><th key={k}>{l}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([k])=><td key={k}>{typeof r[k]==='boolean'?(r[k]?'نعم':'لا'):(r[k]??'—')}</td>)}</tr>)}</tbody></table></div>}
 
 function ModuleCard({ icon, title, value, note }: { icon:string; title:string; value?:number; note:string }) { return <div className="module-card"><div className="module-icon">{icon}</div><div><strong>{title}</strong><p>{note}</p></div><b>{typeof value==='number'?value.toLocaleString('ar-SA'):'—'}</b></div>; }
@@ -666,23 +677,22 @@ function StatCard({ label, value }: { label: string; value?: number }) {
   );
 }
 
-function StudentsTable({ rows, circles, onChanged }: { rows: StudentRow[]; circles: CircleRow[]; onChanged:()=>Promise<void> }) {
+function StudentsTable({ rows, circles, currentRole, onChanged }: { rows: StudentRow[]; circles: CircleRow[]; currentRole:string; onChanged:()=>Promise<void> }) {
+  const [editing,setEditing]=useState<any>(null);
   if (!rows.length) return <div className="empty">لا توجد بيانات طلاب مطابقة.</div>;
   async function updateStudent(id:string,body:any){await apiPut('/api/students',{id,...body});await onChanged();}
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead><tr><th>الاسم</th><th>البريد</th><th>الحلقة</th><th>المركز</th><th>الحالة</th><th>النقاط</th></tr></thead>
-        <tbody>{rows.map(row=><tr key={row.id}>
-          <td>{row.full_name}</td><td>{row.email||'—'}</td>
-          <td><select aria-label={`حلقة ${row.full_name}`} value={row.circle_id||''} onChange={e=>updateStudent(row.id,{circle_id:e.target.value||null,center_id:e.target.value?undefined:null})}><option value="">غير مسند</option>{circles.map(c=><option key={c.id} value={c.id}>{c.name} — {c.center_name||''}</option>)}</select></td>
-          <td>{row.center_name||'غير مسند'}</td>
-          <td><select aria-label={`حالة ${row.full_name}`} value={row.status||'active'} onChange={e=>updateStudent(row.id,{status:e.target.value})}><option value="active">نشط</option><option value="excused">مستأذن</option><option value="suspended">موقوف</option></select></td>
-          <td>{row.points_balance??0}</td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-  );
+  async function save(e:any){e.preventDefault();const fd=new FormData(e.currentTarget);await updateStudent(editing.id,Object.fromEntries(fd.entries()));setEditing(null)}
+  return <><div className="table-wrap"><table><thead><tr><th>الاسم</th><th>البريد</th><th>الحلقة</th><th>المركز</th><th>الحالة</th><th>النقاط</th><th>التعديل</th></tr></thead>
+    <tbody>{rows.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email||'—'}</td><td>{row.circle_name||'غير مسند'}</td><td>{row.center_name||'غير مسند'}</td><td>{row.status}</td><td>{row.points_balance??0}</td><td><button className="secondary" onClick={()=>setEditing(row)}>تعديل الملف</button></td></tr>)}</tbody></table></div>
+    {editing&&<div className="panel editPanel"><div className="panelHead"><h3>تعديل ملف الطالب</h3><button className="secondary" onClick={()=>setEditing(null)}>إغلاق</button></div><form className="quickForm" onSubmit={save}>
+      <label className="field"><span>اسم الطالب</span><input name="full_name" defaultValue={editing.full_name} required/></label>
+      <label className="field"><span>المرحلة/المستوى</span><input name="grade_level" defaultValue={editing.grade_level||''}/></label>
+      <label className="field"><span>تاريخ الميلاد</span><input name="birth_date" type="date" defaultValue={editing.birth_date?String(editing.birth_date).slice(0,10):''}/></label>
+      <label className="field"><span>الحالة</span><select name="status" defaultValue={editing.status||'active'}><option value="active">نشط</option><option value="excused">مستأذن</option><option value="suspended">موقوف</option></select></label>
+      {currentRole!=='teacher'&&<label className="field"><span>الحلقة</span><select name="circle_id" defaultValue={editing.circle_id||''}><option value="">غير مسند</option>{circles.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+      <button className="primary">حفظ التعديلات</button>
+    </form></div>}
+  </>;
 }
 
 function CirclesTable({ rows, users, onChanged }: { rows: CircleRow[]; users: UserRow[]; onChanged:()=>Promise<void> }) {
