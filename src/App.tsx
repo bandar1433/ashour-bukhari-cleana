@@ -154,16 +154,13 @@ export default function App() {
       const role=getAccessCode()?'system_admin':getSessionRole();
       const root=role==='system_admin';
       const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
-      const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, attendanceData, memorizationData, plansData, newsData] = await Promise.all([
+      const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, newsData] = await Promise.all([
         staff?apiGet<Summary>('/api/ops?action=summary'):Promise.resolve(null),
         staff?apiGet<{ items: CenterRow[] }>('/api/centers'):Promise.resolve({items:[]}),
         staff?apiGet<{ items: StudentRow[] }>('/api/students'):Promise.resolve({items:[]}),
         staff?apiGet<{ items: CircleRow[] }>('/api/circles'):Promise.resolve({items:[]}),
         (root||role==='center_manager')?apiGet<{ items: UserRow[]; requests?: any[] }>('/api/users'):Promise.resolve({items:[],requests:[]}),
         root?apiGet<any>('/api/roles'):Promise.resolve({roles:[],permissions:[]}),
-        staff?apiGet<{ items: any[] }>('/api/attendance'):Promise.resolve({items:[]}),
-        staff?apiGet<{ items:any[] }>('/api/memorization'):Promise.resolve({items:[]}),
-        staff?apiGet<{ items:any[] }>('/api/plans'):Promise.resolve({items:[]}),
         root?apiGet<{ items:any[] }>('/api/news'):Promise.resolve({items:[]}),
       ]);
 
@@ -171,7 +168,7 @@ export default function App() {
       setCenters(centersData.items || []);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
-      setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setAttendance(attendanceData.items||[]); setMemorization(memorizationData.items||[]); setPlans(plansData.items||[]); setNews(newsData.items||[]);
+      setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setNews(newsData.items||[]);
       setLoadState('ready');
     } catch (err) {
       setLoadState('error');
@@ -356,6 +353,9 @@ export default function App() {
     if(activeTab==='teacherToday')loadTeacherToday();
     if(activeTab==='circleRegister')loadCircleRegister();
     if(activeTab==='evaluations')loadEvaluations();
+    if(activeTab==='attendance')apiGet<{items:any[]}>('/api/attendance').then(x=>setAttendance(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل الحضور')));
+    if(activeTab==='memorization')apiGet<{items:any[]}>('/api/memorization').then(x=>setMemorization(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل التسميع')));
+    if(activeTab==='plans')apiGet<{items:any[]}>('/api/plans').then(x=>setPlans(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل الخطط')));
     if(activeTab==='studentProfile'&&currentRole==='student'&&!studentProfile)openStudentProfile('me');
   },[activeTab]);
 
