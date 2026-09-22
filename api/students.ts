@@ -7,7 +7,7 @@ export default async function handler(req:any,res:any){
     const u=await getActor(req,res);if(!u)return;
     if(req.method==='GET'){
       const rows=await query(`
-        select s.id,s.user_id,s.center_id,s.circle_id,s.full_name,
+        select s.id,s.user_id,s.center_id,s.circle_id,s.full_name,s.birth_date,s.grade_level,s.registration_date,
           us.email,coalesce(us.is_active,true) as is_active,s.status,s.points_balance,
           c.name as circle_name,ce.name as center_name
         from students s
