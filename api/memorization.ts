@@ -1,5 +1,34 @@
-import { query } from './_lib/db.js'; import { handleError,json,requireAccess } from './_lib/http.js';
-export default async function handler(req:any,res:any){if(!requireAccess(req,res))return;try{
-if(req.method==='GET'){const rows=await query(`select m.id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_ayah,m.from_page,m.to_page,m.grade,m.qiraah,m.approved,coalesce(s.full_name,u.full_name,'بدون اسم') full_name from memorization_records m join students s on s.id=m.student_id left join users u on u.id=s.user_id order by m.record_date desc,m.created_at desc limit 300`);return json(res,200,{items:rows})}
-if(req.method==='POST'){const b=req.body||{};const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,[b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,Number(b.to_ayah)-Number(b.from_ayah)+1,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,b.record_date||new Date().toISOString().slice(0,10)]);return json(res,201,rows[0])}
-return json(res,405,{error:'Method not allowed'});}catch(e){return handleError(res,e)}}
+import { query } from './_lib/db.js';
+import { getActor,isStaff } from './_lib/actor.js';
+import { handleError,json } from './_lib/http.js';
+
+export default async function handler(req:any,res:any){
+  try{
+    const u=await getActor(req,res);if(!u)return;
+    if(req.method==='GET'){
+      if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+      const rows=await query(`
+        select m.id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_ayah,m.from_page,m.to_page,m.grade,m.qiraah,m.approved,
+          coalesce(s.full_name,us.full_name,'بدون اسم') full_name
+        from memorization_records m join students s on s.id=m.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id
+        where $1='system_admin'
+          or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid)
+          or ($1='teacher' and c.teacher_user_id=$3::uuid)
+        order by m.record_date desc,m.created_at desc limit 300
+      `,[u.role,u.center_id,u.id]);
+      return json(res,200,{items:rows});
+    }
+    if(req.method==='POST'){
+      if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+      const b=req.body||{};
+      const s=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
+      if(!s)return json(res,404,{error:'الطالب غير موجود'});
+      const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
+      if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
+      const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) returning *`,
+        [b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,Number(b.to_ayah)-Number(b.from_ayah)+1,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,b.record_date||new Date().toISOString().slice(0,10),u.id]);
+      return json(res,201,rows[0]);
+    }
+    return json(res,405,{error:'Method not allowed'});
+  }catch(e){return handleError(res,e)}
+}
