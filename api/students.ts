@@ -40,11 +40,12 @@ export default async function handler(req:any,res:any){
       return json(res,201,rows[0]);
     }
     if(req.method==='PUT'){
-      if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الطلاب غير متاح لهذا الحساب.'});
+      if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الطلاب غير متاح لهذا الحساب.'});
       const b=req.body||{};if(!b.id)return json(res,400,{error:'معرف الطالب مطلوب'});
-      const existing=(await query<any>('select * from students where id=$1',[b.id]))[0];
+      const existing=(await query<any>('select s.*,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1',[b.id]))[0];
       if(!existing)return json(res,404,{error:'الطالب غير موجود'});
-      if(u.role!=='system_admin'&&existing.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الطالب خارج مركزك.'});
+      if(u.role==='teacher'&&existing.teacher_user_id!==u.id)return json(res,403,{error:'Forbidden',message:'الطالب خارج حلقتك.'});
+      if(['center_manager','supervisor'].includes(u.role)&&existing.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الطالب خارج مركزك.'});
       let centerId=b.center_id!==undefined?(b.center_id||null):existing.center_id;
       let circleId=b.circle_id!==undefined?(b.circle_id||null):existing.circle_id;
       if(circleId){
@@ -52,9 +53,10 @@ export default async function handler(req:any,res:any){
         if(!circle)return json(res,400,{error:'الحلقة المحددة غير موجودة'});
         centerId=circle.center_id;
       }
-      if(u.role!=='system_admin'&&centerId!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك نقل الطالب خارج مركزك.'});
-      const rows=await query(`update students set full_name=coalesce($2,full_name),center_id=$3,circle_id=$4,grade_level=coalesce($5,grade_level),status=coalesce($6::student_status,status),updated_at=now() where id=$1 returning *`,
-        [b.id,b.full_name?.trim()||null,centerId,circleId,b.grade_level||null,b.status||null]);
+      if(u.role==='teacher'&&circleId!==existing.circle_id)return json(res,403,{error:'Forbidden',message:'المعلم يستطيع تعديل بيانات الطالب داخل حلقته، ونقل الطالب بين الحلقات من صلاحية الإدارة.'});
+      if(['center_manager','supervisor'].includes(u.role)&&centerId!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك نقل الطالب خارج مركزك.'});
+      const rows=await query(`update students set full_name=coalesce($2,full_name),center_id=$3,circle_id=$4,birth_date=coalesce($5::date,birth_date),grade_level=coalesce($6,grade_level),status=coalesce($7::student_status,status),updated_at=now() where id=$1 returning *`,
+        [b.id,b.full_name?.trim()||null,centerId,circleId,b.birth_date||null,b.grade_level||null,b.status||null]);
       return json(res,200,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
