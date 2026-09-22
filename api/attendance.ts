@@ -17,13 +17,17 @@ export default async function handler(req:any,res:any){
       `,[u.role,u.center_id,u.id]);
       return json(res,200,{items:rows});
     }
-    if(req.method==='POST'){
+    if(req.method==='POST'||req.method==='PUT'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};
+      const recordDate=String(b.attendance_date||new Date().toISOString().slice(0,10));
       const s=(await query<any>(`select s.id,s.circle_id,s.center_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
       if(!s?.circle_id)return json(res,400,{error:'الطالب غير مرتبط بحلقة'});
       const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
       if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
+      const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];
+      const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
+      if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
       const rows=await query(`insert into attendance(student_id,circle_id,attendance_date,status,late_minutes,points_penalty,notes,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8) on conflict(student_id,attendance_date) do update set status=excluded.status,late_minutes=excluded.late_minutes,points_penalty=excluded.points_penalty,notes=excluded.notes,recorded_by=excluded.recorded_by returning *`,
         [b.student_id,s.circle_id,b.attendance_date,b.status||'present',Number(b.late_minutes||0),Number(b.points_penalty||0),b.notes||null,u.id]);
       return json(res,200,rows[0]);
