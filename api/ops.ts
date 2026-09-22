@@ -7,26 +7,6 @@ const today=()=>new Date().toISOString().slice(0,10);
 const int=(v:any,min=0,max=100000)=>{const n=Number(v);if(!Number.isInteger(n)||n<min||n>max)throw new Error('قيمة رقمية غير صالحة');return n};
 const txt=(v:any,max=1000)=>String(v??'').trim().slice(0,max);
 
-async function ensureExtendedSchema(){
-  await query(`CREATE TABLE IF NOT EXISTS circle_tasks(
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    circle_id uuid NOT NULL REFERENCES circles(id) ON DELETE CASCADE,
-    name text NOT NULL, answer_type text NOT NULL CHECK(answer_type IN ('done','count')),
-    points_per_unit integer NOT NULL DEFAULT 1,max_units integer NOT NULL DEFAULT 1,
-    is_active boolean NOT NULL DEFAULT true,created_by uuid REFERENCES users(id),
-    created_at timestamptz NOT NULL DEFAULT now())`);
-  await query(`CREATE TABLE IF NOT EXISTS task_entries(
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),task_id uuid NOT NULL REFERENCES circle_tasks(id) ON DELETE CASCADE,
-    student_id uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,entry_date date NOT NULL,
-    units integer NOT NULL DEFAULT 0,points integer NOT NULL DEFAULT 0,updated_by uuid REFERENCES users(id),
-    updated_at timestamptz NOT NULL DEFAULT now(),UNIQUE(task_id,student_id,entry_date))`);
-  await query(`ALTER TABLE rewards ADD COLUMN IF NOT EXISTS circle_id uuid REFERENCES circles(id) ON DELETE CASCADE`);
-  await query(`ALTER TABLE rewards ADD COLUMN IF NOT EXISTS image_path text`);
-  await query(`CREATE TABLE IF NOT EXISTS reward_requests(
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),reward_id uuid NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
-    student_id uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,status text NOT NULL DEFAULT 'pending',
-    requested_at timestamptz NOT NULL DEFAULT now(),decided_by uuid REFERENCES users(id),decided_at timestamptz)`);
-}
 async function scopedStudent(u:any,idValue:any){
   const sid=validUuid(idValue); if(!sid)return null;
   return (await query<any>(`select s.*,h.teacher_user_id from students s left join circles h on h.id=s.circle_id where s.id=$4 and
@@ -225,7 +205,6 @@ async function joinRequests(req:any,res:any,u:any){
   return json(res,405,{error:'Method not allowed'});
 }
 async function motivation(req:any,res:any,u:any){
-  await ensureExtendedSchema();
   const sub=String(req.query?.sub||'list');
   if(sub==='list'&&req.method==='GET'){
     const month=validMonth(req.query?.month)||today().slice(0,7);
