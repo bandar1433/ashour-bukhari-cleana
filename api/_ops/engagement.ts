@@ -1,0 +1,190 @@
+import { getPool, query } from '../_lib/db.js';
+import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
+import { json } from '../_lib/http.js';
+import { managers,today,int,txt,scopedStudent } from './shared.js';
+
+export async function joinRequests(req:any,res:any,u:any){
+  const sub=String(req.query?.sub||'list');
+  if(sub==='circles'&&req.method==='GET'){
+    return json(res,200,{items:await query<any>("select h.id,h.name,c.name center_name from circles h join centers c on c.id=h.center_id where h.is_active order by c.name,h.name")});
+  }
+  if(sub==='request'&&req.method==='POST'){
+    if(!['student','guardian'].includes(u.role))return json(res,403,{error:'هذه الخدمة للطالب أو ولي الأمر'});
+    const circleId=validUuid(req.body?.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+    const exists=(await query<any>("select id from circle_join_requests where user_id=$1 and circle_id=$2 and status='pending'",[u.id,circleId]))[0];
+    if(exists)return json(res,400,{error:'يوجد طلب قائم لهذه الحلقة'});
+    return json(res,201,(await query<any>("insert into circle_join_requests(user_id,circle_id,requested_role,status) values($1,$2,$3,'pending') returning *",[u.id,circleId,u.role]))[0]);
+  }
+  if(sub==='list'&&req.method==='GET'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const rows=await query<any>(`select jr.*,coalesce(us.full_name,us.email) applicant_name,us.email,h.name circle_name,c.name center_name
+      from circle_join_requests jr join users us on us.id=jr.user_id join circles h on h.id=jr.circle_id join centers c on c.id=h.center_id
+      where jr.status='pending' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and c.id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
+      order by jr.requested_at desc`,[u.role,u.center_id,u.id]);
+    return json(res,200,{items:rows});
+  }
+  if(sub==='decide'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const id=validUuid(req.body?.request_id),decision=String(req.body?.decision||'');
+    if(!id||!['approved','rejected'].includes(decision))return json(res,400,{error:'بيانات القرار غير صالحة'});
+    const jr=(await query<any>(`select jr.*,h.center_id,h.teacher_user_id,us.full_name from circle_join_requests jr join circles h on h.id=jr.circle_id join users us on us.id=jr.user_id where jr.id=$1`,[id]))[0];
+    if(!jr)return json(res,404,{error:'الطلب غير موجود'});
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===jr.center_id)||(u.role==='teacher'&&u.id===jr.teacher_user_id);
+    if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
+    if(decision==='approved'&&jr.requested_role==='student'){
+      let st=(await query<any>('select * from students where user_id=$1',[jr.user_id]))[0];
+      if(st)await query('update students set center_id=$1,circle_id=$2,status=\'active\',updated_at=now() where id=$3',[jr.center_id,jr.circle_id,st.id]);
+      else await query('insert into students(user_id,center_id,circle_id,full_name,status) values($1,$2,$3,$4,\'active\')',[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب']);
+    }
+    await query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
+    return json(res,200,{success:true});
+  }
+  return json(res,405,{error:'Method not allowed'});
+}
+
+export async function motivation(req:any,res:any,u:any){
+  const sub=String(req.query?.sub||'list');
+  if(sub==='list'&&req.method==='GET'){
+    const month=validMonth(req.query?.month)||today().slice(0,7);
+    let target:any=null;
+    if(req.query?.student_id)target=await scopedStudent(u,req.query.student_id);
+    if(!target&&u.role==='student')target=(await query<any>('select * from students where user_id=$1',[u.id]))[0];
+    let circleId=validUuid(req.query?.circle_id)||target?.circle_id||null;
+    if(!circleId&&u.role==='teacher')circleId=(await query<any>('select id from circles where teacher_user_id=$1 order by name limit 1',[u.id]))[0]?.id||null;
+    if(!circleId&&managers.includes(u.role))circleId=(await query<any>(`select id from circles where $1='system_admin' or center_id=$2::uuid order by name limit 1`,[u.role,u.center_id]))[0]?.id||null;
+    if(!circleId)return json(res,200,{month,tasks:[],students:[],entries:[],rewards:[],requests:[],rankings:[]});
+    const allowed=(await query<any>(`select id,name from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid) or exists(select 1 from students s where s.circle_id=circles.id and s.user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
+    if(!allowed)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
+    const [tasks,students,entries,rewards,requests,rankings]=await Promise.all([
+      query<any>('select * from circle_tasks where circle_id=$1 and is_active order by created_at',[circleId]),
+      query<any>(`select id,full_name,points_balance from students where circle_id=$1 and status='active' order by full_name`,[circleId]),
+      query<any>(`select e.*,t.name task_name from task_entries e join circle_tasks t on t.id=e.task_id where t.circle_id=$1 and to_char(e.entry_date,'YYYY-MM')=$2 and ($3::uuid is null or e.student_id=$3)`,[circleId,month,target?.id||null]),
+      query<any>('select * from rewards where is_active and circle_id=$1 order by points_cost',[circleId]),
+      query<any>(`select rr.*,r.name reward_name,s.full_name from reward_requests rr join rewards r on r.id=rr.reward_id join students s on s.id=rr.student_id where r.circle_id=$1 and ($2::uuid is null or rr.student_id=$2) order by rr.requested_at desc`,[circleId,target?.id||null]),
+      query<any>(`select s.id,s.full_name,s.points_balance,coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-29),0) quran_average,
+        coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-29),0) attendance_rate
+        from students s where s.circle_id=$1 and s.status='active' order by s.points_balance desc,quran_average desc,attendance_rate desc limit 30`,[circleId])
+    ]);
+    return json(res,200,{month,circle:allowed,student:target,tasks,students,entries,rewards,requests,rankings});
+  }
+  if(sub==='task'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},circleId=validUuid(b.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+    const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
+    if(!allowed)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
+    const answer=String(b.answer_type||'done');if(!['done','count'].includes(answer))return json(res,400,{error:'نوع المهمة غير صالح'});
+    const row=(await query<any>('insert into circle_tasks(circle_id,name,answer_type,points_per_unit,max_units,created_by) values($1,$2,$3,$4,$5,$6) returning *',
+      [circleId,txt(b.name,200),answer,int(b.points_per_unit,1,1000),answer==='done'?1:int(b.max_units,1,20),u.id]))[0];
+    return json(res,201,row);
+  }
+  if(sub==='entry'&&req.method==='POST'){
+    const b=req.body||{};let s:any;
+    if(u.role==='student')s=(await query<any>('select * from students where user_id=$1',[u.id]))[0];
+    else s=await scopedStudent(u,b.student_id);
+    if(!s)return json(res,404,{error:'الطالب غير موجود أو خارج النطاق'});
+    const d=validDate(b.entry_date)||today();if(u.role==='student'&&d!==today())return json(res,403,{error:'يمكن للطالب التسجيل في اليوم الحالي فقط'});
+    const task=(await query<any>('select * from circle_tasks where id=$1 and circle_id=$2 and is_active',[validUuid(b.task_id),s.circle_id]))[0];
+    if(!task)return json(res,400,{error:'المهمة غير متاحة'});
+    const units=int(b.units,0,Number(task.max_units)),points=units*Number(task.points_per_unit);
+    const old=(await query<any>('select points from task_entries where task_id=$1 and student_id=$2 and entry_date=$3',[task.id,s.id,d]))[0];
+    const row=(await query<any>(`insert into task_entries(task_id,student_id,entry_date,units,points,updated_by) values($1,$2,$3,$4,$5,$6)
+      on conflict(task_id,student_id,entry_date) do update set units=excluded.units,points=excluded.points,updated_by=excluded.updated_by,updated_at=now() returning *`,
+      [task.id,s.id,d,units,points,u.id]))[0];
+    const delta=points-Number(old?.points||0);
+    if(delta){
+      await query('update students set points_balance=greatest(0,points_balance+$1) where id=$2',[delta,s.id]);
+      await query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,$3,'circle_task',$4)`,[s.id,delta,`مهمة: ${task.name}`,u.id]);
+    }
+    return json(res,200,row);
+  }
+  if(sub==='reward'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},circleId=validUuid(b.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+    const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
+    if(!allowed)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
+    return json(res,201,(await query<any>('insert into rewards(name,description,points_cost,stock,circle_id,image_path) values($1,$2,$3,$4,$5,$6) returning *',[txt(b.name,200),txt(b.description,1000)||null,int(b.points_cost,1,100000),int(b.stock,0,100000),circleId,txt(b.image_path,1000)||null]))[0]);
+  }
+  if(sub==='reward-request'&&req.method==='POST'){
+    if(u.role!=='student')return json(res,403,{error:'هذه الخدمة للطالب'});
+    const s=(await query<any>('select * from students where user_id=$1',[u.id]))[0];if(!s)return json(res,404,{error:'لم يتم ربط الحساب بالطالب'});
+    const reward=(await query<any>('select * from rewards where id=$1 and circle_id=$2 and is_active',[validUuid(req.body?.reward_id),s.circle_id]))[0];
+    if(!reward||Number(reward.stock)<1)return json(res,400,{error:'الجائزة غير متاحة'});
+    if(Number(s.points_balance)<Number(reward.points_cost))return json(res,400,{error:'رصيد النقاط غير كاف'});
+    const pending=(await query<any>(`select id from reward_requests where reward_id=$1 and student_id=$2 and status='pending'`,[reward.id,s.id]))[0];
+    if(pending)return json(res,400,{error:'لديك طلب قائم لهذه الجائزة'});
+    return json(res,201,(await query<any>('insert into reward_requests(reward_id,student_id) values($1,$2) returning *',[reward.id,s.id]))[0]);
+  }
+  if(sub==='reward-approve'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const requestId=validUuid(req.body?.request_id);if(!requestId)return json(res,400,{error:'طلب غير صالح'});
+    const rr=(await query<any>(`select rr.*,r.circle_id,c.teacher_user_id,c.center_id from reward_requests rr join rewards r on r.id=rr.reward_id join circles c on c.id=r.circle_id where rr.id=$1`,[requestId]))[0];
+    if(!rr||rr.status!=='pending')return json(res,400,{error:'الطلب غير متاح'});
+    const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===rr.center_id)||(u.role==='teacher'&&u.id===rr.teacher_user_id);
+    if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
+    await query(`update reward_requests set status='approved',decided_by=$1,decided_at=now() where id=$2`,[u.id,requestId]);
+    return json(res,200,{success:true,status:'approved'});
+  }
+  if(sub==='reward-deliver'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const requestId=validUuid(req.body?.request_id);if(!requestId)return json(res,400,{error:'طلب غير صالح'});
+    const client=await getPool().connect();
+    try{
+      await client.query('begin');
+      const rr=(await client.query(`select rr.*,r.points_cost,r.stock,r.circle_id,c.teacher_user_id,c.center_id from reward_requests rr join rewards r on r.id=rr.reward_id join circles c on c.id=r.circle_id where rr.id=$1 for update`,[requestId])).rows[0];
+      if(!rr||rr.status!=='approved')throw new Error('يجب اعتماد الطلب أولاً');
+      const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===rr.center_id)||(u.role==='teacher'&&u.id===rr.teacher_user_id);
+      if(!allowed)throw new Error('الطلب خارج نطاق صلاحيتك');
+      if(Number(rr.stock)<1)throw new Error('نفدت الكمية');
+      const changed=await client.query('update students set points_balance=points_balance-$1 where id=$2 and points_balance>=$1 returning id',[rr.points_cost,rr.student_id]);
+      if(!changed.rowCount)throw new Error('رصيد الطالب لم يعد كافيًا');
+      await client.query('update rewards set stock=stock-1 where id=$1',[rr.reward_id]);
+      await client.query(`update reward_requests set status='delivered',delivered_by=$1,delivered_at=now() where id=$2`,[u.id,requestId]);
+      await client.query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,'تسليم جائزة','reward',$3)`,[rr.student_id,-rr.points_cost,u.id]);
+      await client.query('commit');return json(res,200,{success:true,status:'delivered'});
+    }catch(e){await client.query('rollback');throw e}finally{client.release()}
+  }
+  return json(res,405,{error:'Method not allowed'});
+}
+
+export async function notifications(req:any,res:any,u:any){
+  if(req.method==='GET')return json(res,200,await query<any>('select * from inapp_notifications where user_id=$1 order by created_at desc limit 100',[u.id]));
+  const sub=String(req.query?.sub||'');
+  if(req.method==='POST'&&sub==='send'){
+    if(!managers.includes(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
+    const rows=await query<any>(`insert into inapp_notifications(user_id,title,body,kind) select id,$1,$2,'admin' from users where is_active and ($3::uuid is null or center_id=$3::uuid) returning id`,
+      [txt(b.title,200),txt(b.body,2000),centerId]);return json(res,200,{sent:rows.length});
+  }
+  if(req.method==='PUT'&&sub==='read'){
+    const id=validUuid(req.query?.id);if(!id)return json(res,400,{error:'إشعار غير صالح'});
+    await query('update inapp_notifications set is_read=true where id=$1 and user_id=$2',[id,u.id]);return json(res,200,{success:true});
+  }
+  return json(res,405,{error:'Method not allowed'});
+}
+
+export async function competitions(req:any,res:any,u:any){
+  const sub=String(req.query?.sub||'list');
+  if(req.method==='GET'){
+    const rows=u.role==='system_admin'
+      ?await query<any>(`select c.*,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c order by c.start_date desc`)
+      :await query<any>(`select c.*,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c where c.center_id is null or c.center_id=$1::uuid order by c.start_date desc`,[u.center_id]);
+    return json(res,200,rows);
+  }
+  if(req.method==='POST'&&sub==='create'){
+    if(!managers.includes(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date);if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
+    const centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
+    return json(res,201,(await query<any>('insert into competitions(center_id,title,start_date,end_date,created_by) values($1,$2,$3,$4,$5) returning *',[centerId,txt(b.title,300),start,end,u.id]))[0]);
+  }
+  if(req.method==='POST'&&sub==='score'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},s=await scopedStudent(u,b.student_id),competitionId=validUuid(b.competition_id);
+    if(!s||!competitionId)return json(res,400,{error:'بيانات الطالب أو المسابقة غير صالحة'});
+    const allowed=(await query<any>('select id from competitions where id=$1 and (center_id is null or center_id=$2)',[competitionId,s.center_id]))[0];
+    if(!allowed)return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
+    const row=(await query<any>(`insert into competition_entries(competition_id,student_id,score,notes,updated_by) values($1,$2,$3,$4,$5)
+      on conflict(competition_id,student_id) do update set score=excluded.score,notes=excluded.notes,updated_by=excluded.updated_by,updated_at=now() returning *`,
+      [competitionId,s.id,int(b.score,0,1000),txt(b.notes,1000)||null,u.id]))[0];return json(res,200,row);
+  }
+  return json(res,405,{error:'Method not allowed'});
+}
