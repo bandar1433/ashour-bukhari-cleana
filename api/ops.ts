@@ -25,7 +25,7 @@ async function ensureExtendedSchema(){
   await query(`CREATE TABLE IF NOT EXISTS reward_requests(
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),reward_id uuid NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
     student_id uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,status text NOT NULL DEFAULT 'pending',
-    requested_at timestamptz NOT NULL DEFAULT now(),approved_by uuid REFERENCES users(id),approved_at timestamptz)`);
+    requested_at timestamptz NOT NULL DEFAULT now(),decided_by uuid REFERENCES users(id),decided_at timestamptz)`);
 }
 async function scopedStudent(u:any,idValue:any){
   const sid=validUuid(idValue); if(!sid)return null;
@@ -83,7 +83,7 @@ async function evaluations(req:any,res:any,u:any){
   const from=validDate(req.query?.from)||today(), to=validDate(req.query?.to)||from;
   const settings=(await query<any>('select memorization_weight,review_weight,discipline_weight from operational_settings where id=1'))[0]||{memorization_weight:30,review_weight:40,discipline_weight:30};
   const rows=await query<any>(`with days as (
-    select s.id student_id,s.full_name,d::date day,(d::date-((extract(dow from d)::int+1)%7))::date week_start
+    select s.id student_id,s.full_name,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start
     from students s cross join generate_series($4::date,$5::date,'1 day') d where
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or
      ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
@@ -97,7 +97,7 @@ async function evaluations(req:any,res:any,u:any){
     sum(case when record_type='review' then coalesce((substring(notes from '— ([0-9]+) صفحة'))::numeric,0) else 0 end) review_pages
     from memorization_records where record_date between $4 and $5 group by student_id,record_date
   ), att as (select student_id,attendance_date,status,points_penalty from attendance where attendance_date between $4 and $5)
-  select days.student_id,days.full_name,days.day,att.status,round(coalesce(done.new_pages,0),2) new_pages,round(coalesce(done.review_pages,0),2) review_pages,
+  select days.student_id,days.full_name,days.record_day as day,att.status,round(coalesce(done.new_pages,0),2) new_pages,round(coalesce(done.review_pages,0),2) review_pages,
   round(coalesce(plans.new_daily_target,0),2) new_daily_target,round(coalesce(plans.review_daily_target,0),2) review_daily_target,
   case when coalesce(plans.new_daily_target,0)>0 then least(100,round(100*coalesce(done.new_pages,0)/plans.new_daily_target))::int else 0 end new_grade,
   case when coalesce(plans.review_daily_target,0)>0 then least(100,round(100*coalesce(done.review_pages,0)/plans.review_daily_target))::int else 0 end review_grade,
@@ -108,8 +108,8 @@ async function evaluations(req:any,res:any,u:any){
           ($8::numeric*(case when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,least(1,(100+coalesce(att.points_penalty,0))/100.0)) else 0 end)))::int
   end daily_score
   from days left join plans on plans.student_id=days.student_id and plans.week_start=days.week_start
-  left join done on done.student_id=days.student_id and done.record_date=days.day left join att on att.student_id=days.student_id and att.attendance_date=days.day
-  order by days.day desc,days.full_name`,[u.role,u.center_id,u.id,from,to,settings.memorization_weight,settings.review_weight,settings.discipline_weight]);
+  left join done on done.student_id=days.student_id and done.record_date=days.record_day left join att on att.student_id=days.student_id and att.attendance_date=days.record_day
+  order by days.record_day desc,days.full_name`,[u.role,u.center_id,u.id,from,to,settings.memorization_weight,settings.review_weight,settings.discipline_weight]);
   const scored=rows.filter((r:any)=>r.daily_score!==null);
   return json(res,200,{rows,weights:{new:settings.memorization_weight,review:settings.review_weight,attendance:settings.discipline_weight},
     formula:'الإنجاز اليومي مقارنة بالخطة الأسبوعية مع وزن الانضباط',average:scored.length?Math.round(scored.reduce((n:number,r:any)=>n+Number(r.daily_score),0)/scored.length):0});
@@ -268,7 +268,7 @@ async function motivation(req:any,res:any,u:any){
       const changed=await client.query('update students set points_balance=points_balance-$1 where id=$2 and points_balance>=$1 returning id',[rr.points_cost,rr.student_id]);
       if(!changed.rowCount)throw new Error('رصيد الطالب لم يعد كافيًا');
       await client.query('update rewards set stock=stock-1 where id=$1',[rr.reward_id]);
-      await client.query(`update reward_requests set status='approved',approved_by=$1,approved_at=now() where id=$2`,[u.id,requestId]);
+      await client.query(`update reward_requests set status='approved',decided_by=$1,decided_at=now() where id=$2`,[u.id,requestId]);
       await client.query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,'استبدال جائزة','reward',$3)`,[rr.student_id,-rr.points_cost,u.id]);
       await client.query('commit');return json(res,200,{success:true});
     }catch(e){await client.query('rollback');throw e}finally{client.release()}
