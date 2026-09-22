@@ -9,7 +9,7 @@ import {
   clearSessionToken,
   getAccessCode,
   getSessionToken,
-  getSessionRole,
+  getSessionRole, readableError,
   getStatus,
   setAccessCode,
   setSessionToken,
@@ -225,7 +225,7 @@ export default function App() {
         }
       }
     });
-    if(current?.error) throw new Error(current.error.message||'تعذر قراءة جلسة Google.');
+    if(current?.error) throw new Error(readableError(current.error,'تعذر قراءة جلسة Google.'));
     const user=current?.data?.user||current?.data?.session?.user;
     if(!current?.data?.session||!user)return false;
 
@@ -237,7 +237,7 @@ export default function App() {
       headers:{Accept:'application/json',Authorization:`Bearer ${jwt}`}
     });
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
+    if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
     if(payload?.pending){setError(payload.message||'الحساب بانتظار اعتماد الإدارة.');setAuthOpen(true);return false;}
     clearAccessCode();
     setSessionToken(payload.token);
@@ -257,8 +257,7 @@ export default function App() {
         disableRedirect:true
       });
       if(result?.error){
-        const detail=result.error.message||result.error.code||result.error.statusText||'تعذر تسجيل الدخول عبر Google';
-        throw new Error(detail);
+        throw new Error(readableError(result.error,'تعذر تسجيل الدخول عبر Google'));
       }
       const url=result?.data?.url||result?.url;
       if(!url) throw new Error('تعذر بدء تسجيل الدخول عبر Google.');
