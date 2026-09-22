@@ -1,5 +1,6 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {apiGet,apiPost,apiPut,CenterRow,CircleRow,StudentRow} from './lib/api';
+import {MadinahMushafRange} from './MadinahMushafRange';
 
 type Mode='selfService'|'motivation'|'competitions'|'notifications'|'reports'|'operations'|'joinRequests';
 export default function ExtendedOperations({mode,currentRole,students,circles,centers}:{mode:Mode;currentRole:string;students:StudentRow[];circles:CircleRow[];centers:CenterRow[]}){
