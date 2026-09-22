@@ -16,7 +16,8 @@
     "react-dom": "^18.3.1",
     "pg": "^8.13.1",
     "@neondatabase/neon-js": "0.7.0-beta",
-    "jose": "6.2.12"
+    "jose": "6.2.12",
+    "quran-meta": "^6.0.17"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
