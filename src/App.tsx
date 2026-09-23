@@ -117,6 +117,8 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
 };
 
+const EXPLICIT_LOGOUT_KEY = 'ashour_explicit_logout';
+
 export default function App() {
   const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
   const [enteredCode, setEnteredCode] = useState(getAccessCode());
@@ -200,6 +202,7 @@ export default function App() {
       loadDashboard();
       return;
     }
+    if(localStorage.getItem(EXPLICIT_LOGOUT_KEY)==='1') return;
     finishSocialSession().catch(err=>{
       const message=err instanceof Error?err.message:'تعذر استكمال تسجيل الدخول.';
       setError(message);
@@ -216,6 +219,7 @@ export default function App() {
     }
     setAuthBusy(true);
     setError('');
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     clearSessionToken();
     setAccessCode(cleaned);
     try {
@@ -258,6 +262,7 @@ export default function App() {
     if(payload?.pending){localStorage.removeItem('ashour_signup_draft');setError(payload.message||'الحساب بانتظار الاعتماد.');setAuthOpen(true);return false;}
     clearAccessCode();
     setSessionToken(payload.token);
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     setCode('session');
     setAuthOpen(false);
     setError('');localStorage.removeItem('ashour_signup_draft');
@@ -266,6 +271,7 @@ export default function App() {
 
   async function handleGoogleLogin(){
     setAuthBusy(true); setError('');
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try{
       if(authIntent==='signup'){
         const draft={name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId};
@@ -295,6 +301,7 @@ export default function App() {
     event.preventDefault();
     setAuthBusy(true);
     setError('');
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try{
       const email=accountForm.email.trim();
       const password=accountForm.password;
@@ -346,13 +353,16 @@ export default function App() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    localStorage.setItem(EXPLICIT_LOGOUT_KEY,'1');
     clearAccessCode();
     clearSessionToken();
-    authClient.signOut().catch(()=>{});
     setCode('');
     setAuthOpen(false);
     setEnteredCode('');
+    setPublicView('الرئيسية');
+    setActiveTab('overview');
+    setTabHistory([]);
     setSummary(null);
     setCenters([]);
     setStudents([]);
@@ -360,7 +370,20 @@ export default function App() {
     setUsers([]);
     setLoginRequests([]);
     setRoleData({roles:[],permissions:[]});
+    setPlans([]);
+    setNews([]);
+    setTeacherToday({students:[],approvals:[]});
+    setCircleRegister({students:[]});
+    setStudentProfile(null);
     setLoadState('idle');
+    setError('');
+    window.history.replaceState({},'',window.location.pathname);
+    window.scrollTo({top:0,behavior:'smooth'});
+    try{
+      await authClient.signOut();
+    }catch{
+      // The local application session is already cleared; keep the user on the public site.
+    }
   }
 
   async function loadTeacherToday(date=dailyDate){
@@ -512,7 +535,7 @@ export default function App() {
           {[
             ['01','منصة موحدة','لإدارة التعليم والمتابعة'],
             ['04','مسارات قرآنية','تلقين • حفظ • إتقان • قراءات'],
-            ['06','بوابات صلاحيات','لكل مستخدم ما يخصه'],
+            ['06','أدوار وصلاحيات','بدخول موحد واحد'],
             ['04','محاور تشغيلية','تعليم • حضور • تقارير • تحفيز']
           ].map(([number,label,detail],index)=><article key={label} className="statCard reveal reveal-up" style={{animationDelay:`${0.18+index*0.11}s`}}><b>{number}</b><span>{label}</span><small>{detail}</small></article>)}
         </section>
@@ -532,7 +555,7 @@ export default function App() {
             <div className="reportCards achievements">{report1447.achievements.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-tanzania','achievement-omar'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div>
           </section>
           <section className="section portalsSection">
-            <div className="sectionHead"><div><span>بوابات المنصة</span><h2>كل مستخدم يرى ما يخصه فقط</h2></div></div>
+            <div className="sectionHead"><div><span>أدوار وصلاحيات</span><h2>دخول واحد موحد، ومحتوى يظهر حسب صلاحية الحساب</h2></div><button className="secondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
             <div className="roleGrid">{[
               ['ولي الأمر','متابعة الحضور والإنجاز والتقارير'],
               ['الطالب','تعلم ومراجعة وإنجاز'],
@@ -540,7 +563,7 @@ export default function App() {
               ['المشرف','متابعة الأداء التعليمي'],
               ['مدير المركز','إدارة المركز والحلقات'],
               ['المدير','إدارة ومتابعة النظام']
-            ].map(([title,description],index)=><button className="roleCard reveal reveal-up" style={{animationDelay:`${0.12+index*0.08}s`}} key={title} onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}><i>◈</i><b>{title}</b><small>{description}</small><em>دخول البوابة ←</em></button>)}</div>
+            ].map(([title,description],index)=><article className="roleCard reveal reveal-up" style={{animationDelay:`${0.12+index*0.08}s`}} key={title}><i>◈</i><b>{title}</b><small>{description}</small><em>صلاحيات تظهر تلقائيًا بعد الدخول</em></article>)}</div>
           </section>
           <section className="featureBand reveal reveal-up">
             <div><span>منظومة واحدة لكل المسيرة</span><h2>من أول حفظ ومراجعة إلى تقرير الأسرة</h2><p>تجمع المنصة الحضور والحفظ الجديد والمراجعة والنقاط والتقارير في تجربة واحدة؛ لتصبح المعلومة أقرب والقرار أسرع والمتابعة أدق.</p><button className="featureCta" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>ابدأ من لوحة المنصة</button></div>
