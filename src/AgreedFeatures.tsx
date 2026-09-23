@@ -13,10 +13,10 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
   async function load(id=studentId){
     setBusy(true);setError('');
     try{
-      if(mode==='library') setData(await apiGet('/api/features?action=library'));
-      if(mode==='guardian') setData(await apiGet('/api/features?action=guardian'));
-      if(mode==='quranJourney') setData(await apiGet('/api/features?action=quran-journey'+(id?'&student_id='+encodeURIComponent(id):'')));
-      if(mode==='interventions') setData(await apiGet('/api/features?action=interventions'));
+      if(mode==='library') setData(await apiGet('/api/ops?action=features&sub=library'));
+      if(mode==='guardian') setData(await apiGet('/api/ops?action=features&sub=guardian'));
+      if(mode==='quranJourney') setData(await apiGet('/api/ops?action=features&sub=quran-journey'+(id?'&student_id='+encodeURIComponent(id):'')));
+      if(mode==='interventions') setData(await apiGet('/api/ops?action=features&sub=interventions'));
     }catch(e){setError(e instanceof Error?e.message:'تعذر تحميل البيانات')}
     finally{setBusy(false)}
   }
@@ -37,7 +37,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
     {error&&<div className="notice">{error}</div>}
     {canManageLibrary&&<form className="quickForm" onSubmit={async e=>{
       e.preventDefault();setBusy(true);
-      try{await apiPost('/api/features?action=library',formBody(e));e.currentTarget.reset();await load()}
+      try{await apiPost('/api/ops?action=features&sub=library',formBody(e));e.currentTarget.reset();await load()}
       catch(x){setError(x instanceof Error?x.message:'تعذر الحفظ')}
       finally{setBusy(false)}
     }}>
@@ -56,14 +56,14 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
       <small>{x.teacher_name||'—'} {x.duration?'• '+x.duration:''}</small>
       <p>{x.description||''}</p>
       <a href={x.youtube_url} target="_blank" rel="noreferrer">فتح الدرس في YouTube</a>
-      {canManageLibrary&&<button className="secondary" onClick={async()=>{await apiPut('/api/features?action=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button>}
+      {canManageLibrary&&<button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button>}
     </article>)}</div>
   </div>;
 
   if(mode==='guardian')return <div>
     {error&&<div className="notice">{error}</div>}
     <div className="opsToolbar"><label className="field"><span>دورية التقرير</span>
-      <select value={data?.preference||'weekly'} onChange={async e=>{await apiPost('/api/features?action=guardian-preference',{frequency:e.target.value});await load()}}>
+      <select value={data?.preference||'weekly'} onChange={async e=>{await apiPost('/api/ops?action=features&sub=guardian-preference',{frequency:e.target.value});await load()}}>
         <option value="weekly">أسبوعي</option><option value="monthly">شهري</option><option value="quarterly">ربع سنوي</option><option value="half_yearly">نصف سنوي</option><option value="yearly">سنوي</option>
       </select>
     </label></div>
