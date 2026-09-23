@@ -9,7 +9,7 @@ export async function selfService(req:any,res:any,u:any){
   if(!s)return json(res,404,{error:'لم يتم ربط حسابك بسجل الطالب'});
   if(req.method==='GET'){
     const att=(await query<any>('select attendance_date,status,check_in_at,check_out_at from attendance where student_id=$1 and attendance_date=current_date',[s.id]))[0]||null;
-    const recent=await query<any>('select record_date,record_type,surah_no,from_ayah,to_ayah,grade from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 12',[s.id]);
+    const recent=await query<any>("select record_date,record_type,surah_no,from_ayah,to_ayah,grade from memorization_records where student_id=$1 and record_type in ('new','review') order by record_date desc,created_at desc limit 12",[s.id]);
     return json(res,200,{student:s,attendance:att,recent});
   }
   if(req.method==='POST'){

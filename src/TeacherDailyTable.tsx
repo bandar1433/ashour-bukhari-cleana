@@ -3,7 +3,7 @@ import {apiPost,apiPut} from './lib/api';
 import {MadinahMushafRange} from './MadinahMushafRange';
 export default function TeacherDailyTable({data,date,onRefresh,onProfile}:{data:any;date:string;onRefresh:()=>Promise<void>;onProfile:(id:string)=>void}){
  const [edit,setEdit]=useState<any>(null); const rows=data?.students||[];
- async function attendance(r:any,status:string){await apiPost('/api/attendance',{student_id:r.id,attendance_date:date,status,late_minutes:r.late_minutes||0,check_in_at:status==='present'&&!r.check_in_at?new Date().toISOString():r.check_in_at||'',check_out_at:r.check_out_at||''});await onRefresh()}
+ async function attendance(r:any,status:string){await apiPost('/api/attendance',{student_id:r.id,attendance_date:date,status,late_minutes:r.late_minutes||0,check_in_at:(status==='present'||status==='late')&&!r.check_in_at?new Date().toISOString():r.check_in_at||'',check_out_at:r.check_out_at||''});await onRefresh()}
  async function checkout(r:any){await apiPost('/api/attendance',{student_id:r.id,attendance_date:date,status:r.attendance_status||'present',late_minutes:r.late_minutes||0,check_in_at:r.check_in_at||'',check_out_at:new Date().toISOString()});await onRefresh()}
  async function qsave(e:any){e.preventDefault();const body:any=Object.fromEntries(new FormData(e.currentTarget).entries());body.student_id=edit.r.id;body.record_date=date;body.record_type=edit.kind;if(edit.old?.id){body.id=edit.old.id;await apiPut('/api/memorization',body)}else await apiPost('/api/memorization',body);setEdit(null);await onRefresh()}
  const fmt=(v:any)=>v?new Date(v).toLocaleTimeString('ar-SA',{hour:'2-digit',minute:'2-digit'}):'—';

@@ -92,8 +92,11 @@ export async function features(req:any,res:any,u:any){
       const plans=await query<any>(`select week_start,day_name,new_target,review_target from weekly_plans where student_id=$1 and week_start>=current_date-interval '14 days'`,[r.id]);
       let missed=0;const dayOffset:any={'السبت':0,'الأحد':1,'الاثنين':2,'الثلاثاء':3,'الأربعاء':4,'الخميس':5};
       for(const p of plans){
-        const d=new Date(String(p.week_start).slice(0,10)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+(dayOffset[p.day_name]??0));
-        const done=await query<any>(`select record_type,coalesce(sum(page_count),0)::numeric pages from memorization_records where student_id=$1 and record_date=$2::date and record_type in ('new','review') group by record_type`,[r.id,d.toISOString().slice(0,10)]);
+        const raw=p.week_start instanceof Date?p.week_start.toISOString().slice(0,10):String(p.week_start||'').slice(0,10);
+        const base=/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw:null;if(!base)continue;
+        const d=new Date(base+'T00:00:00.000Z');d.setUTCDate(d.getUTCDate()+(dayOffset[p.day_name]??0));
+        const recordDate=d.toISOString().slice(0,10);
+        const done=await query<any>(`select record_type,coalesce(sum(page_count),0)::numeric pages from memorization_records where student_id=$1 and record_date=$2::date and record_type in ('new','review') group by record_type`,[r.id,recordDate]);
         const map:any={};for(const x of done)map[x.record_type]=Number(x.pages||0);
         if(targetPages(p.new_target)>0&&(map.new||0)<targetPages(p.new_target))missed++;
         if(targetPages(p.review_target)>0&&(map.review||0)<targetPages(p.review_target))missed++;
