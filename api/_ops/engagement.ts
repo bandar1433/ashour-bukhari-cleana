@@ -32,9 +32,14 @@ export async function joinRequests(req:any,res:any,u:any){
     const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===jr.center_id)||(u.role==='teacher'&&u.id===jr.teacher_user_id);
     if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
     if(decision==='approved'&&jr.requested_role==='student'){
+      await query('alter table students add column if not exists document_no text');
+      await query('alter table students add column if not exists mobile text');
+      const lr=(await query<any>('select document_no,phone from login_requests where auth_subject=(select auth_subject from users where id=$1) order by requested_at desc limit 1',[jr.user_id]))[0]||{};
       let st=(await query<any>('select * from students where user_id=$1',[jr.user_id]))[0];
-      if(st)await query('update students set center_id=$1,circle_id=$2,status=\'active\',updated_at=now() where id=$3',[jr.center_id,jr.circle_id,st.id]);
-      else await query('insert into students(user_id,center_id,circle_id,full_name,status) values($1,$2,$3,$4,\'active\')',[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب']);
+      if(st)await query('update students set center_id=$1,circle_id=$2,status=\'active\',document_no=coalesce($3,document_no),mobile=coalesce($4,mobile),updated_at=now() where id=$5',[jr.center_id,jr.circle_id,lr.document_no||null,lr.phone||null,st.id]);
+      else await query('insert into students(user_id,center_id,circle_id,full_name,status,document_no,mobile) values($1,$2,$3,$4,\'active\',$5,$6)',[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب',lr.document_no||null,lr.phone||null]);
+      await query("update users set is_active=true,role='student',center_id=$2 where id=$1",[jr.user_id,jr.center_id]);
+      await query("update login_requests set status='approved' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
     }
     await query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
     return json(res,200,{success:true});
