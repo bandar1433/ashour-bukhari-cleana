@@ -54,6 +54,7 @@ function permitted(payload:AppSessionPayload,req:any){
   const method=String(req.method||'GET').toUpperCase();
   const path=String(req.url||'').split('?')[0];
   const staff=['center_manager','supervisor','teacher'].includes(payload.role);
+  if(path==='/api/ops') return true;
   if(!staff) return false;
   if(method==='GET' && ['/api/summary','/api/centers','/api/students','/api/circles','/api/attendance','/api/memorization','/api/plans'].includes(path)) return true;
   if(['POST','PUT'].includes(method) && ['/api/attendance','/api/memorization','/api/plans'].includes(path)) return true;

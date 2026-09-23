@@ -44,6 +44,17 @@ export async function features(req:any,res:any,u:any){
     return json(res,405,{error:'Method not allowed'});
   }
 
+  if(sub==='guardian-link'){
+    if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden'});
+    if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
+    const guardianId=validUuid(req.body?.guardian_user_id),studentId=validUuid(req.body?.student_id);if(!guardianId||!studentId)return json(res,400,{error:'ولي الأمر والطالب مطلوبان'});
+    const s=(await query<any>(`select s.id,s.center_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[studentId]))[0];
+    const g=(await query<any>(`select id from users where id=$1 and role='guardian'`,[guardianId]))[0];
+    if(!s||!g)return json(res,404,{error:'الطالب أو ولي الأمر غير موجود'});
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===s.center_id)||(u.role==='teacher'&&u.id===s.teacher_user_id);if(!allowed)return json(res,403,{error:'خارج نطاق صلاحيتك'});
+    await query(`insert into guardian_student_links(guardian_user_id,student_id) values($1,$2) on conflict do nothing`,[guardianId,studentId]);return json(res,200,{success:true});
+  }
+
   if(sub==='guardian-preference'){
     if(u.role!=='guardian')return json(res,403,{error:'Forbidden'});
     if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
@@ -108,4 +119,13 @@ export async function features(req:any,res:any,u:any){
   }
 
   return json(res,404,{error:'Unknown feature'});
+}
+
+export async function profile(req:any,res:any,u:any){
+  if(req.method==='GET')return json(res,200,(await query<any>('select id,full_name,email,phone,role::text role,center_id,is_active from users where id=$1',[u.id]))[0]);
+  if(req.method==='PUT'){
+    const b=req.body||{};const row=(await query<any>('update users set full_name=coalesce($2,full_name),phone=coalesce($3,phone),updated_at=now() where id=$1 returning id,full_name,email,phone,role::text role,center_id,is_active',[u.id,String(b.full_name||'').trim()||null,String(b.phone||'').trim()||null]))[0];
+    return json(res,200,row);
+  }
+  return json(res,405,{error:'Method not allowed'});
 }

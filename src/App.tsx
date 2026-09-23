@@ -24,7 +24,7 @@ import { MadinahMushafRange } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
 
-type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -116,6 +116,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   library: { title: 'المكتبة', subtitle: 'البرامج والسلاسل والدروس المرتبطة بروابط YouTube.', short: 'المكتبة' },
   guardian: { title: 'متابعة الأبناء', subtitle: 'متابعة الحضور والإنجاز والتقارير للأبناء المرتبطين بالحساب.', short: 'الأبناء' },
   quranJourney: { title: 'رحلتي مع القرآن', subtitle: 'خريطة تقدم الطالب في صفحات مصحف المدينة وسجل الإنجاز.', short: 'رحلتي' },
+  profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
 };
 
 export default function App() {
@@ -124,7 +125,9 @@ export default function App() {
   const [authOpen,setAuthOpen]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
-  const [accountForm,setAccountForm]=useState({name:'',email:'',password:''});
+  const [accountForm,setAccountForm]=useState({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});
+  const [signupStep,setSignupStep]=useState<1|2>(1);
+  const [signupCircles,setSignupCircles]=useState<any[]>([]);
   const [status, setStatus] = useState<any>(null);
   const [publicData,setPublicData]=useState<any>({stats:{},news:[],circles:[]});
   const [siteImages,setSiteImages]=useState<Record<string,string>>({});
@@ -252,22 +255,28 @@ export default function App() {
 
     const response=await fetch('/api/status',{
       method:'POST',
-      headers:{Accept:'application/json',Authorization:`Bearer ${jwt}`}
+      headers:{Accept:'application/json',Authorization:`Bearer ${jwt}`,'x-signup-draft':localStorage.getItem('ashour_signup_draft')||''}
     });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
-    if(payload?.pending){setError(payload.message||'الحساب بانتظار اعتماد الإدارة.');setAuthOpen(true);return false;}
+    if(payload?.pending){localStorage.removeItem('ashour_signup_draft');setError(payload.message||'الحساب بانتظار الاعتماد.');setAuthOpen(true);return false;}
     clearAccessCode();
     setSessionToken(payload.token);
     setCode('session');
     setAuthOpen(false);
-    setError('');
+    setError('');localStorage.removeItem('ashour_signup_draft');
     return true;
   }
 
   async function handleGoogleLogin(){
     setAuthBusy(true); setError('');
     try{
+      if(authIntent==='signup'){
+        const draft={name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId};
+        if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال قبل المتابعة.');
+        if(draft.role==='student'&&(!draft.centerId||!draft.circleId))throw new Error('اختر المركز والحلقة قبل المتابعة.');
+        localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
+      }
       const result:any=await authClient.signIn.social({
         provider:'google',
         callbackURL:'/',
@@ -320,7 +329,7 @@ export default function App() {
       setSessionToken(payload.token);
       setCode('session');
       setAuthOpen(false);
-      setAccountForm({name:'',email:'',password:''});
+      setAccountForm({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});setSignupStep(1);
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر تسجيل الدخول');
     }finally{
@@ -450,7 +459,7 @@ export default function App() {
         <nav aria-label="التنقل الرئيسي">
           {['الرئيسية','عن الحلقات','الحلقات القرآنية','المعلمون','الطلاب','الإنجازات','الأخبار والفعاليات','الوسائط','تواصل معنا'].map(v=><button key={v} className={publicView===v?'active':''} onClick={()=>setPublicView(v)}>{v}</button>)}
         </nav>
-        <div className="headerActions"><button className="login" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
+        <div className="headerActions"><button className="secondary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد</button><button className="login" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
       </header>}
 
       {!code ? <>
@@ -489,8 +498,8 @@ export default function App() {
             <p className="reveal reveal-right delay-4">بيئة رقمية متكاملة لخدمة حلقات القرآن الكريم، وبناء جيل متصل بكتاب الله علمًا وعملًا.</p>
             <div className="heroHighlights reveal reveal-up delay-4"><span>✓ متابعة يومية</span><span>✓ تقارير دقيقة</span><span>✓ صلاحيات آمنة</span></div>
             <div className="actions reveal reveal-up delay-5">
-              <button className="primary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button>
-              <button className="secondary" type="button" onClick={()=>setPublicView('عن الحلقات')}>تعرف على الحلقات</button>
+              <button className="primary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد</button>
+              <button className="secondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button>
             </div>
           </div>
           <div className="heroArt reveal reveal-left delay-2">
@@ -560,23 +569,30 @@ export default function App() {
             </div>
             <div className="authDialogBody">
               <div className="authHeading">
-                <span className="authEyebrow">{authIntent==='signin'?'تسجيل الدخول':'تفعيل حساب الدخول'}</span>
-                <h2 id="auth-title">{authIntent==='signin'?'مرحبًا بعودتك':'تفعيل الدخول لأول مرة'}</h2>
-                <p className="authLead">استخدم حساب Google الخاص بك، كما في المنصة السابقة. إذا كان الحساب جديدًا فسيظهر للإدارة لاعتماده وربطه بالدور المناسب.</p>
+                <span className="authEyebrow">{authIntent==='signin'?'دخول موحد':'إنشاء حساب جديد'}</span>
+                <h2 id="auth-title">{authIntent==='signin'?'دخول المنصة':'التسجيل في المنصة'}</h2>
+                <p className="authLead">{authIntent==='signin'?'سجّل الدخول بحسابك، وسيتم توجيهك تلقائيًا إلى لوحتك حسب دورك.':'أدخل بياناتك ثم اختر نوع الحساب. التسجيل بالجوال مجهز وسيُفعّل لاحقًا مع OTP.'}</p>
               </div>
-              <div className="authForm authFormPro">
-                {error&&<div className="authNotice" role="alert">{error}</div>}
+              {error&&<div className="authNotice" role="alert">{error}</div>}
+              {authIntent==='signin'?<div className="authForm authFormPro">
                 <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'الدخول باستخدام Google'}</button>
-              </div>
-              <div className="authAlternate"><span>استخدم حساب Google المعتمد لديك للدخول إلى المنصة.</span></div>
-              <div className="authSecurityNote">لا تُمنح أي صلاحية لحساب جديد قبل اعتماد الإدارة وربطه بالسجل الصحيح.</div>
-              {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro">
-                <div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت خلال مرحلة نقل الحسابات.</span></div>
-                <form className="authForm legacyForm" onSubmit={handleLogin}>
-                  <label className="field"><span>رمز الإدارة</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز مدير النظام" /></label>
-                  <button className="secondary" type="submit" disabled={authBusy}>{authBusy?'جارٍ التحقق…':'دخول الإدارة'}</button>
-                </form>
+                <button className="secondary authSubmit" type="button" disabled title="سيتم تفعيله لاحقًا">الدخول برقم الجوال — قريبًا</button>
+                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
+              </div>:<div className="authForm authFormPro">
+                {signupStep===1?<><label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} required/></label>
+                <label className="field"><span>رقم الهوية / الوثيقة</span><input value={accountForm.documentNo} onChange={e=>setAccountForm(x=>({...x,documentNo:e.target.value}))} required/></label>
+                <label className="field"><span>رقم الجوال</span><input type="tel" placeholder="+966..." value={accountForm.phone} onChange={e=>setAccountForm(x=>({...x,phone:e.target.value}))} required/><small>محفوظ للتنبيهات والرسائل؛ التحقق OTP سيُفعّل لاحقًا.</small></label>
+                <label className="field"><span>نوع الحساب</span><select value={accountForm.role} onChange={e=>setAccountForm(x=>({...x,role:e.target.value,centerId:'',circleId:''}))}><option value="supervisor">مشرف مركز</option><option value="teacher">معلم حلقة</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label>
+                {accountForm.role==='student'&&<><label className="field"><span>المركز</span><select value={accountForm.centerId} onChange={async e=>{const centerId=e.target.value;setAccountForm(x=>({...x,centerId,circleId:''}));try{const r:any=await fetch('/api/public').then(x=>x.json());setSignupCircles((r.circles||[]).filter((q:any)=>q.center_id===centerId))}catch{setSignupCircles([])}}}><option value="">اختر المركز</option>{(publicData.centers||[]).map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+                <label className="field"><span>الحلقة</span><select value={accountForm.circleId} onChange={e=>setAccountForm(x=>({...x,circleId:e.target.value}))}><option value="">اختر الحلقة</option>{signupCircles.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label></>}
+                <button className="primary authSubmit" type="button" onClick={()=>setSignupStep(2)}>متابعة</button></>:<>
+                <div className="authSecurityNote">بعد التسجيل: الطالب ينتظر قبول الحلقة، المعلم والمشرف ينتظران الاعتماد، وولي الأمر ينتظر ربط الطالب من الجهة المخولة.</div>
+                <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'التسجيل عبر Google'}</button>
+                <button className="secondary authSubmit" type="button" disabled title="تم تجهيز المسار وسيُفعّل لاحقًا مع OTP">التسجيل برقم الجوال — قريبًا</button>
+                <button className="tableAction" type="button" onClick={()=>setSignupStep(1)}>← تعديل البيانات</button></>}
+                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
               </div>}
+              {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro"><div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت للإدارة العامة فقط.</span></div><form className="authForm legacyForm" onSubmit={handleLogin}><label className="field"><span>رمز الإدارة</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز مدير النظام"/></label><button className="secondary" type="submit" disabled={authBusy}>دخول الإدارة</button></form></div>}
             </div>
           </section>
         </div>}
@@ -616,7 +632,7 @@ export default function App() {
           <button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>
           <button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
           <button className={activeTab==='news'?'selected':''} onClick={()=>goTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button></>}
-          <div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>جلسة دخول نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
+          <button className={activeTab==='profile'?'selected':''} onClick={()=>goTab('profile')}><span className="navDot">◉</span>الملف الشخصي</button><div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>جلسة دخول نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
           <div className="adminTopbar">
@@ -662,7 +678,7 @@ export default function App() {
               </>}
             </>}
             {['selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
-            {['library','guardian','quranJourney'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
+            {['library','guardian','quranJourney','profile'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>

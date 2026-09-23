@@ -9,7 +9,7 @@ export async function joinRequests(req:any,res:any,u:any){
     return json(res,200,{items:await query<any>("select h.id,h.name,c.name center_name from circles h join centers c on c.id=h.center_id where h.is_active order by c.name,h.name")});
   }
   if(sub==='request'&&req.method==='POST'){
-    if(!['student','guardian'].includes(u.role))return json(res,403,{error:'هذه الخدمة للطالب أو ولي الأمر'});
+    if(u.role!=='student')return json(res,403,{error:'طلبات الانضمام للحلقات متاحة للطالب فقط'});
     const circleId=validUuid(req.body?.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
     const exists=(await query<any>("select id from circle_join_requests where user_id=$1 and circle_id=$2 and status='pending'",[u.id,circleId]))[0];
     if(exists)return json(res,400,{error:'يوجد طلب قائم لهذه الحلقة'});

@@ -5,7 +5,7 @@ import { summary,teacherToday,circleRegister,evaluations,studentProfile,dayAppro
 import { selfService } from './_ops/student.js';
 import { joinRequests,motivation,notifications,competitions } from './_ops/engagement.js';
 import { managementReport,adminOperations } from './_ops/admin.js';
-import { features } from './_ops/features.js';
+import { features,profile } from './_ops/features.js';
 
 
 
@@ -39,6 +39,7 @@ export default async function handler(req:any,res:any){
     if(action==='management-report')return managementReport(req,res,u);
     if(action==='admin-operations')return adminOperations(req,res,u);
     if(action==='features')return features(req,res,u);
+    if(action==='profile')return profile(req,res,u);
     return json(res,404,{error:'Unknown operation'});
   }catch(e){return handleError(res,e)}
 }
