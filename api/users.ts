@@ -67,16 +67,18 @@ export default async function handler(req:any,res:any){
       ]);
       if(b.request_id&&b.auth_subject){
         const lr=(await query<any>('select requested_role,circle_id,center_id from login_requests where id=$1 and auth_subject=$2',[b.request_id,b.auth_subject]))[0];
-        await query("update login_requests set status='approved' where id=$1 and auth_subject=$2",[b.request_id,b.auth_subject]);
-        if(lr?.requested_role==='student'&&lr.circle_id){
+        if(!lr)return json(res,404,{error:'طلب الاعتماد غير موجود'});
+        if(lr.requested_role==='student'&&lr.circle_id){
           const st=(await query<any>('select id from students where user_id=$1',[b.id]))[0];
           if(st)await query("update students set center_id=coalesce($1,center_id),circle_id=$2,status='active' where id=$3",[lr.center_id,lr.circle_id,st.id]);
           else await query("insert into students(user_id,center_id,circle_id,full_name,status) select id,coalesce($2,center_id),$3,full_name,'active' from users where id=$1",[b.id,lr.center_id,lr.circle_id]);
           await query("update circle_join_requests set status='approved',decided_at=now() where user_id=$1 and circle_id=$2 and status='pending'",[b.id,lr.circle_id]);
           await query("update users set is_active=true where id=$1",[b.id]);
         }
+        await query("update login_requests set status='approved' where id=$1 and auth_subject=$2",[b.request_id,b.auth_subject]);
       }
-      return json(res,200,rows[0]);
+      const finalRow=(await query<any>("select id,full_name,email,phone,role,center_id,is_active,case when auth_subject is null then false else true end linked from users where id=$1",[b.id]))[0];
+      return json(res,200,finalRow||rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
   }catch(e){return handleError(res,e)}
