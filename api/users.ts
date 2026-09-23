@@ -50,7 +50,10 @@ export default async function handler(req:any,res:any){
       if(b.role!==undefined&&!allowedRoles.includes(b.role)) return json(res,400,{error:'الدور غير صحيح'});
       if(u.role!=='system_admin'&&b.role!==undefined&&['system_admin','center_manager','supervisor'].includes(b.role))return json(res,403,{error:'Forbidden',message:'لا يمكنك منح دور إداري أعلى.'});
       const e=(await query<any>('select * from users where id=$1',[b.id]))[0];
-      if(!e) return json(res,404,{error:'المستخدم غير موجود'});if(u.role!=='system_admin'&&e.center_id!==u.center_id&&e.id!==u.id)return json(res,403,{error:'Forbidden',message:'المستخدم خارج مركزك.'});
+      if(!e) return json(res,404,{error:'المستخدم غير موجود'});
+      if(u.role!=='system_admin'&&e.center_id!==u.center_id&&e.id!==u.id)return json(res,403,{error:'Forbidden',message:'المستخدم خارج مركزك.'});
+      if(u.role!=='system_admin'&&b.center_id!==undefined&&(b.center_id||null)!==e.center_id)return json(res,403,{error:'Forbidden',message:'نقل المستخدم بين المراكز من صلاحية الإدارة العامة فقط.'});
+      if(u.role!=='system_admin'&&b.role!==undefined&&['system_admin','center_manager','supervisor'].includes(b.role)&&b.role!==e.role)return json(res,403,{error:'Forbidden',message:'منح الأدوار الإدارية العليا من صلاحية الإدارة العامة فقط.'});
       const rows=await query(`
         update users set
           full_name=coalesce($2,full_name),
