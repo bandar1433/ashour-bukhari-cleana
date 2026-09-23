@@ -9,8 +9,9 @@ const JWKS=createRemoteJWKSet(new URL(`${NEON_AUTH_BASE_URL}/.well-known/jwks.js
 async function exchangeAuthSession(req:any,res:any){
   let draft:any={};try{draft=JSON.parse(String(req.headers['x-signup-draft']||'{}'))}catch{}
   const authorization=String(req.headers.authorization||'');
-  const token=authorization.startsWith('Bearer ')?authorization.slice(7).trim():'';
-  if(!token) return json(res,401,{error:'Unauthorized',message:'رمز جلسة Google غير موجود.'});
+  const bearer=authorization.startsWith('Bearer ')?authorization.slice(7).trim():'';
+  const token=bearer||String(req.headers['x-neon-session-token']||'').trim();
+  if(!token) return json(res,401,{error:'Unauthorized',message:'رمز جلسة المصادقة غير موجود.'});
 
   const {payload}=await jwtVerify(token,JWKS,{issuer:AUTH_ORIGIN});
   const neon={
@@ -18,7 +19,7 @@ async function exchangeAuthSession(req:any,res:any){
     email:String(payload.email||''),
     name:String(payload.name||'')
   };
-  if(!neon.id) return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من هوية حساب Google.'});
+  if(!neon.id) return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من هوية حساب المصادقة.'});
 
   const appUser=(await query<any>(`
     select id,full_name,email,role::text role,is_active
@@ -106,7 +107,7 @@ export default async function handler(req:any,res:any){
     try{return await exchangeAuthSession(req,res)}
     catch(error){
       console.error('[auth-exchange] failed',error);
-      return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من جلسة Google. أعد تسجيل الدخول.'});
+      return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من جلسة الدخول. أعد تسجيل الدخول.'});
     }
   }
 
