@@ -36,7 +36,8 @@ export default async function handler(req:any,res:any){
       if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
       const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];const weekLocked=s.circle_id?await isWeekLocked(s.circle_id,recordDate):false;
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
-      if((locked||weekLocked)&&u.role==='teacher'&&!exception)return json(res,403,{error:weekLocked?'الأسبوع مقفل':'تم اعتماد اليوم',message:weekLocked?'تم إقفال هذا الأسبوع من الإشراف. اطلب فتحه قبل التعديل.':'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
+      if(weekLocked&&u.role==='teacher')return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال هذا الأسبوع نهائيًا من الإشراف.'});
+      if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
       if(req.method==='PUT'){
         if(!b.id)return json(res,400,{error:'معرف السجل القرآني مطلوب'});
         const existing=(await query<any>('select * from memorization_records where id=$1 and student_id=$2',[b.id,b.student_id]))[0];

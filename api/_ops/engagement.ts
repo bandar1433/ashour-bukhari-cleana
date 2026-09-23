@@ -42,6 +42,10 @@ export async function joinRequests(req:any,res:any,u:any){
       await query("update login_requests set status='approved' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
     }
     await query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
+    if(jr.requested_role==='student'&&decision==='rejected'){
+      await query("update users set is_active=false where id=$1",[jr.user_id]);
+      await query("update login_requests set status='rejected' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
+    }
     return json(res,200,{success:true});
   }
   return json(res,405,{error:'Method not allowed'});
