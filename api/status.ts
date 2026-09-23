@@ -44,6 +44,8 @@ async function exchangeAuthSession(req:any,res:any){
   if(!resolvedUser){
     const requestedRole=['supervisor','teacher','student','guardian'].includes(String(draft.role))?String(draft.role):null;
     const fullName=String(draft.name||neon.name||'').trim()||null,documentNo=String(draft.documentNo||'').trim()||null,phone=String(draft.phone||'').trim()||null;
+    if(!requestedRole||!fullName||!documentNo||!phone)return json(res,400,{error:'INCOMPLETE_SIGNUP',message:'أكمل الاسم ورقم الهوية ورقم الجوال ونوع الحساب من شاشة تسجيل جديد.'});
+    if(requestedRole==='student'&&(!draft.centerId||!draft.circleId))return json(res,400,{error:'INCOMPLETE_STUDENT_SIGNUP',message:'اختر المركز والحلقة قبل إكمال تسجيل الطالب.'});
     await query(`alter table login_requests add column if not exists requested_role text`);
     await query(`alter table login_requests add column if not exists phone text`);
     await query(`alter table login_requests add column if not exists document_no text`);
