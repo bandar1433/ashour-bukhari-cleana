@@ -28,7 +28,7 @@ type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' |
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
-const legacyStaticImages:Record<string,string>={
+const staticSiteImages:Record<string,string>={
   talqeen:'/resources/report-talqeen.jpg',
   hifz:'/resources/report-hifz.jpg',
   itqan:'/resources/report-itqan.jpg',
@@ -167,7 +167,7 @@ export default function App() {
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
-    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages({...((x?.images||{}) as Record<string,string>),...legacyStaticImages});}).catch(()=>setSiteImages(legacyStaticImages));
+    fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages({...staticSiteImages,...((x?.images||{}) as Record<string,string>)});}).catch(()=>setSiteImages(staticSiteImages));
   }, []);
 
   async function loadDashboard() {
