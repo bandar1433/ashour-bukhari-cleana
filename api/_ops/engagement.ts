@@ -171,29 +171,48 @@ export async function notifications(req:any,res:any,u:any){
 }
 
 export async function competitions(req:any,res:any,u:any){
+  await query('alter table competitions add column if not exists circle_id uuid references circles(id)');
+  await query('alter table competitions add column if not exists max_points integer not null default 100');
   const sub=String(req.query?.sub||'list');
   if(req.method==='GET'){
-    const rows=u.role==='system_admin'
-      ?await query<any>(`select c.*,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c order by c.start_date desc`)
-      :await query<any>(`select c.*,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c where c.center_id is null or c.center_id=$1::uuid order by c.start_date desc`,[u.center_id]);
+    let rows:any[]=[];
+    if(u.role==='system_admin')rows=await query<any>(`select c.*,h.name circle_name,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id order by c.start_date desc`);
+    else if(u.role==='teacher')rows=await query<any>(`select c.*,h.name circle_name,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id where c.center_id=$1::uuid and (c.circle_id is null or c.circle_id in(select id from circles where teacher_user_id=$2)) order by c.start_date desc`,[u.center_id,u.id]);
+    else rows=await query<any>(`select c.*,h.name circle_name,coalesce((select json_agg(x order by x.score desc) from (select ce.score,ce.notes,s.id student_id,s.full_name from competition_entries ce join students s on s.id=ce.student_id where ce.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id where c.center_id is null or c.center_id=$1::uuid order by c.start_date desc`,[u.center_id]);
     return json(res,200,rows);
   }
   if(req.method==='POST'&&sub==='create'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date);if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
-    let centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
-    if(u.role==='teacher'){const own=(await query<any>('select id,center_id from circles where teacher_user_id=$1 and is_active order by created_at limit 1',[u.id]))[0];if(!own)return json(res,403,{error:'لا توجد حلقة مرتبطة بالمعلم'});centerId=own.center_id}
-    return json(res,201,(await query<any>('insert into competitions(center_id,title,start_date,end_date,created_by) values($1,$2,$3,$4,$5) returning *',[centerId,txt(b.title,300),start,end,u.id]))[0]);
+    let centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id,circleId:string|null=null;
+    if(u.role==='teacher'){
+      const requested=validUuid(b.circle_id);
+      const own=(await query<any>('select id,center_id from circles where teacher_user_id=$1 and is_active and ($2::uuid is null or id=$2::uuid) order by created_at limit 1',[u.id,requested||null]))[0];
+      if(!own)return json(res,403,{error:'لا توجد حلقة مرتبطة بالمعلم'});centerId=own.center_id;circleId=own.id;
+    }else if(u.role==='system_admin'&&b.circle_id){
+      const h=(await query<any>('select id,center_id from circles where id=$1',[validUuid(b.circle_id)]))[0];if(!h)return json(res,400,{error:'الحلقة غير موجودة'});circleId=h.id;centerId=h.center_id;
+    }
+    const row=(await query<any>('insert into competitions(center_id,circle_id,title,start_date,end_date,max_points,created_by) values($1,$2,$3,$4,$5,$6,$7) returning *',[centerId,circleId,txt(b.title,300),start,end,int(b.max_points,1,10000),u.id]))[0];
+    return json(res,201,row);
+  }
+  if(req.method==='PUT'&&sub==='edit'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'المسابقة غير صالحة'});
+    const c=(await query<any>('select * from competitions where id=$1',[id]))[0];if(!c)return json(res,404,{error:'المسابقة غير موجودة'});
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&c.center_id===u.center_id)||(u.role==='teacher'&&c.circle_id&&await query<any>('select id from circles where id=$1 and teacher_user_id=$2',[c.circle_id,u.id]).then(x=>x[0]));
+    if(!allowed)return json(res,403,{error:'المسابقة خارج نطاق صلاحيتك'});
+    const row=(await query<any>('update competitions set title=coalesce($2,title),start_date=coalesce($3::date,start_date),end_date=coalesce($4::date,end_date),max_points=coalesce($5,max_points) where id=$1 returning *',[id,b.title?txt(b.title,300):null,b.start_date||null,b.end_date||null,b.max_points?int(b.max_points,1,10000):null]))[0];
+    return json(res,200,row);
   }
   if(req.method==='POST'&&sub==='score'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},s=await scopedStudent(u,b.student_id),competitionId=validUuid(b.competition_id);
     if(!s||!competitionId)return json(res,400,{error:'بيانات الطالب أو المسابقة غير صالحة'});
-    const allowed=(await query<any>('select id from competitions where id=$1 and (center_id is null or center_id=$2)',[competitionId,s.center_id]))[0];
-    if(!allowed)return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
+    const comp=(await query<any>('select id,circle_id,max_points from competitions where id=$1 and (center_id is null or center_id=$2)',[competitionId,s.center_id]))[0];
+    if(!comp|| (comp.circle_id&&comp.circle_id!==s.circle_id))return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
     const row=(await query<any>(`insert into competition_entries(competition_id,student_id,score,notes,updated_by) values($1,$2,$3,$4,$5)
       on conflict(competition_id,student_id) do update set score=excluded.score,notes=excluded.notes,updated_by=excluded.updated_by,updated_at=now() returning *`,
-      [competitionId,s.id,int(b.score,0,1000),txt(b.notes,1000)||null,u.id]))[0];return json(res,200,row);
+      [competitionId,s.id,int(b.score,0,Number(comp.max_points||100)),txt(b.notes,1000)||null,u.id]))[0];return json(res,200,row);
   }
   return json(res,405,{error:'Method not allowed'});
 }

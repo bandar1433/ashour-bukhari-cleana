@@ -116,7 +116,9 @@ export async function features(req:any,res:any,u:any){
       coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '30 days'),0) attendance_rate,
       coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '30 days'),0) quran_average,
       coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date>=current_date-interval '30 days'),0)::int new_pages,
-      coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date>=current_date-interval '30 days'),0)::int review_pages
+      coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date>=current_date-interval '30 days'),0)::int review_pages,
+      s.points_balance,
+      coalesce((select count(*)::int from reward_requests rr where rr.student_id=s.id and rr.status in ('approved','delivered')),0) rewards_count
       from guardian_student_links g join students s on s.id=g.student_id left join circles c on c.id=s.circle_id where g.guardian_user_id=$1 order by s.full_name`,[u.id]);
     return json(res,200,{preference,children});
   }

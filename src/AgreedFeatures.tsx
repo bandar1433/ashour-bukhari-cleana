@@ -89,7 +89,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
     </label></div>
     <div className="kpis compactOpsKpis">{(data?.children||[]).map((x:any)=><article key={x.id}><span>{x.full_name}</span><b>{x.attendance_rate}%</b><small>الحضور • متوسط القرآن {x.quran_average}%</small></article>)}</div>
     {!(data?.children||[]).length&&<div className="emptyState">لا يوجد طالب مرتبط بحساب ولي الأمر حتى الآن.</div>}
-    <Mini rows={data?.children||[]} cols={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_rate','الحضور %'],['quran_average','متوسط القرآن'],['new_pages','الجديد صفحات'],['review_pages','المراجعة صفحات']]}/>
+    <Mini rows={data?.children||[]} cols={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['attendance_rate','الحضور %'],['quran_average','متوسط القرآن'],['new_pages','الجديد صفحات'],['review_pages','المراجعة صفحات'],['points_balance','النقاط'],['rewards_count','الجوائز']]}/>
   </div>;
 
   return <div>
