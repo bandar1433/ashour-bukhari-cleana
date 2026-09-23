@@ -1,31 +1,14 @@
 import { query } from './_lib/db.js';
 import { handleError,json } from './_lib/http.js';
 
-const imageKeys=['talqeen','hifz','itqan','qiraat','nationalities','madinah','madinah-group','iftar','recreation','khatm','eid','achievement-anas','achievement-russia','achievement-tanzania','achievement-omar','photo-1','photo-2'];
-
 async function persistedImages(){
   try{
     await query("CREATE TABLE IF NOT EXISTS legacy_site_images(image_key text PRIMARY KEY,content text NOT NULL,updated_at timestamptz NOT NULL DEFAULT now())");
-    let rows=await query<any>("SELECT image_key,content FROM legacy_site_images");
-    if(!rows.length){
-      const origin='https://app-it055u.v2.appdeploy.ai';
-      const response=await fetch(origin+'/api/site-images-export',{headers:{Accept:'application/json'}});
-      if(response.ok){
-        const payload=await response.json();
-        if(payload&&typeof payload==='object'&&!Array.isArray(payload)){
-          for(const key of imageKeys){
-            const raw=String((payload as any)[key]||'').trim();
-            if(!raw)continue;
-            await query("INSERT INTO legacy_site_images(image_key,content,updated_at) VALUES($1,$2,now()) ON CONFLICT(image_key) DO UPDATE SET content=excluded.content,updated_at=now()",[key,raw]);
-          }
-          rows=await query<any>("SELECT image_key,content FROM legacy_site_images");
-        }
-      }
-    }
+    const rows=await query<any>("SELECT image_key,content FROM legacy_site_images");
     const images:Record<string,string>={};
     for(const row of rows){
       const raw=String(row.content||'').trim();
-      if(raw) images[row.image_key]=raw.startsWith('data:')?raw:'data:image/jpeg;base64,'+raw;
+      if(raw)images[row.image_key]=raw.startsWith('data:')?raw:'data:image/jpeg;base64,'+raw;
     }
     return images;
   }catch{return {};}
