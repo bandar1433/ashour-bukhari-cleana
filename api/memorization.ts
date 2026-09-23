@@ -20,7 +20,7 @@ export default async function handler(req:any,res:any){
     }
     if(req.method==='POST'||req.method==='PUT'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
-      const b=req.body||{};
+      const b=req.body||{};if(b.record_type&&!['new','review'].includes(String(b.record_type)))return json(res,400,{error:'النوع المسموح: الحفظ الجديد أو المراجعة فقط'});
       const recordDate=String(b.record_date||new Date().toISOString().slice(0,10));
       const s=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
       if(!s)return json(res,404,{error:'الطالب غير موجود'});
@@ -30,9 +30,9 @@ export default async function handler(req:any,res:any){
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
       if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
       if(req.method==='PUT'){
-        if(!b.id)return json(res,400,{error:'معرف سجل التسميع مطلوب'});
+        if(!b.id)return json(res,400,{error:'معرف السجل القرآني مطلوب'});
         const existing=(await query<any>('select * from memorization_records where id=$1 and student_id=$2',[b.id,b.student_id]))[0];
-        if(!existing)return json(res,404,{error:'سجل التسميع غير موجود'});
+        if(!existing)return json(res,404,{error:'السجل القرآني غير موجود'});
         const rows=await query(`update memorization_records set record_type=coalesce($3,record_type),surah_no=coalesce($4,surah_no),from_ayah=coalesce($5,from_ayah),to_surah_no=coalesce($6,to_surah_no,surah_no),to_ayah=coalesce($7,to_ayah),from_page=$8,to_page=$9,page_count=case when $8::int is not null and $9::int is not null then greatest(1,$9::int-$8::int+1) else null end,ayah_count=case when coalesce($6,to_surah_no,surah_no)=coalesce($4,surah_no) then coalesce($7,to_ayah)-coalesce($5,from_ayah)+1 else ayah_count end,grade=$10,notes=$11,qiraah=coalesce($12,qiraah),recorded_by=$13 where id=$1 and student_id=$2 returning *`,
           [b.id,b.student_id,b.record_type||null,b.surah_no?Number(b.surah_no):null,b.from_ayah?Number(b.from_ayah):null,b.to_surah_no?Number(b.to_surah_no):null,b.to_ayah?Number(b.to_ayah):null,b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
         return json(res,200,rows[0]);

@@ -14,6 +14,11 @@ export type Summary = {
 export type UserRow = {
   id: string;
   full_name: string;
+  document_no?: string | null;
+  mobile?: string | null;
+  birth_date?: string | null;
+  grade_level?: string | null;
+  registration_date?: string | null;
   email: string | null;
   phone?: string | null;
   role: string;
