@@ -304,32 +304,45 @@ export default function App() {
       const email=accountForm.email.trim();
       const password=accountForm.password;
       if(!email||!password) throw new Error('أدخل البريد الإلكتروني وكلمة المرور.');
+      const draft=authIntent==='signup'?{
+        name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),
+        role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId
+      }:null;
+      if(draft){
+        if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال.');
+        if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز.');
+        if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة.');
+      }
       let authResult:any;
       if(authIntent==='signup'){
-        const name=accountForm.name.trim();
-        if(!name) throw new Error('أدخل الاسم.');
-        authResult=await authClient.signUp.email({email,password,name});
-        if(authResult?.error) throw new Error(authResult.error.message||'تعذر إنشاء الحساب');
+        authResult=await authClient.signUp.email({email,password,name:draft!.name});
+        if(authResult?.error) throw new Error(readableError(authResult.error,'تعذر إنشاء الحساب'));
       }else{
         authResult=await authClient.signIn.email({email,password});
-        if(authResult?.error) throw new Error(authResult.error.message||'بيانات الدخول غير صحيحة');
+        if(authResult?.error) throw new Error(readableError(authResult.error,'بيانات الدخول غير صحيحة'));
       }
-      let neonSessionToken=authResult?.data?.token||authResult?.data?.session?.token||'';
+      let neonSessionToken=authResult?.data?.token||authResult?.data?.session?.token||authResult?.data?.access_token||'';
       if(!neonSessionToken){
         const current:any=await authClient.getSession();
-        neonSessionToken=current?.data?.session?.token||current?.data?.token||'';
+        neonSessionToken=current?.data?.session?.token||current?.data?.session?.access_token||current?.data?.token||'';
       }
-      if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول الآمنة. أعد المحاولة.');
-      const response=await fetch('/api/status',{
-        method:'POST',
-        headers:{Accept:'application/json','x-neon-session-token':String(neonSessionToken)}
-      });
+      if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول الآمنة. تحقق من البريد إن كانت خدمة المصادقة تتطلب تأكيده ثم أعد المحاولة.');
+      const headers:any={Accept:'application/json','x-neon-session-token':String(neonSessionToken)};
+      if(draft)headers['x-signup-draft']=JSON.stringify(draft);
+      const response=await fetch('/api/status',{method:'POST',headers});
       const payload=await response.json().catch(()=>({}));
-      if(!response.ok) throw new Error(payload?.message||payload?.error||'تعذر اعتماد جلسة الدخول.');
+      if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
+      if(payload?.pending){
+        clearAccessCode();clearSessionToken();
+        setError(payload.message||'الحساب مسجل وبانتظار الاعتماد.');
+        setAuthOpen(true);
+        return;
+      }
       clearAccessCode();
       setSessionToken(payload.token);
       setCode('session');
       setAuthOpen(false);
+      setError('');
       setAccountForm({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});setSignupStep(1);
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر تسجيل الدخول');
@@ -577,6 +590,12 @@ export default function App() {
               {error&&<div className="authNotice" role="alert">{error}</div>}
               {authIntent==='signin'?<div className="authForm authFormPro">
                 <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'الدخول باستخدام Google'}</button>
+                <div className="authDivider"><span>أو</span></div>
+                <form className="authForm" onSubmit={handleAccountLogin}>
+                  <label className="field"><span>البريد الإلكتروني</span><input type="email" value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" required/></label>
+                  <label className="field"><span>كلمة المرور</span><input type="password" value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete="current-password" required/></label>
+                  <button className="secondary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ الدخول…':'الدخول بالبريد وكلمة المرور'}</button>
+                </form>
                 <button className="secondary authSubmit" type="button" disabled title="سيتم تفعيله لاحقًا">الدخول برقم الجوال — قريبًا</button>
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
               </div>:<div className="authForm authFormPro">
@@ -587,8 +606,14 @@ export default function App() {
                 {['student','teacher','supervisor'].includes(accountForm.role)&&<><label className="field"><span>المركز</span><select value={accountForm.centerId} onChange={async e=>{const centerId=e.target.value;setAccountForm(x=>({...x,centerId,circleId:''}));try{const r:any=await fetch('/api/public').then(x=>x.json());setSignupCircles((r.circles||[]).filter((q:any)=>q.center_id===centerId))}catch{setSignupCircles([])}}}><option value="">اختر المركز</option>{(publicData.centers||[]).map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 {accountForm.role==='student'&&<label className="field"><span>الحلقة</span><select value={accountForm.circleId} onChange={e=>setAccountForm(x=>({...x,circleId:e.target.value}))}><option value="">اختر الحلقة</option>{signupCircles.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}{accountForm.role==='student'&&null}</>}
                 <button className="primary authSubmit" type="button" onClick={()=>{if(!accountForm.name.trim()||!accountForm.documentNo.trim()||!accountForm.phone.trim()){setError('أكمل الاسم ورقم الهوية ورقم الجوال.');return}if(['student','teacher','supervisor'].includes(accountForm.role)&&!accountForm.centerId){setError('اختر المركز.');return}if(accountForm.role==='student'&&!accountForm.circleId){setError('اختر الحلقة.');return}setError('');setSignupStep(2)}}>متابعة</button></>:<>
-                <div className="authSecurityNote">بعد التسجيل: الطالب ينتظر قبول الحلقة، المعلم والمشرف ينتظران الاعتماد، وولي الأمر ينتظر ربط الطالب من الجهة المخولة.</div>
+                <div className="authSecurityNote">بعد التسجيل: الطالب ينتظر قبول الحلقة، والمعلم والمشرف ينتظران الاعتماد، أما حساب ولي الأمر فيتفعّل ثم تظهر بيانات الأبناء بعد ربطهم من الجهة المخولة.</div>
                 <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'التسجيل عبر Google'}</button>
+                <div className="authDivider"><span>أو</span></div>
+                <form className="authForm" onSubmit={handleAccountLogin}>
+                  <label className="field"><span>البريد الإلكتروني</span><input type="email" value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" required/></label>
+                  <label className="field"><span>كلمة المرور</span><input type="password" minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete="new-password" required/></label>
+                  <button className="secondary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ إنشاء الحساب…':'التسجيل بالبريد وكلمة المرور'}</button>
+                </form>
                 <button className="secondary authSubmit" type="button" disabled title="تم تجهيز المسار وسيُفعّل لاحقًا مع OTP">التسجيل برقم الجوال — قريبًا</button>
                 <button className="tableAction" type="button" onClick={()=>setSignupStep(1)}>← تعديل البيانات</button></>}
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
