@@ -1,6 +1,8 @@
 import { query } from './_lib/db.js';
 import { getActor,isStaff } from './_lib/actor.js';
 import { handleError,json } from './_lib/http.js';
+import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
+import {riyadhDate} from './_lib/prayer.js';
 
 export default async function handler(req:any,res:any){
   try{
@@ -21,7 +23,12 @@ export default async function handler(req:any,res:any){
     if(req.method==='POST'||req.method==='PUT'){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};if(b.record_type&&!['new','review'].includes(String(b.record_type)))return json(res,400,{error:'النوع المسموح: الحفظ الجديد أو المراجعة فقط'});
-      const recordDate=String(b.record_date||new Date().toISOString().slice(0,10));
+      const recordDate=String(b.record_date||riyadhDate());
+      const fromSurah=Number(b.surah_no),toSurah=Number(b.to_surah_no||b.surah_no),fromAyah=Number(b.from_ayah),toAyah=Number(b.to_ayah);
+      if(!Number.isInteger(fromSurah)||fromSurah<1||fromSurah>114||!Number.isInteger(toSurah)||toSurah<1||toSurah>114)return json(res,400,{error:'السورة غير صالحة'});
+      if(!Number.isInteger(fromAyah)||fromAyah<1||fromAyah>Number(getAyahCountInSurah(fromSurah as any))||!Number.isInteger(toAyah)||toAyah<1||toAyah>Number(getAyahCountInSurah(toSurah as any)))return json(res,400,{error:'رقم الآية غير صالح للسورة المحددة'});
+      if(toSurah<fromSurah||(toSurah===fromSurah&&toAyah<fromAyah))return json(res,400,{error:'نهاية الورد يجب أن تكون بعد بدايته'});
+      const fromPage=Number(findPage(fromSurah as any,fromAyah as any)),toPage=Number(findPage(toSurah as any,toAyah as any)),pageCount=Math.max(1,toPage-fromPage+1);
       const s=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
       if(!s)return json(res,404,{error:'الطالب غير موجود'});
       const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
@@ -34,11 +41,11 @@ export default async function handler(req:any,res:any){
         const existing=(await query<any>('select * from memorization_records where id=$1 and student_id=$2',[b.id,b.student_id]))[0];
         if(!existing)return json(res,404,{error:'السجل القرآني غير موجود'});
         const rows=await query(`update memorization_records set record_type=coalesce($3,record_type),surah_no=coalesce($4,surah_no),from_ayah=coalesce($5,from_ayah),to_surah_no=coalesce($6,to_surah_no,surah_no),to_ayah=coalesce($7,to_ayah),from_page=$8,to_page=$9,page_count=case when $8::int is not null and $9::int is not null then greatest(1,$9::int-$8::int+1) else null end,ayah_count=case when coalesce($6,to_surah_no,surah_no)=coalesce($4,surah_no) then coalesce($7,to_ayah)-coalesce($5,from_ayah)+1 else ayah_count end,grade=$10,notes=$11,qiraah=coalesce($12,qiraah),recorded_by=$13 where id=$1 and student_id=$2 returning *`,
-          [b.id,b.student_id,b.record_type||null,b.surah_no?Number(b.surah_no):null,b.from_ayah?Number(b.from_ayah):null,b.to_surah_no?Number(b.to_surah_no):null,b.to_ayah?Number(b.to_ayah):null,b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
+          [b.id,b.student_id,b.record_type||null,fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes??existing.notes,b.qiraah||null,u.id]);
         return json(res,200,rows[0]);
       }
       const rows=await query(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_surah_no,to_ayah,from_page,to_page,page_count,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by) values($1,$2,$3,$4,$5,$6,$7,$8,case when $7::int is not null and $8::int is not null then greatest(1,$8::int-$7::int+1) else null end,case when $5::int=$3::int then $6::int-$4::int+1 else null end,$9,$10,$11,$12,$13,$14) returning *`,
-        [b.student_id,b.record_type||'new',Number(b.surah_no),Number(b.from_ayah),Number(b.to_surah_no||b.surah_no),Number(b.to_ayah),b.from_page?Number(b.from_page):null,b.to_page?Number(b.to_page):null,b.grade?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,recordDate,u.id]);
+        [b.student_id,b.record_type||'new',fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,b.grade!==undefined&&b.grade!==''?Number(b.grade):null,b.notes||null,b.qiraah||'حفص عن عاصم',!!b.approved,recordDate,u.id]);
       return json(res,201,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
