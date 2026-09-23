@@ -1,35 +1,40 @@
 import { query } from './_lib/db.js';
-import { handleError, json, requireAccess } from './_lib/http.js';
+import { handleError, json } from './_lib/http.js';
+import { getActor } from './_lib/actor.js';
 
 const allowedRoles=['system_admin','center_manager','supervisor','teacher','student','guardian'];
 
 export default async function handler(req:any,res:any){
-  if(!requireAccess(req,res)) return;
   try{
+    const u=await getActor(req,res);if(!u)return;
     if(req.method==='GET'){
+      if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
       const rows=await query(`
         select id,coalesce(full_name,email,'بدون اسم') full_name,email,phone,role,
           center_id,is_active,case when auth_subject is null then false else true end linked
         from users
+        where $1='system_admin' or center_id=$2::uuid or id=$3::uuid
         order by case role::text
           when 'system_admin' then 1 when 'center_manager' then 2 when 'supervisor' then 3
           when 'teacher' then 4 when 'student' then 5 when 'guardian' then 6 else 7 end,
           full_name nulls last,email nulls last
         limit 500
-      `);
+      `,[u.role,u.center_id,u.id]);
       const requests=await query(`
         select id,auth_subject,email,full_name,status,requested_at,requested_role,phone,document_no,center_id,circle_id
         from login_requests
-        where status='pending'
+        where status='pending' and ($1='system_admin' or center_id=$2::uuid)
         order by requested_at desc
         limit 200
-      `);
+      `,[u.role,u.center_id]);
       return json(res,200,{items:rows,requests});
     }
     if(req.method==='POST'){
+      if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};
       if(!b.full_name?.trim()) return json(res,400,{error:'اسم المستخدم مطلوب'});
       if(!allowedRoles.includes(b.role)) return json(res,400,{error:'الدور غير صحيح'});
+      if(u.role!=='system_admin'&&b.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك إضافة مستخدم خارج مركزك.'});
       const rows=await query(`
         insert into users(full_name,email,phone,role,center_id,is_active)
         values($1,$2,$3,$4::app_role,$5,coalesce($6,true))
@@ -38,11 +43,12 @@ export default async function handler(req:any,res:any){
       return json(res,201,rows[0]);
     }
     if(req.method==='PUT'){
+      if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};
       if(!b.id) return json(res,400,{error:'معرف المستخدم مطلوب'});
       if(b.role!==undefined&&!allowedRoles.includes(b.role)) return json(res,400,{error:'الدور غير صحيح'});
       const e=(await query<any>('select * from users where id=$1',[b.id]))[0];
-      if(!e) return json(res,404,{error:'المستخدم غير موجود'});
+      if(!e) return json(res,404,{error:'المستخدم غير موجود'});if(u.role!=='system_admin'&&e.center_id!==u.center_id&&e.id!==u.id)return json(res,403,{error:'Forbidden',message:'المستخدم خارج مركزك.'});
       const rows=await query(`
         update users set
           full_name=coalesce($2,full_name),

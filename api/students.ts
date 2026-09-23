@@ -7,7 +7,6 @@ export default async function handler(req:any,res:any){
     const u=await getActor(req,res);if(!u)return;
     await query('alter table students add column if not exists document_no text');
     await query('alter table students add column if not exists mobile text');
-    await query('create unique index if not exists students_document_no_unique on students(document_no) where document_no is not null');
     if(req.method==='GET'){
       const rows=await query(`
         select s.id,s.user_id,s.center_id,s.circle_id,s.full_name,s.document_no,s.mobile,s.birth_date,s.grade_level,s.registration_date,
@@ -28,6 +27,7 @@ export default async function handler(req:any,res:any){
     if(req.method==='POST'){
       if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'إضافة الطلاب غير متاحة لهذا الحساب.'});
       const b=req.body||{};if(!b.full_name?.trim())return json(res,400,{error:'اسم الطالب مطلوب'});if(!String(b.document_no||'').trim())return json(res,400,{error:'رقم الهوية أو الوثيقة مطلوب'});if(!/^\+?[0-9]{7,15}$/.test(String(b.mobile||'').replace(/[\s-]/g,'')))return json(res,400,{error:'رقم الجوال مطلوب ويجب أن يكون رقمًا دوليًا صالحًا'});
+      const duplicate=(await query<any>('select id from students where document_no=$1 limit 1',[String(b.document_no).trim()]))[0];if(duplicate)return json(res,409,{error:'رقم الهوية أو الوثيقة مسجل مسبقًا'});
       let centerId=b.center_id||u.center_id||null;
       if(b.circle_id){
         const circle=(await query<any>('select center_id,teacher_user_id from circles where id=$1',[b.circle_id]))[0];
@@ -60,6 +60,7 @@ export default async function handler(req:any,res:any){
       }
       if(u.role==='teacher'&&circleId!==existing.circle_id)return json(res,403,{error:'Forbidden',message:'المعلم يستطيع تعديل بيانات الطالب داخل حلقته، ونقل الطالب بين الحلقات من صلاحية الإدارة.'});
       if(['center_manager','supervisor'].includes(u.role)&&centerId!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك نقل الطالب خارج مركزك.'});
+      if(b.document_no){const duplicate=(await query<any>('select id from students where document_no=$1 and id<>$2 limit 1',[String(b.document_no).trim(),b.id]))[0];if(duplicate)return json(res,409,{error:'رقم الهوية أو الوثيقة مسجل مسبقًا'});}
       const rows=await query(`update students set full_name=coalesce($2,full_name),center_id=$3,circle_id=$4,birth_date=coalesce($5::date,birth_date),grade_level=coalesce($6,grade_level),status=coalesce($7::student_status,status),document_no=coalesce($8,document_no),mobile=coalesce($9,mobile),updated_at=now() where id=$1 returning *`,
         [b.id,b.full_name?.trim()||null,centerId,circleId,b.birth_date||null,b.grade_level||null,b.status||null,b.document_no?.trim()||null,b.mobile?String(b.mobile).replace(/[\s-]/g,''):null]);
       return json(res,200,rows[0]);

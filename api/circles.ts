@@ -21,14 +21,14 @@ export default async function handler(req:any,res:any){
    return json(res,200,{items:rows});
   }
   if(req.method==='POST'){
-   if(!['system_admin','center_manager'].includes(u.role))return json(res,403,{error:'Forbidden',message:'إضافة الحلقات غير متاحة لهذا الحساب.'});
+   if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden',message:'إضافة الحلقات غير متاحة لهذا الحساب.'});
    const b=req.body||{}; if(!b.name?.trim()||!b.center_id)return json(res,400,{error:'اسم الحلقة والمركز مطلوبان'});
    if(u.role!=='system_admin'&&b.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك إضافة حلقة خارج مركزك.'});
    const rows=await query(`insert into circles(center_id,name,teacher_user_id,schedule,circle_type,start_time,grace_minutes,student_track,quran_track,is_active) values($1,$2,$3,$4,$5,$6,$7,$8,$9,true) returning *`,[b.center_id,b.name.trim(),b.teacher_user_id||null,b.schedule||null,b.circle_type||'memorization',b.start_time||null,b.grace_minutes===''||b.grace_minutes==null?10:Number(b.grace_minutes),b.student_track||null,b.quran_track||null]);
    return json(res,201,rows[0]);
   }
   if(req.method==='PUT'){
-   if(!['system_admin','center_manager','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الحلقات غير متاح لهذا الحساب.'});
+   if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الحلقات غير متاح لهذا الحساب.'});
    const b=req.body||{}; if(!b.id)return json(res,400,{error:'معرف الحلقة مطلوب'});
    const e=(await query<any>('select * from circles where id=$1',[b.id]))[0];
    if(!e)return json(res,404,{error:'الحلقة غير موجودة'});
