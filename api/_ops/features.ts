@@ -121,7 +121,9 @@ export async function features(req:any,res:any,u:any){
       coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date>=current_date-interval '30 days'),0)::int new_pages,
       coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date>=current_date-interval '30 days'),0)::int review_pages,
       s.points_balance,
-      coalesce((select count(*)::int from reward_requests rr where rr.student_id=s.id and rr.status in ('approved','delivered')),0) rewards_count
+      coalesce((select count(*)::int from reward_requests rr where rr.student_id=s.id and rr.status in ('approved','delivered')),0) rewards_count,
+      coalesce((select string_agg(distinct case when a.status='absent' then to_char(a.attendance_date,'YYYY-MM-DD') end,', ') from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '30 days'),'') absence_dates,
+      coalesce((select round(100.0*sum(coalesce(m.page_count,0))/nullif(sum(case when m.record_type='new' then 1 else 1 end),0))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '30 days'),0) progress_indicator
       from guardian_student_links g join students s on s.id=g.student_id left join circles c on c.id=s.circle_id where g.guardian_user_id=$1 order by s.full_name`,[u.id]);
     return json(res,200,{preference,children});
   }
@@ -145,6 +147,7 @@ export async function features(req:any,res:any,u:any){
     const rows=await query<any>(`select s.id,s.full_name,c.name circle_name,
       coalesce((select count(*) from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '14 days' and a.status='absent'),0)::int absences,
       coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '14 days'),100) avg_grade,
+      coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between current_date-interval '28 days' and current_date-interval '15 days'),100) previous_avg,
       coalesce((select count(*) from generate_series(current_date-interval '13 days',current_date,'1 day') d where extract(dow from d)<>5 and not exists(select 1 from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date=d::date)),0)::int review_gaps
       from students s left join circles c on c.id=s.circle_id
       where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid)) order by s.full_name`,[u.role,u.center_id,u.id]);
@@ -162,7 +165,8 @@ export async function features(req:any,res:any,u:any){
         if(targetPages(p.new_target)>0&&(map.new||0)<targetPages(p.new_target))missed++;
         if(targetPages(p.review_target)>0&&(map.review||0)<targetPages(p.review_target))missed++;
       }
-      const reasons=[r.absences>=2?`غياب متكرر (${r.absences})`:null,r.avg_grade<70?`متوسط منخفض (${r.avg_grade})`:null,missed>=2?`عدم تحقيق الورد (${missed})`:null,r.review_gaps>=3?`انقطاع عن المراجعة (${r.review_gaps} أيام)`:null].filter(Boolean);
+      const declining=Number(r.previous_avg)-Number(r.avg_grade)>=10;
+      const reasons=[declining?`تراجع الأداء من ${r.previous_avg} إلى ${r.avg_grade}`:null,r.absences>=2?`غياب متكرر (${r.absences})`:null,r.avg_grade<70?`متوسط منخفض (${r.avg_grade})`:null,missed>=2?`عدم تحقيق الورد (${missed})`:null,r.review_gaps>=3?`انقطاع عن المراجعة (${r.review_gaps} أيام)`:null].filter(Boolean);
       if(reasons.length)items.push({...r,missed_targets:missed,reasons_text:reasons.join('، ')});
     }
     return json(res,200,{items});
