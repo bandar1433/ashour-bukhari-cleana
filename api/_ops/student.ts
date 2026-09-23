@@ -18,7 +18,7 @@ export async function selfService(req:any,res:any,u:any){
     const dm:any={};for(const x of done)dm[x.record_type]=Number(x.pages||0);
     const target=(v:any)=>/^\d+(?:\.\d+)?$/.test(String(v||''))?Number(v):0,nt=target(plan.new_target),rt=target(plan.review_target);
     const attendanceScore=att?.status==='excused'?null:att?.status==='absent'?0:att?.status?Number(att.late_minutes||0)<=30?30:Number(att.late_minutes||0)<=60?20:10:0;
-    const newScore=nt>0?Math.min(30,Math.round(30*(dm.new||0)/nt)):30,reviewScore=rt>0?Math.min(40,Math.round(40*(dm.review||0)/rt)):0;
+    const newScore=nt>0?Math.min(30,Math.round(30*(dm.new||0)/nt)):30,reviewScore=rt>0?Math.min(40,Math.round(40*(dm.review||0)/rt)):40;
     return json(res,200,{student:{...s,effective_start_time:String(s.start_time||makkahAsrPlus70(d)).slice(0,5),automatic_start:!s.start_time},attendance:att,recent,today:{date:d,week_start:weekStart,is_friday:dateObj.getUTCDay()===5,new_target:nt,review_target:rt,new_done:dm.new||0,review_done:dm.review||0,attendance_score:attendanceScore,new_score:newScore,review_score:reviewScore,daily_score:dateObj.getUTCDay()===5||attendanceScore===null?null:attendanceScore+newScore+reviewScore,goals:plan.goals||''}});
   }
   if(req.method==='POST'){
