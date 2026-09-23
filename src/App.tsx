@@ -20,11 +20,11 @@ import {
 import { authClient } from './lib/auth';
 import ExtendedOperations from './ExtendedOperations';
 import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
-import { MadinahMushafRange, madinahSurahName } from './MadinahMushafRange';
+import { madinahSurahName } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
 
-type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile'|'adminReports';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -98,8 +98,6 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   circles: { title: 'الحلقات القرآنية', subtitle: 'تنظيم الحلقات والمعلمين والمسارات التعليمية.', short: 'الحلقات' },
   users: { title: 'الحسابات والدخول', subtitle: 'إدارة المستخدمين واعتماد طلبات ربط الدخول.', short: 'الحسابات' },
   roles: { title: 'الأدوار والصلاحيات', subtitle: 'ضبط الصلاحيات الوظيفية مع بقاء مدير النظام بصلاحية الجذر.', short: 'الصلاحيات' },
-  attendance: { title: 'الحضور', subtitle: 'تسجيل الحضور والتأخر والاستئذان والغياب.', short: 'الحضور' },
-  memorization: { title: 'الحفظ والمراجعة', subtitle: 'توثيق الحفظ الجديد والمراجعة والتقييم.', short: 'القرآن' },
   plans: { title: 'الخطط الأسبوعية', subtitle: 'متابعة أهداف الطلاب وخطط الحفظ والمراجعة.', short: 'الخطط' },
   news: { title: 'الأخبار والفعاليات', subtitle: 'إدارة محتوى الموقع العام والأخبار والإنجازات.', short: 'المحتوى' },
   teacherToday: { title: 'حلقتي اليوم', subtitle: 'مراجعة اكتمال الحضور والحفظ والمراجعة قبل اعتماد اليوم.', short: 'اليوم' },
@@ -117,7 +115,6 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   guardian: { title: 'متابعة الأبناء', subtitle: 'متابعة الحضور والإنجاز والتقارير للأبناء المرتبطين بالحساب.', short: 'الأبناء' },
   quranJourney: { title: 'رحلتي مع القرآن', subtitle: 'خريطة تقدم الطالب في صفحات مصحف المدينة وسجل الإنجاز.', short: 'رحلتي' },
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
-  adminReports: { title: 'التقارير الإدارية', subtitle: 'التقرير الإداري السابق للحلقات والمتابعة.', short: 'التقارير الإدارية' },
 };
 
 export default function App() {
@@ -141,8 +138,6 @@ export default function App() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [roleData, setRoleData] = useState<any>({roles:[],permissions:[]});
   const [loginRequests,setLoginRequests]=useState<any[]>([]);
-  const [attendance, setAttendance] = useState<any[]>([]);
-  const [memorization, setMemorization] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
   const [dailyDate,setDailyDate]=useState(new Date().toISOString().slice(0,10));
@@ -396,8 +391,6 @@ export default function App() {
     if(activeTab==='teacherToday')loadTeacherToday();
     if(activeTab==='circleRegister')loadCircleRegister();
     if(activeTab==='evaluations')loadEvaluations();
-    if(activeTab==='attendance')apiGet<{items:any[]}>('/api/attendance').then(x=>setAttendance(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل الحضور')));
-    if(activeTab==='memorization')apiGet<{items:any[]}>('/api/memorization').then(x=>setMemorization(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل السجل القرآني')));
     if(activeTab==='plans')apiGet<{items:any[]}>('/api/plans').then(x=>setPlans(x.items||[])).catch(e=>setError(readableError(e,'تعذر تحميل الخطط')));
     if(activeTab==='studentProfile'&&currentRole==='student'&&!studentProfile)openStudentProfile('me');
   },[activeTab]);
@@ -410,15 +403,7 @@ export default function App() {
       const body=Object.fromEntries(new FormData(form).entries());
       await apiPost(path,body);
       form.reset();
-      if(path==='/api/attendance'){
-        const x=await apiGet<{items:any[]}>('/api/attendance');setAttendance(x.items||[]);
-        if(activeTab==='teacherToday')await loadTeacherToday();
-      }else if(path==='/api/memorization'){
-        const x=await apiGet<{items:any[]}>('/api/memorization');setMemorization(x.items||[]);
-        if(activeTab==='teacherToday')await loadTeacherToday();
-      }else{
-        await loadDashboard();
-      }
+      await loadDashboard();
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر حفظ البيانات');
     }
@@ -676,8 +661,8 @@ export default function App() {
             {loadState!=='loading'&&activeTab==='circles'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/circles',e)}><label className="field"><span>اسم الحلقة</span><input name="name" required /></label><label className="field"><span>المركز</span><select name="center_id" required defaultValue=""><option value="" disabled>اختر المركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label className="field"><span>المعلم</span><select name="teacher_user_id" defaultValue=""><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>المسار الرئيس</span><select name="student_track" defaultValue="الطلاب من أهل مكة"><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></label><label className="field"><span>المسار القرآني</span><select name="quran_track" defaultValue="مسار حفظ القرآن للشباب"><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></label><label className="field"><span>الموعد</span><input name="schedule" /></label><label className="field"><span>وقت بدء الحلقة</span><input name="start_time" type="time" /></label><button className="primary" type="submit">إضافة الحلقة</button></form><CirclesTable rows={filteredCircles} users={users} onChanged={loadDashboard}/></>}
             {loadState!=='loading'&&activeTab==='users'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/users',e)}><label className="field"><span>الاسم</span><input name="full_name" required /></label><label className="field"><span>البريد</span><input name="email" type="email" /></label><label className="field"><span>الجوال</span><input name="phone" /></label><label className="field"><span>الدور</span><select name="role" required defaultValue="teacher"><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label><label className="field"><span>المركز</span><select name="center_id" defaultValue=""><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary" type="submit">إضافة المستخدم</button></form><UsersTable rows={filteredUsers} centers={centers} onChanged={loadDashboard}/><LoginRequestsPanel rows={loginRequests} users={users} onChanged={loadDashboard}/><form className="quickForm" onSubmit={async e=>{e.preventDefault();try{await apiPost('/api/ops?action=features&sub=guardian-link',Object.fromEntries(new FormData(e.currentTarget).entries()));e.currentTarget.reset();setError('تم ربط الطالب بولي الأمر.')}catch(x){setError(x instanceof Error?x.message:'تعذر الربط')}}}><label className="field"><span>ولي الأمر</span><select name="guardian_user_id" required defaultValue=""><option value="">اختر ولي الأمر</option>{users.filter(u=>u.role==='guardian').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="">اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><button className="primary">ربط الطالب بولي الأمر</button></form></>}
             {loadState!=='loading'&&activeTab==='roles'&&<RolesPanel data={roleData} onChanged={loadDashboard}/>}
-            {loadState!=='loading'&&activeTab==='attendance'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/attendance',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>التاريخ</span><input name="attendance_date" type="date" required defaultValue={new Date().toISOString().slice(0,10)} /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="present"><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue="0" /></label><button className="primary" type="submit">حفظ الحضور</button></form><AttendanceEditor rows={attendance} onChanged={async()=>{const x=await apiGet<{items:any[]}>('/api/attendance');setAttendance(x.items||[])}}/></>}
-            {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option></select></label><MadinahMushafRange /><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ الحفظ والمراجعة</button></form><MemorizationEditor rows={memorization} onChanged={async()=>{const x=await apiGet<{items:any[]}>('/api/memorization');setMemorization(x.items||[])}}/></>}
+            
+            
             {loadState!=='loading'&&activeTab==='plans'&&<><form className="quickForm" onSubmit={async e=>{e.preventDefault();await apiPost('/api/plans',Object.fromEntries(new FormData(e.currentTarget).entries()));e.currentTarget.reset();const x=await apiGet<{items:any[]}>('/api/plans');setPlans(x.items||[])}}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(x=><option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label><label className="field"><span>بداية الأسبوع (السبت)</span><input name="week_start" type="date" required/></label><label className="field"><span>إجمالي الحفظ الجديد (صفحات)</span><input name="weekly_new_total" type="number" min="0" step="1" defaultValue="0"/></label><label className="field"><span>إجمالي المراجعة (صفحات)</span><input name="weekly_review_total" type="number" min="0" step="1" defaultValue="0"/></label><label className="field"><span>أهداف وملاحظات</span><input name="goals"/></label><button className="primary">توزيع وحفظ الخطة</button></form><GenericTable rows={plans} columns={[[ 'full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/></>}
             {activeTab==='teacherToday'&&<>
               <div className="opsToolbar"><button className="secondary" type="button" onClick={()=>goTab('plans')}>الخطة الأسبوعية</button><label className="field"><span>التاريخ</span><input type="date" value={dailyDate} onChange={e=>{setDailyDate(e.target.value);loadTeacherToday(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadTeacherToday()}>تحديث اليوم</button></div>
@@ -713,17 +698,6 @@ export default function App() {
       {!code&&<footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>}
     </main>
   );
-}
-
-function AttendanceEditor({rows,onChanged}:{rows:any[];onChanged:()=>Promise<void>}){
- const [edit,setEdit]=useState<any>(null);
- async function save(e:any){e.preventDefault();const b:any=Object.fromEntries(new FormData(e.currentTarget).entries());b.student_id=edit.student_id;await apiPut('/api/attendance',b);setEdit(null);await onChanged()}
- return <><GenericTable rows={rows} columns={[[ 'attendance_date','التاريخ'],['full_name','الطالب'],['circle_name','الحلقة'],['status','الحالة'],['late_minutes','التأخر'],['points_penalty','الخصم']]}/>{rows.length>0&&<div className="editPicker"><label className="field"><span>اختر سجلًا للتعديل</span><select value={edit?.id||''} onChange={e=>setEdit(rows.find(x=>x.id===e.target.value)||null)}><option value="">اختر الطالب والتاريخ</option>{rows.map(r=><option key={r.id} value={r.id}>{r.full_name} — {String(r.attendance_date).slice(0,10)}</option>)}</select></label></div>}{edit&&<form className="quickForm" onSubmit={save}><input type="hidden" name="attendance_date" value={String(edit.attendance_date).slice(0,10)}/><label className="field"><span>الحالة</span><select name="status" defaultValue={edit.status}><option value="present">حاضر</option><option value="late">متأخر</option><option value="absent">غائب</option><option value="excused">مستأذن</option></select></label><label className="field"><span>دقائق التأخر</span><input name="late_minutes" type="number" min="0" defaultValue={edit.late_minutes||0}/></label><label className="field"><span>الخصم</span><input name="points_penalty" type="number" defaultValue={edit.points_penalty||0}/></label><label className="field"><span>وقت الحضور</span><input name="check_in_at" type="datetime-local" defaultValue={edit.check_in_at?String(edit.check_in_at).slice(0,16):''}/></label><label className="field"><span>وقت الانصراف</span><input name="check_out_at" type="datetime-local" defaultValue={edit.check_out_at?String(edit.check_out_at).slice(0,16):''}/></label><label className="field"><span>ملاحظات</span><input name="notes" defaultValue={edit.notes||''}/></label><button className="primary">حفظ تعديل الحضور</button></form>}</>
-}
-function MemorizationEditor({rows,onChanged}:{rows:any[];onChanged:()=>Promise<void>}){
- const [edit,setEdit]=useState<any>(null);
- async function save(e:any){e.preventDefault();const b:any=Object.fromEntries(new FormData(e.currentTarget).entries());b.id=edit.id;b.student_id=edit.student_id;await apiPut('/api/memorization',b);setEdit(null);await onChanged()}
- return <><GenericTable rows={rows} columns={[[ 'record_date','التاريخ'],['full_name','الطالب'],['record_type','النوع'],['surah_no','السورة'],['from_page','من صفحة'],['to_page','إلى صفحة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>{rows.length>0&&<div className="editPicker"><label className="field"><span>اختر سجلًا قرآنيًا للتعديل</span><select value={edit?.id||''} onChange={e=>setEdit(rows.find(x=>x.id===e.target.value)||null)}><option value="">اختر السجل</option>{rows.map(r=><option key={r.id} value={r.id}>{r.full_name} — {String(r.record_date).slice(0,10)} — {r.record_type}</option>)}</select></label></div>}{edit&&<form className="quickForm" onSubmit={save}><input type="hidden" name="record_date" value={String(edit.record_date).slice(0,10)}/><label className="field"><span>النوع</span><select name="record_type" defaultValue={edit.record_type}><option value="new">حفظ جديد</option><option value="review">مراجعة</option></select></label><MadinahMushafRange key={edit.id} initial={edit}/><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" defaultValue={edit.grade||''}/></label><label className="field"><span>ملاحظات</span><input name="notes" defaultValue={edit.notes||''}/></label><button className="primary">حفظ تعديل الحفظ والمراجعة</button></form>}</>
 }
 
 function GenericTable({rows,columns}:{rows:any[];columns:[string,string][]}){if(!rows.length)return <div className="empty">لا توجد بيانات مسجلة حتى الآن.</div>;const show=(r:any,k:string)=>k==='surah_no'&&r[k]!=null?madinahSurahName(Number(r[k])):typeof r[k]==='boolean'?(r[k]?'نعم':'لا'):(r[k]??'—');return <div className="table-wrap"><table><thead><tr>{columns.map(([k,l])=><th key={k}>{l}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={r.id||i}>{columns.map(([k])=><td key={k}>{show(r,k)}</td>)}</tr>)}</tbody></table></div>}
