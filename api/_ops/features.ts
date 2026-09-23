@@ -122,9 +122,10 @@ export async function features(req:any,res:any,u:any){
 }
 
 export async function profile(req:any,res:any,u:any){
-  if(req.method==='GET')return json(res,200,(await query<any>('select id,full_name,email,phone,role::text role,center_id,is_active from users where id=$1',[u.id]))[0]);
+  await query('alter table users add column if not exists avatar_url text');
+  if(req.method==='GET')return json(res,200,(await query<any>('select id,full_name,email,phone,avatar_url,role::text role,center_id,is_active from users where id=$1',[u.id]))[0]);
   if(req.method==='PUT'){
-    const b=req.body||{};const row=(await query<any>('update users set full_name=coalesce($2,full_name),phone=coalesce($3,phone) where id=$1 returning id,full_name,email,phone,role::text role,center_id,is_active',[u.id,String(b.full_name||'').trim()||null,String(b.phone||'').trim()||null]))[0];
+    const b=req.body||{};const row=(await query<any>('update users set full_name=coalesce($2,full_name),phone=coalesce($3,phone),avatar_url=coalesce($4,avatar_url) where id=$1 returning id,full_name,email,phone,avatar_url,role::text role,center_id,is_active',[u.id,String(b.full_name||'').trim()||null,String(b.phone||'').trim()||null,String(b.avatar_url||'').trim()||null]))[0];
     return json(res,200,row);
   }
   return json(res,405,{error:'Method not allowed'});
