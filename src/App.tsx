@@ -24,7 +24,7 @@ import { MadinahMushafRange } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
 
-type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile'|'adminReports';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -117,6 +117,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   guardian: { title: 'متابعة الأبناء', subtitle: 'متابعة الحضور والإنجاز والتقارير للأبناء المرتبطين بالحساب.', short: 'الأبناء' },
   quranJourney: { title: 'رحلتي مع القرآن', subtitle: 'خريطة تقدم الطالب في صفحات مصحف المدينة وسجل الإنجاز.', short: 'رحلتي' },
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
+  adminReports: { title: 'التقارير الإدارية', subtitle: 'التقرير الإداري السابق للحلقات والمتابعة.', short: 'التقارير الإدارية' },
 };
 
 export default function App() {
@@ -616,7 +617,7 @@ export default function App() {
           <div className="sidebarSectionLabel">التحفيز والإدارة</div>
           <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button>
           <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
-          <button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>مركز التقارير</button>
+          <button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>مركز التقارير</button><button className={activeTab==='adminReports'?'selected':''} onClick={()=>goTab('adminReports')}><span className="navDot">▥</span>التقارير الإدارية</button>
           <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button>
           {['system_admin','center_manager','supervisor'].includes(currentRole)&&<button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">⚙</span>التشغيل والإعدادات</button>}</>}
           {currentRole==='student'&&<><div className="sidebarSectionLabel">بوابة الطالب</div>
@@ -625,9 +626,9 @@ export default function App() {
           <button className={activeTab==='quranJourney'?'selected':''} onClick={()=>goTab('quranJourney')}><span className="navDot">▦</span>رحلتي مع القرآن</button>
           <button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span>تقييمي</button>
           <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>مهامي وجوائزي</button>
-          <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
+          <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>تقاريري</button>
           <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button></>}
-          {currentRole==='guardian'&&<><div className="sidebarSectionLabel">ولي الأمر</div><button className={activeTab==='guardian'?'selected':''} onClick={()=>goTab('guardian')}><span className="navDot">◉</span>متابعة الأبناء</button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button></>}
+          {currentRole==='guardian'&&<><div className="sidebarSectionLabel">ولي الأمر</div><button className={activeTab==='guardian'?'selected':''} onClick={()=>goTab('guardian')}><span className="navDot">◉</span>متابعة الأبناء</button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>تقارير الأبناء</button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button></>}
           {['system_admin','center_manager','supervisor'].includes(currentRole)&&<button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>}
           {isRoot&&<><div className="sidebarSectionLabel">النظام والمحتوى</div>
           <button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
@@ -677,8 +678,8 @@ export default function App() {
                 <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
               </>}
             </>}
-            {['selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
-            {['library','guardian','quranJourney','profile'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
+            {['selfService','motivation','competitions','notifications','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} {activeTab==='adminReports'&&<ExtendedOperations mode="reports" currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
+            {['library','guardian','quranJourney','profile','reports'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>

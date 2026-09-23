@@ -23,6 +23,51 @@ function targetPages(value:any){const s=String(value||'').trim();if(/^\d+(?:\.\d
 export async function features(req:any,res:any,u:any){
   const sub=String(req.query?.sub||'');await ensureTables();
 
+  if(sub==='reports'){
+    if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
+    const period=String(req.query?.period||'weekly');
+    const nowFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const today=new Date(nowFmt+'T00:00:00Z');
+    const iso=(d:Date)=>d.toISOString().slice(0,10);
+    let from=String(req.query?.from||''),to=String(req.query?.to||'');
+    if(period!=='custom'){
+      to=iso(today);const d=new Date(today);
+      if(period==='weekly'){const dow=d.getUTCDay(),back=(dow+1)%7;d.setUTCDate(d.getUTCDate()-back)}
+      else if(period==='monthly')d.setUTCDate(1);
+      else if(period==='quarterly'){d.setUTCMonth(Math.floor(d.getUTCMonth()/3)*3,1)}
+      else if(period==='half_yearly'){d.setUTCMonth(d.getUTCMonth()<6?0:6,1)}
+      else if(period==='yearly'){d.setUTCMonth(0,1)}
+      else {const dow=d.getUTCDay(),back=(dow+1)%7;d.setUTCDate(d.getUTCDate()-back)}
+      from=iso(d);
+    }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)||from>to)return json(res,400,{error:'الفترة غير صالحة'});
+    let scope='true',args:any[]=[from,to];
+    if(u.role==='student'){scope='s.user_id=$3::uuid';args.push(u.id)}
+    else if(u.role==='guardian'){scope='exists(select 1 from guardian_student_links g where g.student_id=s.id and g.guardian_user_id=$3::uuid)';args.push(u.id)}
+    else if(u.role==='teacher'){scope='h.teacher_user_id=$3::uuid';args.push(u.id)}
+    else if(['center_manager','supervisor'].includes(u.role)){scope='s.center_id=$3::uuid';args.push(u.center_id)}
+    else if(u.role!=='system_admin')return json(res,403,{error:'Forbidden'});
+    const students=await query<any>(`select s.id,s.full_name,s.center_id,s.circle_id,c.name center_name,h.name circle_name,
+      coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0))::int from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0) attendance_rate,
+      coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2),0) avg_grade,
+      coalesce((select sum(m.page_count)::int from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date between $1 and $2),0) new_pages,
+      coalesce((select sum(m.page_count)::int from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date between $1 and $2),0) review_pages,
+      coalesce((select count(*)::int from attendance a where a.student_id=s.id and a.status='absent' and a.attendance_date between $1 and $2),0) absences,
+      coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0) current_avg,
+      coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0) previous_avg
+      from students s left join circles h on h.id=s.circle_id left join centers c on c.id=s.center_id where s.status='active' and ${scope} order by c.name,h.name,s.full_name`,args);
+    const grouped=(key:'circle_id'|'center_id',nameKey:'circle_name'|'center_name')=>{
+      const map=new Map<string,any>();for(const s of students){const id=String(s[key]||'none');let g=map.get(id);if(!g){g={id,name:s[nameKey]||'—',students:0,attendance_sum:0,grade_sum:0,new_pages:0,review_pages:0,struggling:0};map.set(id,g)}g.students++;g.attendance_sum+=Number(s.attendance_rate||0);g.grade_sum+=Number(s.avg_grade||0);g.new_pages+=Number(s.new_pages||0);g.review_pages+=Number(s.review_pages||0);if(Number(s.attendance_rate)<75||Number(s.avg_grade)<70)g.struggling++}
+      return [...map.values()].map(g=>({...g,attendance_rate:g.students?Math.round(g.attendance_sum/g.students):0,avg_grade:g.students?Math.round(g.grade_sum/g.students):0}));
+    };
+    const circles=grouped('circle_id','circle_name'),centers=grouped('center_id','center_name');
+    const struggling=students.filter((s:any)=>Number(s.attendance_rate)<75||Number(s.avg_grade)<70);
+    const topPerformers=[...students].sort((a:any,b:any)=>Number(b.avg_grade)-Number(a.avg_grade)||Number(b.attendance_rate)-Number(a.attendance_rate)).slice(0,10);
+    const mostImproved=[...students].map((s:any)=>({...s,improvement:Number(s.current_avg||0)-Number(s.previous_avg||0)})).sort((a:any,b:any)=>b.improvement-a.improvement).slice(0,10);
+    const n=students.length,metrics={total_students:n,attendance_rate:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.attendance_rate||0),0)/n):0,avg_grade:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.avg_grade||0),0)/n):0,new_pages:students.reduce((x:number,s:any)=>x+Number(s.new_pages||0),0),review_pages:students.reduce((x:number,s:any)=>x+Number(s.review_pages||0),0),struggling:struggling.length,most_improved:mostImproved.length,top_performers:topPerformers.length};
+    return json(res,200,{period,from,to,metrics,students,circles,centers,struggling,topPerformers,mostImproved});
+  }
+
   if(sub==='library'){
     if(req.method==='GET'){
       const where=['system_admin','center_manager','supervisor'].includes(u.role)?'true':'is_active=true';

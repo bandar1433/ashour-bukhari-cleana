@@ -1,7 +1,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {apiGet,apiPost,apiPut,StudentRow} from './lib/api';
 
-type Mode='library'|'guardian'|'quranJourney'|'interventions'|'profile';
+type Mode='library'|'guardian'|'quranJourney'|'interventions'|'profile'|'reports';
 
 export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;currentRole:string;students:StudentRow[]}){
   const [data,setData]=useState<any>(null);
@@ -9,6 +9,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
   const [busy,setBusy]=useState(false);
   const [studentId,setStudentId]=useState('');
   const [pageFilter,setPageFilter]=useState<number|null>(null);
+  const [period,setPeriod]=useState('weekly');const [reportRange,setReportRange]=useState({from:'',to:''});const [reportTab,setReportTab]=useState('dashboard');
   const canManageLibrary=['system_admin','center_manager','supervisor'].includes(currentRole);
 
   async function load(id=studentId){
@@ -19,6 +20,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
       if(mode==='quranJourney') setData(await apiGet('/api/ops?action=features&sub=quran-journey'+(id?'&student_id='+encodeURIComponent(id):'')));
       if(mode==='interventions') setData(await apiGet('/api/ops?action=features&sub=interventions'));
       if(mode==='profile') setData(await apiGet('/api/ops?action=profile'));
+      if(mode==='reports') setData(await apiGet(`/api/ops?action=features&sub=reports&period=${period}${period==='custom'&&reportRange.from&&reportRange.to?`&from=${reportRange.from}&to=${reportRange.to}`:''}`));
     }catch(e){setError(e instanceof Error?e.message:'تعذر تحميل البيانات')}
     finally{setBusy(false)}
   }
@@ -30,6 +32,20 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
   if(busy&&!data)return <div className="emptyState">جارٍ التحميل...</div>;
 
   if(mode==='profile')return <div>{error&&<div className="notice">{error}</div>}{data&&<form className="quickForm" onSubmit={async e=>{e.preventDefault();try{await apiPut('/api/ops?action=profile',formBody(e));await load()}catch(x){setError(x instanceof Error?x.message:'تعذر الحفظ')}}}><label className="field"><span>الاسم الكامل</span><input name="full_name" defaultValue={data.full_name||''}/></label><label className="field"><span>رقم الجوال</span><input name="phone" defaultValue={data.phone||''}/></label><label className="field"><span>الصورة الشخصية (اختياري)</span><input name="avatar_url" type="url" defaultValue={data.avatar_url||''} placeholder="رابط الصورة"/></label><label className="field"><span>البريد</span><input value={data.email||''} disabled/></label><label className="field"><span>نوع الحساب</span><input value={data.role||''} disabled/></label><button className="primary">حفظ البيانات</button><button className="secondary" type="button" disabled title="يُفعّل مع خدمة الجوال">التحقق OTP — قريبًا</button><button className="secondary" type="button" disabled title="يتاح عند تفعيل الدخول بالجوال أو كلمة المرور">تغيير / استرجاع كلمة المرور — قريبًا</button></form>}</div>;
+
+  if(mode==='reports'){
+    const allowedTabs=currentRole==='student'?['dashboard','students']:currentRole==='guardian'?['dashboard','students']:currentRole==='teacher'?['dashboard','students','circles']:['dashboard','students','circles','centers'];
+    const tab=allowedTabs.includes(reportTab)?reportTab:allowedTabs[0];
+    const exportExcel=()=>{const rows=tab==='centers'?(data?.centers||[]):tab==='circles'?(data?.circles||[]):data?.students||[];if(!rows.length)return;const keys=Object.keys(rows[0]);const html='<table><tr>'+keys.map(k=>'<th>'+k+'</th>').join('')+'</tr>'+rows.map((r:any)=>'<tr>'+keys.map(k=>'<td>'+String(r[k]??'')+'</td>').join('')+'</tr>').join('')+'</table>';const blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='report.xls';a.click();URL.revokeObjectURL(url)};
+    return <div>{error&&<div className="notice">{error}</div>}
+      <div className="opsToolbar"><label className="field"><span>الفترة</span><select value={period} onChange={e=>setPeriod(e.target.value)}><option value="weekly">أسبوعي</option><option value="monthly">شهري</option><option value="quarterly">ربع سنوي</option><option value="half_yearly">نصف سنوي</option><option value="yearly">سنوي</option><option value="custom">مخصص</option></select></label>{period==='custom'&&<><label className="field"><span>من</span><input type="date" value={reportRange.from} onChange={e=>setReportRange(x=>({...x,from:e.target.value}))}/></label><label className="field"><span>إلى</span><input type="date" value={reportRange.to} onChange={e=>setReportRange(x=>({...x,to:e.target.value}))}/></label></>}<button className="primary" onClick={()=>load()}>عرض</button><button className="secondary" onClick={()=>window.print()}>طباعة / PDF</button><button className="secondary" onClick={exportExcel}>Excel</button></div>
+      <div className="opsToolbar">{allowedTabs.map(x=><button key={x} className={tab===x?'primary':'secondary'} onClick={()=>setReportTab(x)}>{x==='dashboard'?'لوحة المؤشرات':x==='students'?'الطلاب':x==='circles'?'الحلقات':'المراكز'}</button>)}</div>
+      {tab==='dashboard'&&<><div className="kpis compactOpsKpis"><article><span>الطلاب</span><b>{data?.metrics?.total_students||0}</b></article><article><span>الحضور</span><b>{data?.metrics?.attendance_rate||0}%</b></article><article><span>متوسط الدرجات</span><b>{data?.metrics?.avg_grade||0}%</b></article><article><span>الجديد</span><b>{data?.metrics?.new_pages||0}</b><small>صفحة</small></article><article><span>المراجعة</span><b>{data?.metrics?.review_pages||0}</b><small>صفحة</small></article><article><span>يحتاج متابعة</span><b>{data?.metrics?.struggling||0}</b></article></div><h3>الأكثر تحسنًا</h3><Mini rows={data?.mostImproved||[]} cols={[[ 'full_name','الطالب'],['previous_avg','السابق'],['current_avg','الحالي'],['improvement','التحسن']]}/><h3>الأعلى أداءً</h3><Mini rows={data?.topPerformers||[]} cols={[[ 'full_name','الطالب'],['avg_grade','الدرجة'],['attendance_rate','الحضور %']]}/></>}
+      {tab==='students'&&<Mini rows={data?.students||[]} cols={[[ 'full_name','الطالب'],['center_name','المركز'],['circle_name','الحلقة'],['attendance_rate','الحضور %'],['avg_grade','الدرجة'],['new_pages','الجديد'],['review_pages','المراجعة']]}/>}
+      {tab==='circles'&&<Mini rows={data?.circles||[]} cols={[[ 'name','الحلقة'],['students','الطلاب'],['attendance_rate','الحضور %'],['avg_grade','الدرجة'],['new_pages','الجديد'],['review_pages','المراجعة'],['struggling','يحتاج متابعة']]}/>}
+      {tab==='centers'&&<Mini rows={data?.centers||[]} cols={[[ 'name','المركز'],['students','الطلاب'],['attendance_rate','الحضور %'],['avg_grade','الدرجة'],['new_pages','الجديد'],['review_pages','المراجعة'],['struggling','يحتاج متابعة']]}/>}
+    </div>
+  }
 
   if(mode==='interventions')return <section className="panel featurePanel">
     <div className="panelHead"><div><span className="panelEyebrow">متابعة آلية</span><h2>يحتاجون تدخلك اليوم</h2></div><button className="secondary" onClick={()=>load()}>تحديث</button></div>
