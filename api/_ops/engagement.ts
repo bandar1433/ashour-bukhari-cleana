@@ -65,7 +65,15 @@ export async function motivation(req:any,res:any,u:any){
         coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-29),0) attendance_rate
         from students s where s.circle_id=$1 and s.status='active' order by s.points_balance desc,quran_average desc,attendance_rate desc limit 30`,[circleId])
     ]);
-    return json(res,200,{month,circle:allowed,student:target,tasks,students,entries,rewards,requests,rankings});
+    const top3=rankings.slice(0,3);
+    const centerTop10=await query<any>(`select s.id,s.full_name,h.name circle_name,s.points_balance from students s left join circles h on h.id=s.circle_id where s.center_id=(select center_id from circles where id=$1) and s.status='active' order by s.points_balance desc limit 10`,[circleId]);
+    const mostImproved=await query<any>(`select s.id,s.full_name,
+      round(coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0))::int current_avg,
+      round(coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0))::int previous_avg
+      from students s where s.circle_id=$1 and s.status='active' order by
+      (coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0)-
+       coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0)) desc limit 10`,[circleId]);
+    return json(res,200,{month,circle:allowed,student:target,tasks,students,entries,rewards,requests,rankings,top3,centerTop10,mostImproved});
   }
   if(sub==='task'&&req.method==='POST'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
@@ -171,9 +179,10 @@ export async function competitions(req:any,res:any,u:any){
     return json(res,200,rows);
   }
   if(req.method==='POST'&&sub==='create'){
-    if(!managers.includes(u.role))return json(res,403,{error:'Forbidden'});
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date);if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
-    const centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
+    let centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
+    if(u.role==='teacher'){const own=(await query<any>('select id,center_id from circles where teacher_user_id=$1 and is_active order by created_at limit 1',[u.id]))[0];if(!own)return json(res,403,{error:'لا توجد حلقة مرتبطة بالمعلم'});centerId=own.center_id}
     return json(res,201,(await query<any>('insert into competitions(center_id,title,start_date,end_date,created_by) values($1,$2,$3,$4,$5) returning *',[centerId,txt(b.title,300),start,end,u.id]))[0]);
   }
   if(req.method==='POST'&&sub==='score'){

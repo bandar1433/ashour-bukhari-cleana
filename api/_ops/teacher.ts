@@ -67,41 +67,31 @@ export async function circleRegister(req:any,res:any,u:any){
 
 export async function evaluations(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
-  const from=validDate(req.query?.from)||today(), to=validDate(req.query?.to)||from;
-  const settings=(await query<any>('select memorization_weight,review_weight,discipline_weight from operational_settings where id=1'))[0]||{memorization_weight:30,review_weight:40,discipline_weight:30};
+  const from=validDate(req.query?.from)||today(),to=validDate(req.query?.to)||from;
   const rows=await query<any>(`with days as (
-    select s.id student_id,s.full_name,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start
-    from students s cross join generate_series($4::date,$5::date,'1 day') d where
-    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or
-     ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
-  ), plans as (
-    select w.student_id,w.week_start,
-    sum(case when w.new_target like 'صفحات مصحف المدينة:%' then greatest(0,(substring(w.new_target from '–([0-9]+)')::numeric)-(substring(w.new_target from ': ([0-9]+)')::numeric)+1) else 0 end)/6.0 new_daily_target,
-    sum(case when w.review_target like 'صفحات مصحف المدينة:%' then greatest(0,(substring(w.review_target from '–([0-9]+)')::numeric)-(substring(w.review_target from ': ([0-9]+)')::numeric)+1) else 0 end)/6.0 review_daily_target
-    from weekly_plans w group by w.student_id,w.week_start
+    select s.id student_id,s.full_name,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start,
+      case extract(dow from d)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
+    from students s cross join generate_series($4::date,$5::date,'1 day') d where extract(dow from d)<>5 and
+    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
+  ), plan as (
+    select d.student_id,d.record_day,case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end new_target,
+      case when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?$' then w.review_target::numeric else 0 end review_target
+    from days d left join weekly_plans w on w.student_id=d.student_id and w.week_start=d.week_start and w.day_name=d.day_name
   ), done as (
-    select student_id,record_date,sum(case when record_type='new' then coalesce((substring(notes from '— ([0-9]+) صفحة'))::numeric,0) else 0 end) new_pages,
-    sum(case when record_type='review' then coalesce((substring(notes from '— ([0-9]+) صفحة'))::numeric,0) else 0 end) review_pages
+    select student_id,record_date,sum(case when record_type='new' then coalesce(page_count,0) else 0 end)::numeric new_pages,
+      sum(case when record_type='review' then coalesce(page_count,0) else 0 end)::numeric review_pages
     from memorization_records where record_date between $4 and $5 group by student_id,record_date
-  ), att as (select student_id,attendance_date,status,points_penalty from attendance where attendance_date between $4 and $5)
-  select days.student_id,days.full_name,days.record_day as day,att.status,round(coalesce(done.new_pages,0),2) new_pages,round(coalesce(done.review_pages,0),2) review_pages,
-  round(coalesce(plans.new_daily_target,0),2) new_daily_target,round(coalesce(plans.review_daily_target,0),2) review_daily_target,
-  case when coalesce(plans.new_daily_target,0)>0 then least(100,round(100*coalesce(done.new_pages,0)/plans.new_daily_target))::int else 0 end new_grade,
-  case when coalesce(plans.review_daily_target,0)>0 then least(100,round(100*coalesce(done.review_pages,0)/plans.review_daily_target))::int else 0 end review_grade,
-  case when att.status='excused' then null when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,100+coalesce(att.points_penalty,0)) else 0 end attendance_score,
-  case when att.status='excused' then null else
-    round(
-      ($6::numeric * case when coalesce(plans.new_daily_target,0)>0 then least(1,coalesce(done.new_pages,0)/plans.new_daily_target) else 0 end)+
-      ($7::numeric * case when coalesce(plans.review_daily_target,0)>0 then least(1,coalesce(done.review_pages,0)/plans.review_daily_target) else 0 end)+
-      ($8::numeric * case when att.status='absent' then 0 when att.status in ('present','late') then greatest(0,least(1,(100+coalesce(att.points_penalty,0))/100.0)) else 0 end)
-    )::int
-  end daily_score
-  from days left join plans on plans.student_id=days.student_id and plans.week_start=days.week_start
-  left join done on done.student_id=days.student_id and done.record_date=days.record_day left join att on att.student_id=days.student_id and att.attendance_date=days.record_day
-  order by days.record_day desc,days.full_name`,[u.role,u.center_id,u.id,from,to,settings.memorization_weight,settings.review_weight,settings.discipline_weight]);
-  const scored=rows.filter((r:any)=>r.daily_score!==null);
-  return json(res,200,{rows,weights:{new:settings.memorization_weight,review:settings.review_weight,attendance:settings.discipline_weight},
-    formula:'الإنجاز اليومي مقارنة بالخطة الأسبوعية مع وزن الانضباط',average:scored.length?Math.round(scored.reduce((n:number,r:any)=>n+Number(r.daily_score),0)/scored.length):0});
+  )
+  select d.student_id,d.full_name,d.record_day day,a.status,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
+    coalesce(p.new_target,0) new_daily_target,coalesce(p.review_target,0) review_daily_target,
+    case when coalesce(p.new_target,0)>0 then least(30,round(30*coalesce(done.new_pages,0)/p.new_target))::int else 30 end new_grade,
+    case when coalesce(p.review_target,0)>0 then least(40,round(40*coalesce(done.review_pages,0)/p.review_target))::int else 0 end review_grade,
+    case when a.status='excused' then null when a.status='absent' then 0 when a.status in ('present','late') and coalesce(a.late_minutes,0)<=30 then 30 when a.status in ('present','late') and coalesce(a.late_minutes,0)<=60 then 20 when a.status in ('present','late') then 10 else 0 end attendance_score
+  from days d left join plan p on p.student_id=d.student_id and p.record_day=d.record_day left join done on done.student_id=d.student_id and done.record_date=d.record_day
+  left join attendance a on a.student_id=d.student_id and a.attendance_date=d.record_day order by d.record_day desc,d.full_name`,[u.role,u.center_id,u.id,from,to]);
+  const enriched=rows.map((r:any)=>({...r,daily_score:r.attendance_score===null?null:Number(r.new_grade)+Number(r.review_grade)+Number(r.attendance_score)}));
+  const scored=enriched.filter((r:any)=>r.daily_score!==null);
+  return json(res,200,{rows:enriched,weights:{new:30,review:40,attendance:30},formula:'الحفظ الجديد 30 + المراجعة 40 + الحضور 30',average:scored.length?Math.round(scored.reduce((n:number,r:any)=>n+Number(r.daily_score),0)/scored.length):0});
 }
 
 export async function studentProfile(req:any,res:any,u:any){

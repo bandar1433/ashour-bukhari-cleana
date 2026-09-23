@@ -28,11 +28,13 @@ export default async function handler(req:any,res:any){
    return json(res,201,rows[0]);
   }
   if(req.method==='PUT'){
-   if(!['system_admin','center_manager'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الحلقات غير متاح لهذا الحساب.'});
+   if(!['system_admin','center_manager','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الحلقات غير متاح لهذا الحساب.'});
    const b=req.body||{}; if(!b.id)return json(res,400,{error:'معرف الحلقة مطلوب'});
    const e=(await query<any>('select * from circles where id=$1',[b.id]))[0];
    if(!e)return json(res,404,{error:'الحلقة غير موجودة'});
-   if(u.role!=='system_admin'&&e.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الحلقة خارج مركزك.'});
+   if(u.role==='teacher'&&e.teacher_user_id!==u.id)return json(res,403,{error:'Forbidden',message:'الحلقة خارج نطاقك.'});
+   if(u.role!=='system_admin'&&u.role!=='teacher'&&e.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الحلقة خارج مركزك.'});
+   if(u.role==='teacher'){const rows=await query('update circles set start_time=$2 where id=$1 returning *',[e.id,b.start_time===undefined?e.start_time:(b.start_time||null)]);return json(res,200,rows[0])}
    const rows=await query(`update circles set name=coalesce($2,name),center_id=coalesce($3::uuid,center_id),teacher_user_id=$4,schedule=$5,circle_type=coalesce($6,circle_type),start_time=$7,grace_minutes=coalesce($8,grace_minutes),student_track=$9,quran_track=$10,is_active=coalesce($11,is_active) where id=$1 returning *`,
     [b.id,b.name?.trim()||null,u.role==='system_admin'?(b.center_id||null):u.center_id,b.teacher_user_id===undefined?e.teacher_user_id:(b.teacher_user_id||null),b.schedule===undefined?e.schedule:(b.schedule||null),b.circle_type||null,b.start_time===undefined?e.start_time:(b.start_time||null),b.grace_minutes===undefined?e.grace_minutes:Number(b.grace_minutes),b.student_track===undefined?e.student_track:(b.student_track||null),b.quran_track===undefined?e.quran_track:(b.quran_track||null),b.is_active===undefined?e.is_active:Boolean(b.is_active)]);
    return json(res,200,rows[0]);

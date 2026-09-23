@@ -39,7 +39,7 @@ export async function features(req:any,res:any,u:any){
     }
     if(req.method==='PUT'){
       const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'معرف الدرس غير صالح'});
-      return json(res,200,(await query<any>('update library_items set is_active=coalesce($2,is_active),updated_at=now() where id=$1 returning *',[id,typeof b.is_active==='boolean'?b.is_active:null]))[0]);
+      return json(res,200,(await query<any>('update library_items set is_active=coalesce($2,is_active),title=coalesce($3,title),sort_order=coalesce($4,sort_order),updated_at=now() where id=$1 returning *',[id,typeof b.is_active==='boolean'?b.is_active:null,b.title?String(b.title).trim():null,b.sort_order===undefined?null:Math.max(0,Number(b.sort_order)||0)]))[0]);
     }
     return json(res,405,{error:'Method not allowed'});
   }

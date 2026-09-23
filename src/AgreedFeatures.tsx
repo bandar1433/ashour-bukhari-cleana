@@ -8,6 +8,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const [studentId,setStudentId]=useState('');
+  const [pageFilter,setPageFilter]=useState<number|null>(null);
   const canManageLibrary=['system_admin','center_manager','supervisor'].includes(currentRole);
 
   async function load(id=studentId){
@@ -56,7 +57,7 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
       <small>{x.teacher_name||'—'} {x.duration?'• '+x.duration:''}</small>
       <p>{x.description||''}</p>
       <a href={x.youtube_url} target="_blank" rel="noreferrer">فتح الدرس في YouTube</a>
-      {canManageLibrary&&<button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button>}
+      {canManageLibrary&&<div className="opsToolbar"><button className="secondary" onClick={async()=>{const title=prompt('عنوان الدرس',x.title);if(!title)return;const order=prompt('ترتيب الدرس',String(x.sort_order||0));await apiPut('/api/ops?action=features&sub=library',{id:x.id,title,sort_order:Number(order||0)});await load()}}>تعديل / ترتيب</button><button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button></div>}
     </article>)}</div>
   </div>;
 
@@ -80,9 +81,9 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
     {data?.student&&<>
       <div className="studentProfileHero"><div><span>رحلتي مع القرآن</span><h2>{data.student.full_name}</h2><p>{data.student.circle_name||'—'}</p></div></div>
       <div className="quranLegend"><span>محفوظ</span><span>قيد المراجعة</span><span>يحتاج تثبيت</span><span>لم يبدأ</span></div>
-      <div className="quran604Grid">{(data.pages||[]).map((p:any)=><div key={p.page} title={p.state} className={'quranPage '+(p.state==='محفوظ'?'done':p.state==='قيد المراجعة'?'review':p.state==='يحتاج تثبيت'?'weak':'')}><b>{p.page}</b><small>{p.state}</small></div>)}</div>
-      <h3>سجل الإنجاز</h3>
-      <Mini rows={data.history||[]} cols={[[ 'record_date','التاريخ'],['record_type','النوع'],['from_page','من صفحة'],['to_page','إلى صفحة'],['grade','الدرجة']]}/>
+      <div className="quran604Grid">{(data.pages||[]).map((p:any)=><button type="button" key={p.page} onClick={()=>setPageFilter(p.page)} title={p.state} className={'quranPage '+(p.state==='محفوظ'?'done':p.state==='قيد المراجعة'?'review':p.state==='يحتاج تثبيت'?'weak':'')}><b>{p.page}</b><small>{p.state}</small></button>)}</div>
+      <h3>سجل الإنجاز {pageFilter?`— صفحة ${pageFilter}`:''}</h3>{pageFilter&&<button className="secondary" onClick={()=>setPageFilter(null)}>عرض الكل</button>}
+      <Mini rows={(data.history||[]).filter((r:any)=>!pageFilter||(Number(r.from_page)<=pageFilter&&Number(r.to_page)>=pageFilter))} cols={[[ 'record_date','التاريخ'],['record_type','النوع'],['from_page','من صفحة'],['to_page','إلى صفحة'],['grade','الدرجة']]}/>
     </>}
   </div>
 }
