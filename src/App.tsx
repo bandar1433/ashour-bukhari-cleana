@@ -22,8 +22,9 @@ import ExtendedOperations from './ExtendedOperations';
 import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
 import { MadinahMushafRange } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
+import AgreedFeatures from './AgreedFeatures';
 
-type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests';
+type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'attendance' | 'memorization' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 const report1447={stats:[['447','طالبًا'],['18','معلمًا'],['17','مساعدًا'],['16','حلقة'],['61','جنسية']],news:[['رحلة المدينة المنورة','رحلة إيمانية علمية تربوية لنحو 50 طالبًا من طلاب الحلقات خلال إجازة الصيف.'],['إفطار صائم','لقاء إيماني واجتماعي يجمع طلاب الحلقات ويعزز الأخوة والتواصل.'],['البرنامج الترويحي','أنشطة تربوية واجتماعية مصاحبة تعزز الألفة بين طلاب الحلقات.'],['مجالس ختم القرآن والقراءات','مجالس دورية لختم كتاب الله وإتمام القراءات وربط الطلاب بالقرآن تلاوةً وإتقانًا.'],['برنامج المعايدة','برنامج اجتماعي قرآني يجمع الأساتذة والطلاب والخريجين ويعزز الأخوة والتواصل.']],achievements:[['إنجاز عالمي','تحقيق الطالب أنس الحازمي المركز الثاني على مستوى العالم الإسلامي.'],['المركز الثاني عالميًا','فوز الطالب أحمد كريم بالمركز الثاني في المسابقة العالمية للقرآن الكريم في روسيا.'],['إنجاز دولي','فوز أحمد كريم في مسابقة تنزانيا الدولية لحفظ القرآن الكريم وتلاوته.'],['المركز الأول على مستوى المملكة','فوز الطالب عمر بن محمد أشرف بالمركز الأول في فرع كامل القرآن في مسابقة وزارة التعليم.']]};
@@ -64,6 +65,16 @@ function SitePhoto({src,alt,className=''}:{src?:string;alt:string;className?:str
   if(!src||failed)return <div className={`sitePhotoPlaceholder ${className}`}><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /><span>{alt}</span></div>;
   return <img className={className} src={src} alt={alt} loading="lazy" onError={()=>setFailed(true)} />;
 }
+function CountUp({value}:{value:number}){
+  const [shown,setShown]=useState(0);
+  useEffect(()=>{
+    const target=Number(value)||0;if(target<=0){setShown(0);return}
+    const start=performance.now(),duration=700;let frame=0;
+    const tick=(now:number)=>{const p=Math.min(1,(now-start)/duration);setShown(Math.round(target*p));if(p<1)frame=requestAnimationFrame(tick)};
+    frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);
+  },[value]);
+  return <>{shown.toLocaleString('ar-SA')}</>;
+}
 const objectives = [
 ['01','إتقان التلاوة والحفظ','بناء قراءة صحيحة وحفظ متدرج يقوم على الإتقان والمراجعة المستمرة.'],['02','تعميق الصلة بالقرآن','تربية الطالب على ملازمة كتاب الله وتعظيمه وتحويل التعلم إلى أثر في السلوك.'],['03','متابعة فردية دقيقة','خطة واضحة لكل طالب مع رصد الحضور والإنجاز والتسميع بصورة منتظمة.'],['04','تمكين المعلم','توفير أدوات عملية تساعد المعلم على إدارة الحلقة وقياس تقدم طلابه بوضوح.'],['05','تعزيز شراكة الأسرة','إتاحة تقارير مختصرة وواضحة تعين الأسرة على متابعة مسيرة الطالب وتشجيعه.'],['06','التحفيز والاستدامة','بناء بيئة مشجعة بالنقاط والجوائز والإنجازات بما يحافظ على الدافعية والاستمرار.']];
 const values=[['الإخلاص','نستحضر شرف خدمة كتاب الله وابتغاء الأجر في التعليم والتعلم.'],['الإتقان','نعتمد الجودة والدقة في التلاوة والحفظ والمتابعة والتقويم.'],['الرحمة','نبني علاقة تعليمية راشدة تجمع الرفق والاحتواء والتوجيه.'],['القدوة','نجعل السلوك القرآني جزءاً أصيلاً من شخصية المعلم والمتعلم.'],['الانضباط','نلتزم بالمواعيد والخطط والمتابعة المنتظمة لتحقيق نتائج قابلة للقياس.'],['التعاون','نعزز الشراكة بين الإدارة والمعلم والطالب والأسرة لخدمة المسيرة القرآنية.']];
@@ -91,7 +102,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   memorization: { title: 'الحفظ والمراجعة', subtitle: 'توثيق الحفظ الجديد والمراجعة والتقييم.', short: 'القرآن' },
   plans: { title: 'الخطط الأسبوعية', subtitle: 'متابعة أهداف الطلاب وخطط الحفظ والمراجعة.', short: 'الخطط' },
   news: { title: 'الأخبار والفعاليات', subtitle: 'إدارة محتوى الموقع العام والأخبار والإنجازات.', short: 'المحتوى' },
-  teacherToday: { title: 'لوحة المعلم اليومية', subtitle: 'مراجعة اكتمال الحضور والحفظ والمراجعة قبل اعتماد اليوم.', short: 'اليوم' },
+  teacherToday: { title: 'حلقتي اليوم', subtitle: 'مراجعة اكتمال الحضور والحفظ والمراجعة قبل اعتماد اليوم.', short: 'اليوم' },
   circleRegister: { title: 'سجل الحلقة', subtitle: 'كشف شهري موحد للحضور والمراجعة والحفظ والاعتماد.', short: 'السجل' },
   evaluations: { title: 'التقييم والإنجاز', subtitle: 'قياس الإنجاز اليومي وفق الخطة والحضور والمراجعة.', short: 'التقييم' },
   studentProfile: { title: 'ملف الطالب القرآني', subtitle: 'ملف متكامل للحضور والحفظ والمراجعة والخطط والنقاط.', short: 'ملف الطالب' },
@@ -99,9 +110,12 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   motivation: { title: 'التحفيز والنقاط والجوائز', subtitle: 'المهام اليومية والنقاط والترتيب والجوائز وطلبات الاستبدال.', short: 'التحفيز' },
   competitions: { title: 'المسابقات', subtitle: 'إنشاء المسابقات وتسجيل النتائج وعرض المتصدرين.', short: 'المسابقات' },
   notifications: { title: 'الإشعارات', subtitle: 'إشعارات داخل المنصة للمستخدمين والمراكز.', short: 'الإشعارات' },
-  reports: { title: 'التقارير الإدارية', subtitle: 'مؤشرات الحلقات والطلاب الذين يحتاجون متابعة.', short: 'التقارير' },
+  reports: { title: 'مركز التقارير', subtitle: 'مؤشرات الحلقات والطلاب الذين يحتاجون متابعة.', short: 'التقارير' },
   joinRequests: { title: 'طلبات الانضمام', subtitle: 'اعتماد طلبات الطلاب للانضمام إلى الحلقات.', short: 'طلبات الانضمام' },
   operations: { title: 'التشغيل والإعدادات', subtitle: 'الجاهزية والإجازات والاستثناءات وإعدادات التقييم وسجل العمليات.', short: 'التشغيل' },
+  library: { title: 'المكتبة', subtitle: 'البرامج والسلاسل والدروس المرتبطة بروابط YouTube.', short: 'المكتبة' },
+  guardian: { title: 'متابعة الأبناء', subtitle: 'متابعة الحضور والإنجاز والتقارير للأبناء المرتبطين بالحساب.', short: 'الأبناء' },
+  quranJourney: { title: 'رحلتي مع القرآن', subtitle: 'خريطة تقدم الطالب في صفحات مصحف المدينة وسجل الإنجاز.', short: 'رحلتي' },
 };
 
 export default function App() {
@@ -135,12 +149,15 @@ export default function App() {
   const [evaluations,setEvaluations]=useState<any>({rows:[],average:0,weights:{new:30,review:40,attendance:30}});
   const [studentProfile,setStudentProfile]=useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [tabHistory,setTabHistory]=useState<Tab[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
   const currentRole=getAccessCode()?'system_admin':getSessionRole();
   const isRoot=currentRole==='system_admin';
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
+  const goTab=(tab:Tab)=>{if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));setActiveTab(tab)};
+  const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
 
   useEffect(() => {
     getStatus()
@@ -341,7 +358,7 @@ export default function App() {
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
   }
   async function openStudentProfile(id:string){
-    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${recordMonth}`);setStudentProfile(data);setActiveTab('studentProfile')}
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${recordMonth}`);setStudentProfile(data);goTab('studentProfile')}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
   }
   async function approveDay(circleId:string){
@@ -349,7 +366,7 @@ export default function App() {
     catch(err){setError(err instanceof Error?err.message:'تعذر اعتماد اليوم')}
   }
 
-  useEffect(()=>{if(code&&currentRole==='student'&&activeTab==='overview')setActiveTab('selfService')},[code,currentRole]);
+  useEffect(()=>{if(code&&currentRole==='student'&&activeTab==='overview')goTab('selfService');if(code&&currentRole==='guardian'&&activeTab==='overview')goTab('guardian')},[code,currentRole]);
 
   useEffect(()=>{
     if(!code)return;
@@ -491,12 +508,13 @@ export default function App() {
             ['04','محاور تشغيلية','تعليم • حضور • تقارير • تحفيز']
           ].map(([number,label,detail],index)=><article key={label} className="statCard reveal reveal-up" style={{animationDelay:`${0.18+index*0.11}s`}}><b>{number}</b><span>{label}</span><small>{detail}</small></article>)}
         </section>
+        {publicData?.stats&&<section className="stats platformStats liveStats"><article><b><CountUp value={Number(publicData.stats.students||0)}/></b><span>طالب نشط</span></article><article><b><CountUp value={Number(publicData.stats.teachers||0)}/></b><span>معلم</span></article><article><b><CountUp value={Number(publicData.stats.circles||0)}/></b><span>حلقة</span></article><article><b><CountUp value={Number(publicData.stats.centers||0)}/></b><span>مركز</span></article></section>}
         </>}
         {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<>
           <AboutSections/>
           <section className="report1447">
             <div className="sectionHead"><div><span>حصاد 1447هـ</span><h2>حلقات تمتد من مكة إلى العالم</h2></div></div>
-            <div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b>{n}</b><span>{l}</span></article>)}</div>
+            <div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b><CountUp value={Number(n)}/></b><span>{l}</span></article>)}</div>
             <SitePhoto src={siteImages['nationalities']} alt="خريطة جنسيات طلاب حلقات عاشور بخاري" className="reportMap" />
             <div className="sectionHead reportSubhead"><div><span>المسارات</span><h2>تعليم قرآني متدرج</h2></div></div>
             <div className="reportGallery">{[['talqeen','مسار التلقين والتهجي'],['hifz','مسار حفظ القرآن'],['itqan','مسار الإتقان'],['qiraat','مسار القراءات العشر']].map(([key,title])=><SitePhoto key={key} src={siteImages[key]} alt={title} />)}</div>
@@ -570,41 +588,45 @@ export default function App() {
             <div><b>حلقات عاشور بخاري</b><small>منصة الإدارة التعليمية</small></div>
           </div>
           {isStaff&&<><div className="sidebarSectionLabel">الإدارة</div>
-          <button className={activeTab==='overview'?'selected':''} onClick={()=>setActiveTab('overview')}><span className="navDot">⌂</span>نظرة عامة</button>
-          {['system_admin','center_manager','supervisor'].includes(currentRole)&&<><button className={activeTab==='centers'?'selected':''} onClick={()=>setActiveTab('centers')}><span className="navDot">◇</span>المراكز والفروع</button><button className={activeTab==='circles'?'selected':''} onClick={()=>setActiveTab('circles')}><span className="navDot">◫</span>الحلقات القرآنية</button></>}
+          <button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span>نظرة عامة</button>
+          {['system_admin','center_manager','supervisor'].includes(currentRole)&&<><button className={activeTab==='centers'?'selected':''} onClick={()=>goTab('centers')}><span className="navDot">◇</span>المراكز والفروع</button><button className={activeTab==='circles'?'selected':''} onClick={()=>goTab('circles')}><span className="navDot">◫</span>الحلقات القرآنية</button></>}
           <div className="sidebarSectionLabel">التعليم والمتابعة</div>
-          <button className={activeTab==='students'?'selected':''} onClick={()=>setActiveTab('students')}><span className="navDot">◉</span>الطلاب</button>
-          <button className={activeTab==='teacherToday'?'selected':''} onClick={()=>setActiveTab('teacherToday')}><span className="navDot">◈</span>لوحة المعلم اليومية</button>
-          <button className={activeTab==='plans'?'selected':''} onClick={()=>setActiveTab('plans')}><span className="navDot">▤</span>الخطة الأسبوعية</button>
-          <button className={activeTab==='circleRegister'?'selected':''} onClick={()=>setActiveTab('circleRegister')}><span className="navDot">▦</span>سجل الحلقة</button>
-          <button className={activeTab==='evaluations'?'selected':''} onClick={()=>setActiveTab('evaluations')}><span className="navDot">◎</span>التقييم والإنجاز</button>
-          {['system_admin','center_manager','supervisor','teacher'].includes(currentRole)&&<button className={activeTab==='joinRequests'?'selected':''} onClick={()=>setActiveTab('joinRequests')}><span className="navDot">＋</span>طلبات الانضمام</button>}
+          <button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span>الطلاب</button>
+          <button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span>حلقتي اليوم</button>
+          <button className={activeTab==='plans'?'selected':''} onClick={()=>goTab('plans')}><span className="navDot">▤</span>الخطة الأسبوعية</button>
+          <button className={activeTab==='circleRegister'?'selected':''} onClick={()=>goTab('circleRegister')}><span className="navDot">▦</span>سجل الحلقة</button>
+          <button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span>التقييم والإنجاز</button>
+          {['system_admin','center_manager','supervisor','teacher'].includes(currentRole)&&<button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span>طلبات الانضمام</button>}
           <div className="sidebarSectionLabel">التحفيز والإدارة</div>
-          <button className={activeTab==='motivation'?'selected':''} onClick={()=>setActiveTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button>
-          <button className={activeTab==='notifications'?'selected':''} onClick={()=>setActiveTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
-          <button className={activeTab==='reports'?'selected':''} onClick={()=>setActiveTab('reports')}><span className="navDot">▥</span>التقارير الإدارية</button>
-          {['system_admin','center_manager','supervisor'].includes(currentRole)&&<button className={activeTab==='operations'?'selected':''} onClick={()=>setActiveTab('operations')}><span className="navDot">⚙</span>التشغيل والإعدادات</button>}</>}
+          <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button>
+          <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
+          <button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>مركز التقارير</button>
+          <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button>
+          {['system_admin','center_manager','supervisor'].includes(currentRole)&&<button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">⚙</span>التشغيل والإعدادات</button>}</>}
           {currentRole==='student'&&<><div className="sidebarSectionLabel">بوابة الطالب</div>
-          <button className={activeTab==='selfService'?'selected':''} onClick={()=>setActiveTab('selfService')}><span className="navDot">✓</span>تسجيل اليوم</button>
-          <button className={activeTab==='studentProfile'?'selected':''} onClick={()=>setActiveTab('studentProfile')}><span className="navDot">◇</span>ملفي القرآني</button>
-          <button className={activeTab==='evaluations'?'selected':''} onClick={()=>setActiveTab('evaluations')}><span className="navDot">◎</span>تقييمي</button>
-          <button className={activeTab==='motivation'?'selected':''} onClick={()=>setActiveTab('motivation')}><span className="navDot">★</span>مهامي وجوائزي</button>
-          <button className={activeTab==='notifications'?'selected':''} onClick={()=>setActiveTab('notifications')}><span className="navDot">◌</span>الإشعارات</button></>}
+          <button className={activeTab==='selfService'?'selected':''} onClick={()=>goTab('selfService')}><span className="navDot">✓</span>تسجيل اليوم</button>
+          <button className={activeTab==='studentProfile'?'selected':''} onClick={()=>goTab('studentProfile')}><span className="navDot">◇</span>ملفي القرآني</button>
+          <button className={activeTab==='quranJourney'?'selected':''} onClick={()=>goTab('quranJourney')}><span className="navDot">▦</span>رحلتي مع القرآن</button>
+          <button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span>تقييمي</button>
+          <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>مهامي وجوائزي</button>
+          <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
+          <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button></>}
+          {currentRole==='guardian'&&<><div className="sidebarSectionLabel">ولي الأمر</div><button className={activeTab==='guardian'?'selected':''} onClick={()=>goTab('guardian')}><span className="navDot">◉</span>متابعة الأبناء</button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button></>}
           {isRoot&&<><div className="sidebarSectionLabel">النظام والمحتوى</div>
-          <button className={activeTab==='users'?'selected':''} onClick={()=>setActiveTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>
-          <button className={activeTab==='roles'?'selected':''} onClick={()=>setActiveTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
-          <button className={activeTab==='news'?'selected':''} onClick={()=>setActiveTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button></>}
+          <button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span>الحسابات والدخول</button>
+          <button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
+          <button className={activeTab==='news'?'selected':''} onClick={()=>goTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button></>}
           <div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>جلسة دخول نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
           <div className="adminTopbar">
             <div className="crumb"><span className="crumbPath">لوحة التحكم / {tabMeta[activeTab].short}</span><h1>{tabMeta[activeTab].title}</h1><p>{tabMeta[activeTab].subtitle}</p></div>
-            <div className="adminTopActions"><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
+            <div className="adminTopActions"><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
           </div>
           {error&&<div className="notice">{error}</div>}
-          {activeTab==='overview'&&<div className="kpis"><article><span>الطلاب</span><b>{summary?.students??'—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{summary?.teachers??'—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{summary?.circles??'—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{summary?.centers??'—'}</b><small>مركز وفرع</small></article></div>}
+          {activeTab==='overview'&&<><div className="kpis"><article><span>الطلاب</span><b>{typeof summary?.students==='number'?<CountUp value={summary.students}/>: '—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{typeof summary?.teachers==='number'?<CountUp value={summary.teachers}/>: '—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{typeof summary?.circles==='number'?<CountUp value={summary.circles}/>: '—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{typeof summary?.centers==='number'?<CountUp value={summary.centers}/>: '—'}</b><small>مركز وفرع</small></article></div>{isStaff&&<AgreedFeatures mode="interventions" currentRole={currentRole} students={students}/>}</>}
           <div className="panel mainPanel">
-            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile','selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
+            <div className="panelHead"><div><span className="panelEyebrow">إدارة البيانات</span><h2>{tabMeta[activeTab].title}</h2></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile','selfService','motivation','competitions','notifications','reports','operations','joinRequests','library','guardian','quranJourney'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
 
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
@@ -616,7 +638,7 @@ export default function App() {
             {loadState!=='loading'&&activeTab==='memorization'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/memorization',e)}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><label className="field"><span>النوع</span><select name="record_type" defaultValue="new"><option value="new">جديد</option><option value="review">مراجعة</option></select></label><MadinahMushafRange /><label className="field"><span>الدرجة</span><input name="grade" type="number" min="0" max="100" step="0.5" /></label><button className="primary" type="submit">حفظ الحفظ والمراجعة</button></form><MemorizationEditor rows={memorization} onChanged={async()=>{const x=await apiGet<{items:any[]}>('/api/memorization');setMemorization(x.items||[])}}/></>}
             {loadState!=='loading'&&activeTab==='plans'&&<><form className="quickForm" onSubmit={async e=>{e.preventDefault();await apiPost('/api/plans',Object.fromEntries(new FormData(e.currentTarget).entries()));e.currentTarget.reset();const x=await apiGet<{items:any[]}>('/api/plans');setPlans(x.items||[])}}><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="" disabled>اختر الطالب</option>{students.map(x=><option key={x.id} value={x.id}>{x.full_name}</option>)}</select></label><label className="field"><span>بداية الأسبوع</span><input name="week_start" type="date" required/></label><label className="field"><span>اليوم</span><select name="day_name" required defaultValue="السبت"><option>السبت</option><option>الأحد</option><option>الاثنين</option><option>الثلاثاء</option><option>الأربعاء</option><option>الخميس</option></select></label><label className="field"><span>هدف الحفظ الجديد</span><input name="new_target" placeholder="مثال: صفحات مصحف المدينة: 20–22"/></label><label className="field"><span>هدف المراجعة</span><input name="review_target" placeholder="مثال: صفحات مصحف المدينة: 1–5"/></label><label className="field"><span>أهداف وملاحظات</span><input name="goals"/></label><button className="primary">حفظ الخطة</button></form><GenericTable rows={plans} columns={[[ 'full_name','الطالب'],['week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/></>}
             {activeTab==='teacherToday'&&<>
-              <div className="opsToolbar"><button className="primary" type="button" onClick={()=>setActiveTab('attendance')}>الحضور والانصراف</button><button className="primary" type="button" onClick={()=>setActiveTab('memorization')}>الحفظ والمراجعة</button><button className="secondary" type="button" onClick={()=>setActiveTab('plans')}>الخطة الأسبوعية</button><label className="field"><span>التاريخ</span><input type="date" value={dailyDate} onChange={e=>{setDailyDate(e.target.value);loadTeacherToday(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadTeacherToday()}>تحديث اليوم</button></div>
+              <div className="opsToolbar"><button className="primary" type="button" onClick={()=>goTab('attendance')}>الحضور والانصراف</button><button className="primary" type="button" onClick={()=>goTab('memorization')}>الحفظ والمراجعة</button><button className="secondary" type="button" onClick={()=>goTab('plans')}>الخطة الأسبوعية</button><label className="field"><span>التاريخ</span><input type="date" value={dailyDate} onChange={e=>{setDailyDate(e.target.value);loadTeacherToday(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadTeacherToday()}>تحديث اليوم</button></div>
               <div className="kpis compactOpsKpis"><article><span>طلاب اليوم</span><b>{teacherToday.students?.length||0}</b><small>ضمن نطاق الحساب</small></article><article><span>الحضور المسجل</span><b>{(teacherToday.students||[]).filter((x:any)=>x.attendance_status).length}</b><small>سجل حضور</small></article><article><span>حفظ جديد</span><b>{(teacherToday.students||[]).reduce((n:number,x:any)=>n+Number(x.new_records||0),0)}</b><small>سجل</small></article><article><span>المراجعة</span><b>{(teacherToday.students||[]).reduce((n:number,x:any)=>n+Number(x.review_records||0),0)}</b><small>سجل</small></article></div>
               <div className="dailyApprovalGrid">{Array.from(new Map((teacherToday.students||[]).map((x:any)=>[x.circle_id,{id:x.circle_id,name:x.circle_name}])).values()).map((c:any)=>{const done=(teacherToday.approvals||[]).some((a:any)=>a.circle_id===c.id);return <article key={c.id}><div><b>{c.name}</b><small>{done?'تم اعتماد سجل اليوم':'بانتظار اعتماد اليوم'}</small></div><button className={done?'approvedDay':'primary'} disabled={done} onClick={()=>approveDay(c.id)}>{done?'معتمد ✓':'اعتماد اليوم'}</button></article>})}</div>
               <TeacherDailyTable data={teacherToday} date={dailyDate} onRefresh={()=>loadTeacherToday(dailyDate)} onProfile={openStudentProfile}/>
@@ -639,7 +661,8 @@ export default function App() {
                 <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
               </>}
             </>}
-            {['selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>}
+            {['selfService','motivation','competitions','notifications','reports','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
+            {['library','guardian','quranJourney'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>
         </section>

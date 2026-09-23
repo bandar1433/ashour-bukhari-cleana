@@ -1,0 +1,158 @@
+import {query} from './_lib/db.js';
+import {getActor,isStaff,validUuid} from './_lib/actor.js';
+import {handleError,json} from './_lib/http.js';
+
+async function ensureTables(){
+  await query(`create table if not exists library_items(
+    id uuid primary key default gen_random_uuid(),
+    program_name text not null,
+    series_name text not null,
+    title text not null,
+    teacher_name text,
+    description text,
+    youtube_url text not null,
+    duration text,
+    sort_order integer not null default 0,
+    is_active boolean not null default true,
+    created_by uuid references users(id),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+  )`);
+  await query(`create table if not exists guardian_student_links(
+    guardian_user_id uuid not null references users(id),
+    student_id uuid not null references students(id),
+    created_at timestamptz not null default now(),
+    primary key(guardian_user_id,student_id)
+  )`);
+  await query(`create table if not exists guardian_report_preferences(
+    guardian_user_id uuid primary key references users(id),
+    frequency text not null default 'weekly',
+    updated_at timestamptz not null default now()
+  )`);
+}
+
+function validYoutube(value:any){
+  const v=String(value||'').trim();
+  if(!/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(v))throw new Error('أدخل رابط YouTube صالحًا');
+  return v;
+}
+
+function targetPages(value:any){
+  const s=String(value||'').trim();
+  if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);
+  const m=s.match(/(\d+)\D+(\d+)\s*$/);
+  return m?Math.max(0,Number(m[2])-Number(m[1])+1):0;
+}
+
+export default async function handler(req:any,res:any){
+  try{
+    const u=await getActor(req,res);if(!u)return;
+    const action=String(req.query?.action||'');
+    await ensureTables();
+
+    if(action==='library'){
+      if(req.method==='GET'){
+        const where=['system_admin','center_manager','supervisor'].includes(u.role)?'true':'is_active=true';
+        const items=await query<any>(`select * from library_items where ${where} order by is_active desc,program_name,series_name,sort_order,title`);
+        return json(res,200,{items});
+      }
+      if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
+      if(req.method==='POST'){
+        const b=req.body||{};
+        const program=String(b.program_name||'').trim(),series=String(b.series_name||'').trim(),title=String(b.title||'').trim();
+        if(!program||!series||!title)return json(res,400,{error:'البرنامج والسلسلة وعنوان الدرس مطلوبة'});
+        const row=(await query<any>(`insert into library_items(program_name,series_name,title,teacher_name,description,youtube_url,duration,sort_order,created_by)
+          values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+          [program,series,title,String(b.teacher_name||'').trim()||null,String(b.description||'').trim()||null,validYoutube(b.youtube_url),String(b.duration||'').trim()||null,Math.max(0,Number(b.sort_order)||0),u.id]))[0];
+        return json(res,201,row);
+      }
+      if(req.method==='PUT'){
+        const b=req.body||{},id=validUuid(b.id);
+        if(!id)return json(res,400,{error:'معرف الدرس غير صالح'});
+        const row=(await query<any>('update library_items set is_active=coalesce($2,is_active),updated_at=now() where id=$1 returning *',
+          [id,typeof b.is_active==='boolean'?b.is_active:null]))[0];
+        return json(res,200,row);
+      }
+      return json(res,405,{error:'Method not allowed'});
+    }
+
+    if(action==='guardian-preference'){
+      if(u.role!=='guardian')return json(res,403,{error:'Forbidden'});
+      if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
+      const f=String(req.body?.frequency||'weekly');
+      if(!['weekly','monthly','quarterly','half_yearly','yearly'].includes(f))return json(res,400,{error:'دورية غير صالحة'});
+      const row=(await query<any>(`insert into guardian_report_preferences(guardian_user_id,frequency,updated_at)
+        values($1,$2,now()) on conflict(guardian_user_id) do update set frequency=excluded.frequency,updated_at=now() returning *`,[u.id,f]))[0];
+      return json(res,200,row);
+    }
+
+    if(action==='guardian'){
+      if(u.role!=='guardian')return json(res,403,{error:'Forbidden'});
+      if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
+      const preference=(await query<any>('select frequency from guardian_report_preferences where guardian_user_id=$1',[u.id]))[0]?.frequency||'weekly';
+      const children=await query<any>(`select s.id,s.full_name,c.name circle_name,
+        coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '30 days'),0) attendance_rate,
+        coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '30 days'),0) quran_average,
+        coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date>=current_date-interval '30 days'),0)::int new_pages,
+        coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date>=current_date-interval '30 days'),0)::int review_pages
+        from guardian_student_links g join students s on s.id=g.student_id left join circles c on c.id=s.circle_id
+        where g.guardian_user_id=$1 order by s.full_name`,[u.id]);
+      return json(res,200,{preference,children});
+    }
+
+    if(action==='quran-journey'){
+      if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
+      let student:any=null;
+      const sid=validUuid(req.query?.student_id);
+      if(u.role==='student'){
+        student=(await query<any>('select s.id,s.full_name,c.name circle_name from students s left join circles c on c.id=s.circle_id where s.user_id=$1 limit 1',[u.id]))[0];
+      }else if(isStaff(u.role)&&sid){
+        student=(await query<any>(`select s.id,s.full_name,c.name circle_name from students s left join circles c on c.id=s.circle_id
+          where s.id=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid))`,
+          [u.role,u.center_id,u.id,sid]))[0];
+      }
+      if(!student)return json(res,200,{student:null,pages:[],history:[]});
+      const history=await query<any>('select id,record_date,record_type,from_page,to_page,grade from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 100',[student.id]);
+      const pages=Array.from({length:604},(_,i)=>({page:i+1,state:'لم يبدأ'}));
+      const rank:any={'لم يبدأ':0,'محفوظ':1,'قيد المراجعة':2,'يحتاج تثبيت':3};
+      for(const r of history){
+        const a=Math.max(1,Number(r.from_page)||0),b=Math.min(604,Number(r.to_page)||a);
+        if(!a)continue;
+        const state=Number(r.grade)<70?'يحتاج تثبيت':r.record_type==='review'?'قيد المراجعة':'محفوظ';
+        for(let p=a;p<=b;p++)if(rank[state]>=rank[(pages[p-1] as any).state])(pages[p-1] as any).state=state;
+      }
+      return json(res,200,{student,pages,history});
+    }
+
+    if(action==='interventions'){
+      if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+      if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
+      const rows=await query<any>(`select s.id,s.full_name,c.name circle_name,
+        coalesce((select count(*) from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '14 days' and a.status='absent'),0)::int absences,
+        coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '14 days'),100) avg_grade,
+        coalesce((select count(*) from generate_series(current_date-interval '13 days',current_date,'1 day') d where extract(dow from d)<>5 and not exists(select 1 from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date=d::date)),0)::int review_gaps
+        from students s left join circles c on c.id=s.circle_id
+        where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid))
+        order by s.full_name`,[u.role,u.center_id,u.id]);
+      const items:any[]=[];
+      for(const r of rows){
+        const plans=await query<any>(`select week_start,day_name,new_target,review_target from weekly_plans where student_id=$1 and week_start>=current_date-interval '14 days'`,[r.id]);
+        let missed=0;
+        const dayOffset:any={'السبت':0,'الأحد':1,'الاثنين':2,'الثلاثاء':3,'الأربعاء':4,'الخميس':5};
+        for(const p of plans){
+          const d=new Date(String(p.week_start).slice(0,10)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+(dayOffset[p.day_name]??0));
+          const date=d.toISOString().slice(0,10);
+          const done=await query<any>(`select record_type,coalesce(sum(page_count),0)::numeric pages from memorization_records where student_id=$1 and record_date=$2::date and record_type in ('new','review') group by record_type`,[r.id,date]);
+          const map:any={};for(const x of done)map[x.record_type]=Number(x.pages||0);
+          if(targetPages(p.new_target)>0&&(map.new||0)<targetPages(p.new_target))missed++;
+          if(targetPages(p.review_target)>0&&(map.review||0)<targetPages(p.review_target))missed++;
+        }
+        const reasons=[r.absences>=2?`غياب متكرر (${r.absences})`:null,r.avg_grade<70?`متوسط منخفض (${r.avg_grade})`:null,missed>=2?`عدم تحقيق الورد (${missed})`:null,r.review_gaps>=3?`انقطاع عن المراجعة (${r.review_gaps} أيام)`:null].filter(Boolean);
+        if(reasons.length)items.push({...r,missed_targets:missed,reasons_text:reasons.join('، ')});
+      }
+      return json(res,200,{items});
+    }
+
+    return json(res,404,{error:'Unknown feature'});
+  }catch(e){return handleError(res,e)}
+}

@@ -29,10 +29,23 @@ export async function teacherToday(req:any,res:any,u:any){
     from students s join circles h on h.id=s.circle_id left join attendance a on a.student_id=s.id and a.attendance_date=$4
     where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
     order by h.name,s.full_name`,[u.role,u.center_id,u.id,d]);
+  const dayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dateObj=new Date(d+'T00:00:00Z'),dayName=dayNames[dateObj.getUTCDay()],offset=(dateObj.getUTCDay()+1)%7;
+  const weekDate=new Date(dateObj);weekDate.setUTCDate(weekDate.getUTCDate()-offset);const weekStart=weekDate.toISOString().slice(0,10);
+  const ids=students.map((x:any)=>x.id);
+  const planRows=ids.length?await query<any>('select student_id,new_target,review_target,goals from weekly_plans where student_id=any($1::uuid[]) and week_start=$2::date and day_name=$3 order by created_at desc',[ids,weekStart,dayName]):[];
+  const planMap=new Map<string,any>();for(const p of planRows)if(!planMap.has(p.student_id))planMap.set(p.student_id,p);
+  const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\\d+(?:\\.\\d+)?$/.test(s))return Number(s);const m=s.match(/(\\d+)\\D+(\\d+)\\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
+  const scoredStudents=students.map((r:any)=>{const p=planMap.get(r.id)||{},reviewTarget=targetPages(p.review_target),newTarget=targetPages(p.new_target),reviewDone=Number(r.review_record?.page_count||0),newDone=Number(r.new_record?.page_count||0);
+    const attendanceScore=r.attendance_status==='excused'?null:r.attendance_status==='absent'?0:r.attendance_status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
+    const reviewScore=reviewTarget>0?Math.min(40,Math.round(40*reviewDone/reviewTarget)):0;
+    const newScore=newTarget>0?Math.min(30,Math.round(30*newDone/newTarget)):30;
+    return {...r,review_target:p.review_target||'',new_target:p.new_target||'',goals:p.goals||'',attendance_score:attendanceScore,review_score:reviewScore,new_score:newScore,daily_score:attendanceScore===null?null:attendanceScore+reviewScore+newScore};
+  });
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
     where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
     [u.role,u.center_id,u.id,d]);
-  return json(res,200,{date:d,students,approvals});
+  return json(res,200,{date:d,students:scoredStudents,approvals});
 }
 
 export async function circleRegister(req:any,res:any,u:any){
