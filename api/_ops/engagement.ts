@@ -82,7 +82,12 @@ export async function motivation(req:any,res:any,u:any){
       from students s where s.circle_id=$1 and s.status='active' order by
       (coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0)-
        coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0)) desc limit 10`,[circleId]);
-    return json(res,200,{month,circle:allowed,student:target,tasks,students,entries,rewards,requests,rankings,top3,centerTop10,mostImproved});
+    const centerMostImproved=await query<any>(`select s.id,s.full_name,h.name circle_name,
+      round(coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0))::int current_avg,
+      round(coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0))::int previous_avg
+      from students s left join circles h on h.id=s.circle_id where s.center_id=(select center_id from circles where id=$1) and s.status='active'
+      order by (coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0)-coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between current_date-13 and current_date-7),0)) desc limit 10`,[circleId]);
+    return json(res,200,{month,circle:allowed,student:target,tasks,students,entries,rewards,requests,rankings,top3,centerTop10,mostImproved,centerMostImproved});
   }
   if(sub==='task'&&req.method==='POST'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
@@ -200,7 +205,7 @@ export async function competitions(req:any,res:any,u:any){
   }
   if(req.method==='POST'&&sub==='create'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
-    const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date);if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
+    const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date),title=txt(b.title,300);if(!title)return json(res,400,{error:'اسم المسابقة مطلوب'});if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
     let centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id,circleId:string|null=null;
     if(u.role==='teacher'){
       const requested=validUuid(b.circle_id);
@@ -209,7 +214,7 @@ export async function competitions(req:any,res:any,u:any){
     }else if(u.role==='system_admin'&&b.circle_id){
       const h=(await query<any>('select id,center_id from circles where id=$1',[validUuid(b.circle_id)]))[0];if(!h)return json(res,400,{error:'الحلقة غير موجودة'});circleId=h.id;centerId=h.center_id;
     }
-    const row=(await query<any>('insert into competitions(center_id,circle_id,title,start_date,end_date,max_points,created_by) values($1,$2,$3,$4,$5,$6,$7) returning *',[centerId,circleId,txt(b.title,300),start,end,int(b.max_points,1,10000),u.id]))[0];
+    const row=(await query<any>('insert into competitions(center_id,circle_id,title,start_date,end_date,max_points,created_by) values($1,$2,$3,$4,$5,$6,$7) returning *',[centerId,circleId,title,start,end,int(b.max_points,1,10000),u.id]))[0];
     return json(res,201,row);
   }
   if(req.method==='PUT'&&sub==='edit'){
@@ -226,8 +231,9 @@ export async function competitions(req:any,res:any,u:any){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},s=await scopedStudent(u,b.student_id),competitionId=validUuid(b.competition_id);
     if(!s||!competitionId)return json(res,400,{error:'بيانات الطالب أو المسابقة غير صالحة'});
-    const comp=(await query<any>('select id,circle_id,max_points from competitions where id=$1 and (center_id is null or center_id=$2)',[competitionId,s.center_id]))[0];
-    if(!comp|| (comp.circle_id&&comp.circle_id!==s.circle_id))return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
+    const comp=(await query<any>('select id,center_id,circle_id,max_points from competitions where id=$1 and (center_id is null or center_id=$2)',[competitionId,s.center_id]))[0];
+    if(!comp||(comp.circle_id&&comp.circle_id!==s.circle_id))return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
+    if(u.role==='teacher'&&(!comp.circle_id||!(await query<any>('select id from circles where id=$1 and teacher_user_id=$2',[comp.circle_id,u.id]))[0]))return json(res,403,{error:'المعلم يعدل مسابقات حلقته فقط'});
     const row=(await query<any>(`insert into competition_entries(competition_id,student_id,score,notes,updated_by) values($1,$2,$3,$4,$5)
       on conflict(competition_id,student_id) do update set score=excluded.score,notes=excluded.notes,updated_by=excluded.updated_by,updated_at=now() returning *`,
       [competitionId,s.id,int(b.score,0,Number(comp.max_points||100)),txt(b.notes,1000)||null,u.id]))[0];return json(res,200,row);
