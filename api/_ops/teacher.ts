@@ -46,14 +46,7 @@ export async function teacherToday(req:any,res:any,u:any){
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
     where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
     [u.role,u.center_id,u.id,d]);
-  const weekly=await query<any>(`with days as (
-      select s.id student_id,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start,
-        case extract(dow from d)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
-      from students s cross join generate_series($4::date,($4::date+interval '5 days')::date,'1 day') d
-      join circles h on h.id=s.circle_id
-      where s.status='active' and extract(dow from d)<>5 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
-    ), p as (
-      select d.student_id,d.record_day,case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?
+  return json(res,200,{date:d,students:scoredStudents,approvals});
 }
 
 export async function circleRegister(req:any,res:any,u:any){
