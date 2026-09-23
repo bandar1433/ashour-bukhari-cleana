@@ -67,7 +67,6 @@ export default async function handler(req:any,res:any){
       ]);
       if(b.request_id&&b.auth_subject){
         const lr=(await query<any>('select requested_role,circle_id,center_id from login_requests where id=$1 and auth_subject=$2',[b.request_id,b.auth_subject]))[0];
-        const actor=(await query<any>('select id from users where id=$1',[b.id]))[0];
         await query("update login_requests set status='approved' where id=$1 and auth_subject=$2",[b.request_id,b.auth_subject]);
         if(lr?.requested_role==='student'&&lr.circle_id){
           const st=(await query<any>('select id from students where user_id=$1',[b.id]))[0];
