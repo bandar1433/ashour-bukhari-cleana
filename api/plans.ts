@@ -1,6 +1,7 @@
 import { query } from './_lib/db.js';
 import { getActor,isStaff } from './_lib/actor.js';
 import { handleError,json } from './_lib/http.js';
+import {isWeekLocked} from './_lib/weeklyLock.js';
 
 export default async function handler(req:any,res:any){
   try{
@@ -13,7 +14,7 @@ export default async function handler(req:any,res:any){
       if(!student)return json(res,404,{error:'الطالب غير موجود'});
       const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&student.center_id===u.center_id)||(u.role==='teacher'&&student.teacher_user_id===u.id);
       if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return json(res,400,{error:'بداية الأسبوع مطلوبة'});
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return json(res,400,{error:'بداية الأسبوع مطلوبة'});if(u.role==='teacher'&&student.circle_id&&await isWeekLocked(student.circle_id,week))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال هذا الأسبوع من الإشراف ولا يمكن للمعلم تعديل الخطة.'});
       const days=['السبت','الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس'];
       const distribute=(v:any)=>{const n=Math.max(0,Math.floor(Number(v)||0)),q=Math.floor(n/6),r=n%6;return days.map((_,i)=>q+(i<r?1:0))};
       if(b.weekly_new_total!==undefined||b.weekly_review_total!==undefined){

@@ -2,6 +2,7 @@ import { getPool, query } from '../_lib/db.js';
 import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
 import { json } from '../_lib/http.js';
 import { managers,today,int,txt,scopedStudent } from './shared.js';
+import {ensureWeeklyLocks,weekStart} from '../_lib/weeklyLock.js';
 
 export async function managementReport(req:any,res:any,u:any){
   if(req.method!=='GET'||!isStaff(u.role))return json(res,403,{error:'Forbidden'});
@@ -29,19 +30,21 @@ export async function adminOperations(req:any,res:any,u:any){
   if(!managers.includes(u.role))return json(res,403,{error:'Forbidden',message:'هذه الشاشة للإدارة والإشراف.'});
   const sub=String(req.query?.sub||'dashboard');
   if(sub==='dashboard'&&req.method==='GET'){
+    await ensureWeeklyLocks();
     const scope=u.role==='system_admin'?[]:[u.center_id];
     const centerWhere=u.role==='system_admin'?'true':'id=$1::uuid',circleWhere=u.role==='system_admin'?'true':'center_id=$1::uuid',studentWhere=u.role==='system_admin'?'true':'center_id=$1::uuid';
-    const [centers,circles,students,teachers,settings,holidays,audit]=await Promise.all([
+    const [centers,circles,students,teachers,settings,holidays,audit,weeklyLocks]=await Promise.all([
       query<any>(`select count(*)::int n from centers where ${centerWhere}`,scope),
       query<any>(`select count(*)::int n,count(*) filter(where teacher_user_id is not null)::int assigned from circles where ${circleWhere}`,scope),
       query<any>(`select count(*)::int n,count(*) filter(where circle_id is not null)::int assigned from students where ${studentWhere} and status='active'`,scope),
       u.role==='system_admin'?query<any>(`select count(*)::int n from users where role='teacher' and is_active`):query<any>(`select count(*)::int n from users where center_id=$1::uuid and role='teacher' and is_active`,scope),
       query<any>('select * from operational_settings where id=1'),
       u.role==='system_admin'?query<any>('select * from holidays order by holiday_date desc limit 40'):query<any>('select * from holidays where center_id is null or center_id=$1 order by holiday_date desc limit 40',scope),
-      u.role==='system_admin'?query<any>(`select a.*,u.full_name actor_name from audit_logs a left join users u on u.id=a.actor_user_id order by a.created_at desc limit 60`):query<any>(`select a.*,u.full_name actor_name from audit_logs a left join users u on u.id=a.actor_user_id where u.center_id=$1 order by a.created_at desc limit 60`,scope)
+      u.role==='system_admin'?query<any>(`select a.*,u.full_name actor_name from audit_logs a left join users u on u.id=a.actor_user_id order by a.created_at desc limit 60`):query<any>(`select a.*,u.full_name actor_name from audit_logs a left join users u on u.id=a.actor_user_id where u.center_id=$1 order by a.created_at desc limit 60`,scope),
+      u.role==='system_admin'?query<any>(`select wl.*,c.name circle_name from weekly_locks wl join circles c on c.id=wl.circle_id order by wl.week_start desc,wl.locked_at desc limit 60`):query<any>(`select wl.*,c.name circle_name from weekly_locks wl join circles c on c.id=wl.circle_id where c.center_id=$1 order by wl.week_start desc,wl.locked_at desc limit 60`,scope)
     ]);
     const data={database_configured:Boolean(process.env.DATABASE_URL),centers:centers[0]?.n||0,circles:circles[0]?.n||0,circles_with_teacher:circles[0]?.assigned||0,
-      active_students:students[0]?.n||0,students_in_circle:students[0]?.assigned||0,active_teachers:teachers[0]?.n||0,settings:settings[0]||null,holidays,audit};
+      active_students:students[0]?.n||0,students_in_circle:students[0]?.assigned||0,active_teachers:teachers[0]?.n||0,settings:settings[0]||null,holidays,audit,weekly_locks:weeklyLocks};
     const checks=[{label:'اتصال قاعدة البيانات',ok:data.database_configured},{label:'إضافة مركز واحد على الأقل',ok:data.centers>0},
       {label:'ربط المعلمين بالحلقات',ok:data.circles>0&&data.circles===data.circles_with_teacher},{label:'ربط الطلاب بالحلقات',ok:data.active_students>0&&data.active_students===data.students_in_circle},
       {label:'وجود حساب معلم نشط',ok:data.active_teachers>0},{label:'إعدادات التشغيل متوفرة',ok:!!data.settings}];
@@ -54,6 +57,16 @@ export async function adminOperations(req:any,res:any,u:any){
       [int(b.grace_minutes,0,120),int(b.minor_late_penalty,0,1000),int(b.major_late_penalty,0,1000),mw,rw,dw,int(b.edit_window_days,1,30),u.id]))[0];
     await query(`insert into audit_logs(actor_user_id,action,entity_type,entity_id,after_json) values($1,'update','operational_settings','1',$2::jsonb)`,[u.id,JSON.stringify(row)]);
     return json(res,200,row);
+  }
+  if(sub==='weekly-lock'&&req.method==='POST'){
+    await ensureWeeklyLocks();const circleId=validUuid(req.body?.circle_id),raw=validDate(req.body?.week_start);if(!circleId||!raw)return json(res,400,{error:'الحلقة وبداية الأسبوع مطلوبتان'});
+    const c=(await query<any>('select id,center_id from circles where id=$1',[circleId]))[0];if(!c)return json(res,404,{error:'الحلقة غير موجودة'});
+    if(u.role!=='system_admin'&&c.center_id!==u.center_id)return json(res,403,{error:'الحلقة خارج مركزك'});
+    const w=weekStart(raw),lock=String(req.body?.locked||'true')!=='false';
+    const existing=(await query<any>('select id from weekly_locks where circle_id=$1 and week_start=$2::date order by locked_at desc limit 1',[circleId,w]))[0];
+    if(lock&&!existing)await query('insert into weekly_locks(circle_id,week_start,locked_by) values($1,$2::date,$3)',[circleId,w,u.id]);
+    if(!lock&&existing)await query('delete from weekly_locks where circle_id=$1 and week_start=$2::date',[circleId,w]);
+    return json(res,200,{success:true,circle_id:circleId,week_start:w,locked:lock});
   }
   if(sub==='holiday'&&req.method==='POST'){
     const b=req.body||{},d=validDate(b.holiday_date);if(!d)return json(res,400,{error:'تاريخ الإجازة غير صالح'});

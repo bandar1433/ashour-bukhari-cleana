@@ -4,6 +4,7 @@ import { json } from '../_lib/http.js';
 import { managers,today,int,txt,scopedStudent } from './shared.js';
 import {lateMinutes,makkahAsrPlus70} from '../_lib/prayer.js';
 import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
+import {isWeekLocked} from '../_lib/weeklyLock.js';
 
 export async function selfService(req:any,res:any,u:any){
   if(u.role!=='student')return json(res,403,{error:'Forbidden',message:'هذه الخدمة مخصصة لحساب الطالب.'});
@@ -20,7 +21,7 @@ export async function selfService(req:any,res:any,u:any){
       if(!s.circle_id||s.status!=='active')return json(res,400,{error:'يلزم طالب نشط مرتبط بحلقة'});
       const action=String(req.body?.action||'');
       if(!['check_in','check_out'].includes(action))return json(res,400,{error:'إجراء الحضور غير صالح'});
-      const d=today();let a=(await query<any>('select * from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0];
+      const d=today();if(await isWeekLocked(s.circle_id,d))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});let a=(await query<any>('select * from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0];
       if(!a&&action==='check_out')return json(res,400,{error:'سجّل الحضور أولاً قبل تسجيل الانصراف'});
       if(!a){const late=lateMinutes(d,s.start_time),status=late>30?'late':'present';a=(await query<any>(`insert into attendance(student_id,circle_id,attendance_date,status,recorded_by,late_minutes,points_penalty,check_in_at) values($1,$2,$3::date,$4,$5,$6,0,now()) returning *`,[s.id,s.circle_id,d,status,u.id,late]))[0];}
       else if(action==='check_in'&&!a.check_in_at)a=(await query<any>('update attendance set check_in_at=now(),recorded_by=$1 where id=$2 returning *',[u.id,a.id]))[0];
@@ -28,6 +29,7 @@ export async function selfService(req:any,res:any,u:any){
       return json(res,200,a);
     }
     if(kind==='quran'){
+      if(s.circle_id&&await isWeekLocked(s.circle_id,today()))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});
       const approved=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2::date',[s.circle_id,today()]))[0];
       if(approved)return json(res,403,{error:'تم اعتماد سجل اليوم ولا يمكن إضافة سجل قرآني جديد'});
       const b=req.body||{},recordType=String(b.record_type||'new');
