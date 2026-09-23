@@ -1,9 +1,7 @@
-import { getPool, query } from '../_lib/db.js';
-import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
+import { query } from '../_lib/db.js';
 import { json } from '../_lib/http.js';
-import { managers,today,int,txt,scopedStudent } from './shared.js';
+import {today} from './shared.js';
 import {lateMinutes,makkahAsrPlus70} from '../_lib/prayer.js';
-import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
 import {isWeekLocked} from '../_lib/weeklyLock.js';
 
 export async function selfService(req:any,res:any,u:any){
@@ -36,21 +34,7 @@ export async function selfService(req:any,res:any,u:any){
       else if(action==='check_out'&&!a.check_out_at)a=(await query<any>('update attendance set check_out_at=now(),recorded_by=$1 where id=$2 returning *',[u.id,a.id]))[0];
       return json(res,200,a);
     }
-    if(kind==='quran'){
-      if(s.circle_id&&await isWeekLocked(s.circle_id,today()))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});
-      const approved=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2::date',[s.circle_id,today()]))[0];
-      if(approved)return json(res,403,{error:'تم اعتماد سجل اليوم ولا يمكن إضافة سجل قرآني جديد'});
-      const b=req.body||{},recordType=String(b.record_type||'new');
-      if(!['new','review'].includes(recordType))return json(res,400,{error:'نوع السجل غير صالح'});
-      const surah=int(b.surah_no,1,114),toSurah=int(b.to_surah_no||b.surah_no,1,114),from=int(b.from_ayah,1,Number(getAyahCountInSurah(surah as any))),to=int(b.to_ayah,1,Number(getAyahCountInSurah(toSurah as any)));
-      if(toSurah<surah||(toSurah===surah&&to<from))return json(res,400,{error:'نهاية الورد يجب أن تكون بعد بدايته'});
-      const fromPage=Number(findPage(surah as any,from as any)),toPage=Number(findPage(toSurah as any,to as any)),pages=Math.max(1,toPage-fromPage+1);
-      const notes=[txt(b.notes,800),`— ${pages} صفحة`].filter(Boolean).join(' ');
-      const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_surah_no,to_ayah,from_page,to_page,page_count,ayah_count,grade,notes,qiraah,approved,record_date)
-        values($1,$2,$3,$4,$5,$6,$7,$8,$9,case when $5::int=$3::int then $6::int-$4::int+1 else null end,null,$10,'حفص عن عاصم',false,$11::date) returning *`,
-        [s.id,recordType,surah,from,toSurah,to,fromPage,toPage,pages,notes||null,today()]))[0];
-      return json(res,201,row);
-    }
+
   }
   return json(res,405,{error:'Method not allowed'});
 }
