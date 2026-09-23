@@ -92,7 +92,10 @@ export async function features(req:any,res:any,u:any){
   if(sub==='guardian-link'){
     if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden'});
     if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
-    const guardianId=validUuid(req.body?.guardian_user_id),studentId=validUuid(req.body?.student_id);if(!guardianId||!studentId)return json(res,400,{error:'ولي الأمر والطالب مطلوبان'});
+    let guardianId=validUuid(req.body?.guardian_user_id);const studentId=validUuid(req.body?.student_id);if(!studentId)return json(res,400,{error:'الطالب مطلوب'});
+    const lookup=String(req.body?.guardian_lookup||'').trim();
+    if(!guardianId&&lookup){const g0=(await query<any>(`select id from users where role='guardian' and (lower(email)=lower($1) or regexp_replace(coalesce(phone,''),'[^0-9+]','','g')=regexp_replace($1,'[^0-9+]','','g')) limit 1`,[lookup]))[0];guardianId=g0?.id||''}
+    if(!guardianId)return json(res,404,{error:'لم يتم العثور على حساب ولي الأمر بالبريد أو الجوال'});
     const s=(await query<any>(`select s.id,s.center_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[studentId]))[0];
     const g=(await query<any>(`select id from users where id=$1 and role='guardian'`,[guardianId]))[0];
     if(!s||!g)return json(res,404,{error:'الطالب أو ولي الأمر غير موجود'});

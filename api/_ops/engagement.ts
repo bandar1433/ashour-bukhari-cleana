@@ -166,6 +166,14 @@ export async function motivation(req:any,res:any,u:any){
 export async function notifications(req:any,res:any,u:any){
   if(req.method==='GET')return json(res,200,await query<any>('select * from inapp_notifications where user_id=$1 order by created_at desc limit 100',[u.id]));
   const sub=String(req.query?.sub||'');
+  if(req.method==='POST'&&sub==='student-message'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const s=await scopedStudent(u,req.body?.student_id);if(!s)return json(res,404,{error:'الطالب غير موجود أو خارج نطاقك'});
+    const target=(await query<any>('select s.id,s.user_id,s.mobile,us.phone from students s left join users us on us.id=s.user_id where s.id=$1',[s.id]))[0];
+    const title=txt(req.body?.title||'رسالة من المعلم',200),body=txt(req.body?.body,2000);if(!body)return json(res,400,{error:'نص الرسالة مطلوب'});
+    if(target?.user_id)await query("insert into inapp_notifications(user_id,title,body,kind) values($1,$2,$3,'teacher_message')",[target.user_id,title,body]);
+    return json(res,200,{success:true,inapp_sent:Boolean(target?.user_id),mobile_prepared:Boolean(target?.mobile||target?.phone),mobile_sent:false,phone:target?.mobile||target?.phone||null,message:'تم حفظ الرسالة داخل المنصة. إرسال الجوال مجهز وغير مفعل حاليًا.'});
+  }
   if(req.method==='POST'&&sub==='send'){
     if(!managers.includes(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},centerId=u.role==='system_admin'?(validUuid(b.center_id)||null):u.center_id;
@@ -208,7 +216,8 @@ export async function competitions(req:any,res:any,u:any){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'المسابقة غير صالحة'});
     const c=(await query<any>('select * from competitions where id=$1',[id]))[0];if(!c)return json(res,404,{error:'المسابقة غير موجودة'});
-    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&c.center_id===u.center_id)||(u.role==='teacher'&&c.circle_id&&await query<any>('select id from circles where id=$1 and teacher_user_id=$2',[c.circle_id,u.id]).then(x=>x[0]));
+    let teacherOwn=false;if(u.role==='teacher'&&c.circle_id)teacherOwn=Boolean((await query<any>('select id from circles where id=$1 and teacher_user_id=$2',[c.circle_id,u.id]))[0]);
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&c.center_id===u.center_id)||teacherOwn;
     if(!allowed)return json(res,403,{error:'المسابقة خارج نطاق صلاحيتك'});
     const row=(await query<any>('update competitions set title=coalesce($2,title),start_date=coalesce($3::date,start_date),end_date=coalesce($4::date,end_date),max_points=coalesce($5,max_points) where id=$1 returning *',[id,b.title?txt(b.title,300):null,b.start_date||null,b.end_date||null,b.max_points?int(b.max_points,1,10000):null]))[0];
     return json(res,200,row);
