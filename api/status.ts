@@ -65,7 +65,11 @@ async function exchangeAuthSession(req:any,res:any){
     return json(res,200,{pending:true,code:'PENDING_APPROVAL',role:requestedRole,message:requestedRole==='student'?'تم التسجيل وإرسال طلب الانضمام. لن يتفعّل الحساب حتى قبول الحلقة.':requestedRole==='guardian'?'تم التسجيل. ينتظر حساب ولي الأمر ربط الطالب من المعلم أو المشرف أو الإدارة.':'تم التسجيل والحساب بانتظار الاعتماد.'});
   }
 
-  if(!resolvedUser.is_active) return json(res,200,{pending:true,code:'PENDING_APPROVAL',message:'الحساب مسجل وبانتظار الاعتماد.'});
+  if(!resolvedUser.is_active){
+    const lr=(await query<any>("select status,requested_role from login_requests where auth_subject=$1 order by requested_at desc limit 1",[neon.id]))[0];
+    if(lr?.status==='pending')return json(res,200,{pending:true,code:'PENDING_APPROVAL',role:lr.requested_role,message:'الحساب مسجل وبانتظار الاعتماد.'});
+    return json(res,403,{error:'Inactive',message:'هذا الحساب غير نشط. راجع إدارة المنصة.'});
+  }
 
   const session=issueAdminSession({sub:neon.id,userId:resolvedUser.id,role:resolvedUser.role});
   return json(res,200,{
