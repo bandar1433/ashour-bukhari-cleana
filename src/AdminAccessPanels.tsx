@@ -11,15 +11,15 @@ export function LoginRequestsPanel({rows,users,onChanged}:{rows:any[];users:User
     const target=targets[row.id]||matched?.id||'';
     if(!target){alert('اختر حساب المنصة الذي تريد ربطه بهذا الدخول.');return;}
     try{
-      await apiPut('/api/users',{id:target,auth_subject:row.auth_subject,request_id:row.id});
+      await apiPut('/api/users',{id:target,auth_subject:row.auth_subject,request_id:row.id,role:row.requested_role||undefined,phone:row.phone||undefined,center_id:row.center_id||undefined,is_active:true});
       await onChanged();
     }catch(err){alert(err instanceof Error?err.message:'تعذر اعتماد الربط');}
   }
   return <section className="panel" style={{marginTop:18}}>
     <div className="panelHead"><div><h3>طلبات ربط الدخول</h3><small>لا يتم منح أي صلاحية قبل اعتماد الربط يدويًا.</small></div><b>{rows.length}</b></div>
-    <div className="table-wrap"><table><thead><tr><th>الاسم</th><th>البريد</th><th>تاريخ الطلب</th><th>ربط بحساب المنصة</th><th>الإجراء</th></tr></thead><tbody>
+    <div className="table-wrap"><table><thead><tr><th>الاسم</th><th>البريد</th><th>الدور المطلوب</th><th>تاريخ الطلب</th><th>ربط بحساب المنصة</th><th>الإجراء</th></tr></thead><tbody>
       {rows.map(row=>{const matched=users.find(u=>(u.email||'').toLowerCase()===String(row.email||'').toLowerCase());const selected=targets[row.id]||matched?.id||'';return <tr key={row.id}>
-        <td>{row.full_name||'—'}</td><td>{row.email}</td><td>{row.requested_at?new Date(row.requested_at).toLocaleString('ar-SA'):'—'}</td>
+        <td>{row.full_name||'—'}</td><td>{row.email}</td><td>{roleLabel[row.requested_role]||row.requested_role||'—'}</td><td>{row.requested_at?new Date(row.requested_at).toLocaleString('ar-SA'):'—'}</td>
         <td><select value={selected} onChange={e=>setTargets(x=>({...x,[row.id]:e.target.value}))}><option value="">اختر الحساب</option>{users.map(u=><option key={u.id} value={u.id}>{u.full_name} — {roleLabel[u.role]||u.role}{u.email?` — ${u.email}`:''}</option>)}</select></td>
         <td><button className="primary" type="button" onClick={()=>approve(row)}>اعتماد الربط</button></td>
       </tr>})}
