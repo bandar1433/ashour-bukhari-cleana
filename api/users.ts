@@ -18,7 +18,7 @@ export default async function handler(req:any,res:any){
         limit 500
       `);
       const requests=await query(`
-        select id,auth_subject,email,full_name,status,requested_at
+        select id,auth_subject,email,full_name,status,requested_at,requested_role,phone,document_no,center_id,circle_id
         from login_requests
         where status='pending'
         order by requested_at desc
