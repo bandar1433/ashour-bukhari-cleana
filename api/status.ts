@@ -56,6 +56,12 @@ async function exchangeAuthSession(req:any,res:any){
       on conflict(email) do update set auth_subject=excluded.auth_subject,full_name=excluded.full_name,status='pending',requested_at=now(),
       requested_role=excluded.requested_role,phone=excluded.phone,document_no=excluded.document_no,center_id=excluded.center_id,circle_id=excluded.circle_id`,
       [neon.id,neon.email||null,fullName,requestedRole,phone,documentNo,draft.centerId||null,draft.circleId||null]);
+    if(requestedRole==='student'){
+      const pendingUser=(await query<any>(`insert into users(full_name,email,phone,role,is_active,auth_subject) values($1,$2,$3,'student',false,$4)
+        on conflict(email) do update set full_name=excluded.full_name,phone=excluded.phone,auth_subject=excluded.auth_subject returning id`,[fullName,neon.email||null,phone,neon.id]))[0];
+      await query(`insert into circle_join_requests(user_id,circle_id,requested_role,status) values($1,$2,'student','pending')
+        on conflict do nothing`,[pendingUser.id,draft.circleId]);
+    }
     return json(res,200,{pending:true,code:'PENDING_APPROVAL',role:requestedRole,message:requestedRole==='student'?'تم التسجيل وإرسال طلب الانضمام. لن يتفعّل الحساب حتى قبول الحلقة.':requestedRole==='guardian'?'تم التسجيل. ينتظر حساب ولي الأمر ربط الطالب من المعلم أو المشرف أو الإدارة.':'تم التسجيل والحساب بانتظار الاعتماد.'});
   }
 
