@@ -120,19 +120,32 @@ export async function motivation(req:any,res:any,u:any){
     else s=await scopedStudent(u,b.student_id);
     if(!s)return json(res,404,{error:'الطالب غير موجود أو خارج النطاق'});
     const d=validDate(b.entry_date)||today();if(u.role==='student'&&d!==today())return json(res,403,{error:'يمكن للطالب التسجيل في اليوم الحالي فقط'});
-    const task=(await query<any>('select * from circle_tasks where id=$1 and circle_id=$2 and is_active',[validUuid(b.task_id),s.circle_id]))[0];
-    if(!task)return json(res,400,{error:'المهمة غير متاحة'});
-    const units=int(b.units,0,Number(task.max_units)),points=units*Number(task.points_per_unit);
-    const old=(await query<any>('select points from task_entries where task_id=$1 and student_id=$2 and entry_date=$3',[task.id,s.id,d]))[0];
-    const row=(await query<any>(`insert into task_entries(task_id,student_id,entry_date,units,points,updated_by) values($1,$2,$3,$4,$5,$6)
-      on conflict(task_id,student_id,entry_date) do update set units=excluded.units,points=excluded.points,updated_by=excluded.updated_by,updated_at=now() returning *`,
-      [task.id,s.id,d,units,points,u.id]))[0];
-    const delta=points-Number(old?.points||0);
-    if(delta){
-      await query('update students set points_balance=greatest(0,points_balance+$1) where id=$2',[delta,s.id]);
-      await query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,$3,'circle_task',$4)`,[s.id,delta,`مهمة: ${task.name}`,u.id]);
+    const taskId=validUuid(b.task_id);if(!taskId)return json(res,400,{error:'المهمة غير صالحة'});
+    const client=await getPool().connect();
+    try{
+      await client.query('begin');
+      const lockedStudent=(await client.query('select id,circle_id from students where id=$1 for update',[s.id])).rows[0];
+      if(!lockedStudent){await client.query('rollback');return json(res,404,{error:'الطالب غير موجود'})}
+      const task=(await client.query('select * from circle_tasks where id=$1 and circle_id=$2 and is_active',[taskId,lockedStudent.circle_id])).rows[0];
+      if(!task){await client.query('rollback');return json(res,400,{error:'المهمة غير متاحة'})}
+      const units=int(b.units,0,Number(task.max_units)),points=units*Number(task.points_per_unit);
+      const old=(await client.query('select points from task_entries where task_id=$1 and student_id=$2 and entry_date=$3 for update',[task.id,s.id,d])).rows[0];
+      const row=(await client.query(`insert into task_entries(task_id,student_id,entry_date,units,points,updated_by) values($1,$2,$3,$4,$5,$6)
+        on conflict(task_id,student_id,entry_date) do update set units=excluded.units,points=excluded.points,updated_by=excluded.updated_by,updated_at=now() returning *`,
+        [task.id,s.id,d,units,points,u.id])).rows[0];
+      const delta=points-Number(old?.points||0);
+      if(delta){
+        await client.query('update students set points_balance=greatest(0,points_balance+$1) where id=$2',[delta,s.id]);
+        await client.query(`insert into points_ledger(student_id,points,reason,source_type,created_by) values($1,$2,$3,'circle_task',$4)`,[s.id,delta,`مهمة: ${task.name}`,u.id]);
+      }
+      await client.query('commit');
+      return json(res,200,row);
+    }catch(e){
+      await client.query('rollback');
+      throw e;
+    }finally{
+      client.release();
     }
-    return json(res,200,row);
   }
   if(sub==='reward'&&req.method==='POST'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
