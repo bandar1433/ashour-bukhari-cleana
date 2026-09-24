@@ -9,11 +9,16 @@ export async function summary(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لعرض ملخص الإدارة.'});
   const row=(await query<any>(`select
-    (select count(*) from centers)::text centers,(select count(*) from circles)::text circles,
-    (select count(*) from students)::text students,(select count(*) from users where role='teacher')::text teachers,
-    (select count(*) from users)::text users,(select count(*) from users where is_active)::text active_users,
-    (select count(*) from attendance)::text attendance,(select count(*) from memorization_records)::text memorization,
-    (select count(*) from weekly_plans)::text plans,(select count(*) from news_events)::text news`))[0];
+    (select count(*) from centers c where $1='system_admin' or ($1 in ('center_manager','supervisor') and c.id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.center_id=c.id and h.teacher_user_id=$3::uuid)))::text centers,
+    (select count(*) from circles h where $1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))::text circles,
+    (select count(*) from students s left join circles h on h.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))::text students,
+    (select count(*) from users x where x.role='teacher' and x.is_active and ($1='system_admin' or ($1 in ('center_manager','supervisor') and x.center_id=$2::uuid) or ($1='teacher' and x.id=$3::uuid)))::text teachers,
+    (select count(*) from users x where $1='system_admin' or ($1 in ('center_manager','supervisor') and x.center_id=$2::uuid) or ($1='teacher' and x.id=$3::uuid))::text users,
+    (select count(*) from users x where x.is_active and ($1='system_admin' or ($1 in ('center_manager','supervisor') and x.center_id=$2::uuid) or ($1='teacher' and x.id=$3::uuid)))::text active_users,
+    (select count(*) from attendance a join students s on s.id=a.student_id left join circles h on h.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))::text attendance,
+    (select count(*) from memorization_records m join students s on s.id=m.student_id left join circles h on h.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))::text memorization,
+    (select count(*) from weekly_plans w join students s on s.id=w.student_id left join circles h on h.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))::text plans,
+    (case when $1='system_admin' then (select count(*) from news_events) else 0 end)::text news`,[u.role,u.center_id,u.id]))[0];
   return json(res,200,{centers:+row.centers,circles:+row.circles,students:+row.students,teachers:+row.teachers,
     users:+row.users,activeUsers:+row.active_users,attendance:+row.attendance,memorization:+row.memorization,plans:+row.plans,news:+row.news});
 }
