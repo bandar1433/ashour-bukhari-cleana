@@ -4,14 +4,6 @@ import { json, verifyAppSession, type AppRole } from './http.js';
 export type Actor={id:string;role:AppRole;center_id:string|null;full_name:string;email:string|null};
 
 export async function getActor(req:any,res:any):Promise<Actor|null>{
-  const expected=process.env.ADMIN_ACCESS_CODE;
-  const access=String(req.headers['x-access-code']||'');
-  if(expected && access===expected){
-    const root=(await query<Actor>(`select id,role::text role,center_id,full_name,email from users where role='system_admin' and is_active order by created_at limit 1`))[0];
-    if(root)return root;
-    json(res,403,{error:'Forbidden',message:'لا يوجد حساب مدير نظام نشط في قاعدة البيانات.'});
-    return null;
-  }
   const auth=String(req.headers.authorization||'');
   const token=auth.startsWith('Bearer ')?auth.slice(7).trim():'';
   const session=token?verifyAppSession(token):null;
