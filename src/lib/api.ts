@@ -142,6 +142,18 @@ function responseError(payload:any,status:number){
   return readableError(raw,`تعذر تنفيذ الطلب (HTTP ${status})`);
 }
 
+function handleUnauthorized(status:number,payload:any){
+  if(status!==401||!getSessionToken())return;
+  clearSessionToken();
+  clearAccessCode();
+  try{
+    localStorage.setItem('ashour_explicit_logout','1');
+    window.dispatchEvent(new CustomEvent('ashour:session-expired',{detail:{
+      message:readableError(payload?.message??payload?.error,'انتهت جلسة الدخول. سجّل الدخول من جديد.')
+    }}));
+  }catch{}
+}
+
 function authHeaders(): Record<string,string> {
   const headers: Record<string,string> = {};
   const code = getAccessCode();
@@ -169,6 +181,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 
   if (!response.ok) {
+    handleUnauthorized(response.status,payload);
     throw new Error(responseError(payload,response.status));
   }
 
@@ -180,7 +193,7 @@ export async function getStatus() {
   return response.json();
 }
 
-export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(responseError(payload,response.status));return payload as T;}
+export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok){handleUnauthorized(response.status,payload);throw new Error(responseError(payload,response.status))}return payload as T;}
 
 
 export async function apiPut<T>(path:string,body:unknown):Promise<T>{
@@ -192,6 +205,6 @@ export async function apiPut<T>(path:string,body:unknown):Promise<T>{
   const text=await response.text();
   let payload:any;
   try{payload=text?JSON.parse(text):null}catch{payload={error:text}}
-  if(!response.ok)throw new Error(responseError(payload,response.status));
+  if(!response.ok){handleUnauthorized(response.status,payload);throw new Error(responseError(payload,response.status))}
   return payload as T;
 }
