@@ -4,6 +4,7 @@ import { handleError,json } from './_lib/http.js';
 import {lateMinutes,riyadhDate} from './_lib/prayer.js';
 import {isWeekLocked} from './_lib/weeklyLock.js';
 import {operationalDay} from './_lib/operationalDay.js';
+import {getOperationalSettings,latePenalty} from './_lib/operationalSettings.js';
 
 export default async function handler(req:any,res:any){
   try{
@@ -31,20 +32,21 @@ export default async function handler(req:any,res:any){
       const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
       if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
       const operational=await operationalDay(recordDate,s.center_id);if(!operational.open)return json(res,409,{error:'NON_OPERATIONAL_DAY',message:operational.reason});
+      const settings=await getOperationalSettings();
       const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];const weekLocked=await isWeekLocked(s.circle_id,recordDate);
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
       if(weekLocked&&u.role==='teacher')return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال هذا الأسبوع نهائيًا من الإشراف.'});
       if(locked&&u.role==='teacher'&&!exception)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد هذا اليوم. اطلب فتح تعديل استثنائي من الإدارة.'});
-      let checkIn=b.check_in_at||null,checkOut=b.check_out_at||null,late=0,status=String(b.status||'present');
+      let checkIn=b.check_in_at||null,checkOut=b.check_out_at||null,late=0,penalty=0,status=String(b.status||'present');
       if(status==='present'||status==='late'){
         if(!checkIn)checkIn=new Date().toISOString();
         const parsed=new Date(checkIn);if(!Number.isFinite(parsed.getTime()))return json(res,400,{error:'وقت الوصول غير صالح'});
-        late=lateMinutes(recordDate,s.start_time,parsed);status=late>30?'late':'present';
+        late=lateMinutes(recordDate,s.start_time,parsed);status=late>settings.grace_minutes?'late':'present';penalty=latePenalty(late,settings);
       }else{checkIn=null;checkOut=null;late=0}
       if(checkOut&&!checkIn)return json(res,400,{error:'لا يمكن تسجيل الانصراف قبل الحضور'});
       if(checkOut&&!Number.isFinite(new Date(checkOut).getTime()))return json(res,400,{error:'وقت الانصراف غير صالح'});
       const rows=await query(`insert into attendance(student_id,circle_id,attendance_date,status,late_minutes,points_penalty,notes,recorded_by,check_in_at,check_out_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9::timestamptz,$10::timestamptz) on conflict(student_id,attendance_date) do update set status=excluded.status,late_minutes=excluded.late_minutes,points_penalty=excluded.points_penalty,notes=excluded.notes,recorded_by=excluded.recorded_by,check_in_at=coalesce(excluded.check_in_at,attendance.check_in_at),check_out_at=coalesce(excluded.check_out_at,attendance.check_out_at) returning *`,
-        [b.student_id,s.circle_id,recordDate,status,late,Number(b.points_penalty||0),b.notes||null,u.id,checkIn,checkOut]);
+        [b.student_id,s.circle_id,recordDate,status,late,penalty,b.notes||null,u.id,checkIn,checkOut]);
       return json(res,200,rows[0]);
     }
     return json(res,405,{error:'Method not allowed'});
