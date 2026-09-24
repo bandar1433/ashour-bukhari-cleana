@@ -7,7 +7,6 @@ import {
   CircleRow,
   clearAccessCode,
   clearSessionToken,
-  getAccessCode,
   getSessionToken,
   getSessionRole, readableError,
   getStatus,
@@ -120,7 +119,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
 const EXPLICIT_LOGOUT_KEY = 'ashour_explicit_logout';
 
 export default function App() {
-  const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
+  const [code, setCode] = useState(getSessionToken() ? 'session' : '');
   const [authOpen,setAuthOpen]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
@@ -153,13 +152,14 @@ export default function App() {
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
-  const currentRole=getAccessCode()?'system_admin':getSessionRole();
+  const currentRole=getSessionRole();
   const isRoot=currentRole==='system_admin';
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
   const goTab=(tab:Tab)=>{if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));setActiveTab(tab)};
   const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
 
   useEffect(() => {
+    clearAccessCode();
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
@@ -199,7 +199,7 @@ export default function App() {
     setError('');
 
     try {
-      const role=getAccessCode()?'system_admin':getSessionRole();
+      const role=getSessionRole();
       const root=role==='system_admin';
       const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
       const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, newsData] = await Promise.all([
