@@ -11,16 +11,16 @@ export async function managementReport(req:any,res:any,u:any){
   if(u.role==='teacher'){filter='c.id=$3::uuid and h.teacher_user_id=$4::uuid';args=[from,to,u.center_id,u.id]}
   else if(u.role!=='system_admin'){filter='c.id=$3::uuid';args=[from,to,u.center_id]}
   const circles=await query<any>(`select h.id,h.name,c.name center_name,u.full_name teacher_name,count(distinct s.id)::int students,
-    coalesce(round(avg((select case when count(*)=0 then null else 100.0*count(*) filter(where a.status in ('present','late'))/count(*) end from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2)))::int,0) attendance_rate,
+    coalesce(round(avg((select case when count(*)=0 then null else 100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0) end from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2)))::int,0) attendance_rate,
     coalesce(round(avg((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2)))::int,0) quran_average
     from circles h join centers c on c.id=h.center_id left join users u on u.id=h.teacher_user_id left join students s on s.circle_id=h.id and s.status='active'
     where ${filter} group by h.id,h.name,c.name,u.full_name order by attendance_rate desc,quran_average desc`,args);
   const scoped=u.role==='system_admin'?'true':u.role==='teacher'?'s.center_id=$3::uuid and h.teacher_user_id=$4::uuid':'s.center_id=$3::uuid';
   const follow=await query<any>(`select s.id,s.full_name,c.name center_name,h.name circle_name,
-    coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0) attendance_rate,
+    coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0))::int from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0) attendance_rate,
     coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2),0) quran_average
     from students s join centers c on c.id=s.center_id left join circles h on h.id=s.circle_id where ${scoped} and s.status='active'
-    and (coalesce((select 100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0) from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0)<75
+    and (coalesce((select 100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0) from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0)<75
     or coalesce((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2),0)<70)
     order by attendance_rate,quran_average limit 30`,args);
   return json(res,200,{from,to,circles,needs_followup:follow});
