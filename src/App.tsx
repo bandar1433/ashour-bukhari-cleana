@@ -7,11 +7,9 @@ import {
   CircleRow,
   clearAccessCode,
   clearSessionToken,
-  getAccessCode,
   getSessionToken,
   getSessionRole, readableError,
   getStatus,
-  setAccessCode,
   setSessionToken,
   StudentRow,
   Summary,
@@ -117,9 +115,10 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
 };
 
+const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
+
 export default function App() {
-  const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
-  const [enteredCode, setEnteredCode] = useState(getAccessCode());
+  const [code, setCode] = useState(getSessionToken() ? 'session' : '');
   const [authOpen,setAuthOpen]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
@@ -152,13 +151,14 @@ export default function App() {
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
-  const currentRole=getAccessCode()?'system_admin':getSessionRole();
+  const currentRole=getSessionRole();
   const isRoot=currentRole==='system_admin';
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
   const goTab=(tab:Tab)=>{if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));setActiveTab(tab)};
   const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
 
   useEffect(() => {
+    clearAccessCode();
     getStatus()
       .then(setStatus)
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
@@ -170,7 +170,7 @@ export default function App() {
     setError('');
 
     try {
-      const role=getAccessCode()?'system_admin':getSessionRole();
+      const role=getSessionRole();
       const root=role==='system_admin';
       const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
       const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, newsData] = await Promise.all([
@@ -200,6 +200,7 @@ export default function App() {
       loadDashboard();
       return;
     }
+    if(localStorage.getItem(EXPLICIT_LOGOUT_KEY)==='1') return;
     finishSocialSession().catch(err=>{
       const message=err instanceof Error?err.message:'تعذر استكمال تسجيل الدخول.';
       setError(message);
@@ -207,31 +208,7 @@ export default function App() {
     });
   }, [code]);
 
-  async function handleLogin(event: React.FormEvent) {
-    event.preventDefault();
-    const cleaned = enteredCode.trim();
-    if (!cleaned) {
-      setError('أدخل رمز الدخول الإداري.');
-      return;
-    }
-    setAuthBusy(true);
-    setError('');
-    clearSessionToken();
-    setAccessCode(cleaned);
-    try {
-      await apiGet<Summary>('/api/ops?action=summary');
-      setCode(cleaned);
-      setAuthOpen(false);
-    } catch (err) {
-      clearAccessCode();
-      setCode('');
-      setError(err instanceof Error ? err.message : 'رمز الدخول غير صحيح.');
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-
-  async function finishSocialSession(){
+  async function finishSocialSession():Promise<'ready'|'pending'|'none'>{
     let headerJwt='';
     const current:any=await authClient.getSession({
       fetchOptions:{
@@ -242,12 +219,14 @@ export default function App() {
         }
       }
     });
-    if(current?.error) throw new Error(readableError(current.error,'تعذر قراءة جلسة Google.'));
+    if(current?.error) throw new Error(readableError(current.error,'تعذر قراءة جلسة المصادقة.'));
     const user=current?.data?.user||current?.data?.session?.user;
-    if(!current?.data?.session||!user)return false;
+    if(!current?.data?.session||!user)return 'none';
 
-    const jwt=headerJwt||current?.data?.session?.token||current?.data?.session?.access_token||'';
-    if(!jwt) throw new Error('اكتمل تسجيل Google ولكن تعذر قراءة رمز الجلسة الآمن. أعد المحاولة مرة واحدة.');
+    const candidates=[headerJwt,current?.data?.session?.access_token,current?.data?.session?.token,current?.data?.token]
+      .map((x:any)=>String(x||'').trim()).filter(Boolean);
+    const jwt=candidates.find((x:string)=>x.split('.').length===3)||'';
+    if(!jwt) throw new Error('تعذر إصدار رمز التحقق الآمن للحساب. أعد تسجيل الدخول.');
 
     const response=await fetch('/api/status',{
       method:'POST',
@@ -255,17 +234,24 @@ export default function App() {
     });
     const payload=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
-    if(payload?.pending){localStorage.removeItem('ashour_signup_draft');setError(payload.message||'الحساب بانتظار الاعتماد.');setAuthOpen(true);return false;}
+    if(payload?.pending){
+      localStorage.removeItem('ashour_signup_draft');
+      setError(payload.message||'الحساب بانتظار الاعتماد.');
+      setAuthOpen(true);
+      return 'pending';
+    }
     clearAccessCode();
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     setSessionToken(payload.token);
     setCode('session');
     setAuthOpen(false);
-    setError('');localStorage.removeItem('ashour_signup_draft');
-    return true;
+    setError('');
+    localStorage.removeItem('ashour_signup_draft');
+    return 'ready';
   }
-
   async function handleGoogleLogin(){
     setAuthBusy(true); setError('');
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try{
       if(authIntent==='signup'){
         const draft={name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId};
@@ -295,6 +281,7 @@ export default function App() {
     event.preventDefault();
     setAuthBusy(true);
     setError('');
+    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try{
       const email=accountForm.email.trim();
       const password=accountForm.password;
@@ -307,6 +294,7 @@ export default function App() {
         if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال.');
         if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز.');
         if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة.');
+        localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
       }
       let authResult:any;
       if(authIntent==='signup'){
@@ -316,43 +304,27 @@ export default function App() {
         authResult=await authClient.signIn.email({email,password});
         if(authResult?.error) throw new Error(readableError(authResult.error,'بيانات الدخول غير صحيحة'));
       }
-      let neonSessionToken=authResult?.data?.token||authResult?.data?.session?.token||authResult?.data?.access_token||'';
-      if(!neonSessionToken){
-        const current:any=await authClient.getSession();
-        neonSessionToken=current?.data?.session?.token||current?.data?.session?.access_token||current?.data?.token||'';
+      const state=await finishSocialSession();
+      if(state==='none')throw new Error(authIntent==='signup'?'تم إنشاء الحساب، لكن لم تبدأ جلسة بعد. تحقق من البريد الإلكتروني ثم سجّل الدخول.':'تم قبول بيانات الدخول، لكن تعذر إنشاء جلسة آمنة. أعد المحاولة.');
+      if(state==='ready'){
+        setAccountForm({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});
+        setSignupStep(1);
       }
-      if(!neonSessionToken) throw new Error('تعذر إنشاء جلسة الدخول الآمنة. تحقق من البريد إن كانت خدمة المصادقة تتطلب تأكيده ثم أعد المحاولة.');
-      const headers:any={Accept:'application/json','x-neon-session-token':String(neonSessionToken)};
-      if(draft)headers['x-signup-draft']=JSON.stringify(draft);
-      const response=await fetch('/api/status',{method:'POST',headers});
-      const payload=await response.json().catch(()=>({}));
-      if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
-      if(payload?.pending){
-        clearAccessCode();clearSessionToken();
-        setError(payload.message||'الحساب مسجل وبانتظار الاعتماد.');
-        setAuthOpen(true);
-        return;
-      }
-      clearAccessCode();
-      setSessionToken(payload.token);
-      setCode('session');
-      setAuthOpen(false);
-      setError('');
-      setAccountForm({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});setSignupStep(1);
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر تسجيل الدخول');
     }finally{
       setAuthBusy(false);
     }
   }
-
-  function handleLogout() {
+  async function handleLogout() {
+    localStorage.setItem(EXPLICIT_LOGOUT_KEY,'1');
     clearAccessCode();
     clearSessionToken();
-    authClient.signOut().catch(()=>{});
     setCode('');
     setAuthOpen(false);
-    setEnteredCode('');
+    setPublicView('الرئيسية');
+    setActiveTab('overview');
+    setTabHistory([]);
     setSummary(null);
     setCenters([]);
     setStudents([]);
@@ -360,9 +332,17 @@ export default function App() {
     setUsers([]);
     setLoginRequests([]);
     setRoleData({roles:[],permissions:[]});
+    setPlans([]);
+    setNews([]);
+    setTeacherToday({students:[],approvals:[]});
+    setCircleRegister({students:[]});
+    setStudentProfile(null);
     setLoadState('idle');
+    setError('');
+    window.history.replaceState({},'',window.location.pathname);
+    window.scrollTo({top:0,behavior:'smooth'});
+    try{await authClient.signOut()}catch{}
   }
-
   async function loadTeacherToday(date=dailyDate){
     try{setError('');const data=await apiGet<any>(`/api/ops?action=teacher-today&date=${date}`);setTeacherToday(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل لوحة اليوم')}
@@ -512,7 +492,7 @@ export default function App() {
           {[
             ['01','منصة موحدة','لإدارة التعليم والمتابعة'],
             ['04','مسارات قرآنية','تلقين • حفظ • إتقان • قراءات'],
-            ['06','بوابات صلاحيات','لكل مستخدم ما يخصه'],
+            ['01','دخول موحد','تظهر الصلاحيات حسب الحساب'],
             ['04','محاور تشغيلية','تعليم • حضور • تقارير • تحفيز']
           ].map(([number,label,detail],index)=><article key={label} className="statCard reveal reveal-up" style={{animationDelay:`${0.18+index*0.11}s`}}><b>{number}</b><span>{label}</span><small>{detail}</small></article>)}
         </section>
@@ -532,7 +512,7 @@ export default function App() {
             <div className="reportCards achievements">{report1447.achievements.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-tanzania','achievement-omar'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div>
           </section>
           <section className="section portalsSection">
-            <div className="sectionHead"><div><span>بوابات المنصة</span><h2>كل مستخدم يرى ما يخصه فقط</h2></div></div>
+            <div className="sectionHead"><div><span>صلاحيات المنصة</span><h2>دخول واحد موحد لجميع المستخدمين</h2></div><button className="secondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
             <div className="roleGrid">{[
               ['ولي الأمر','متابعة الحضور والإنجاز والتقارير'],
               ['الطالب','تعلم ومراجعة وإنجاز'],
@@ -540,7 +520,7 @@ export default function App() {
               ['المشرف','متابعة الأداء التعليمي'],
               ['مدير المركز','إدارة المركز والحلقات'],
               ['المدير','إدارة ومتابعة النظام']
-            ].map(([title,description],index)=><button className="roleCard reveal reveal-up" style={{animationDelay:`${0.12+index*0.08}s`}} key={title} onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}><i>◈</i><b>{title}</b><small>{description}</small><em>دخول البوابة ←</em></button>)}</div>
+            ].map(([title,description],index)=><article className="roleCard reveal reveal-up" style={{animationDelay:`${0.12+index*0.08}s`}} key={title}><i>◈</i><b>{title}</b><small>{description}</small><em>تظهر الصلاحيات تلقائيًا بعد الدخول</em></article>)}</div>
           </section>
           <section className="featureBand reveal reveal-up">
             <div><span>منظومة واحدة لكل المسيرة</span><h2>من أول حفظ ومراجعة إلى تقرير الأسرة</h2><p>تجمع المنصة الحضور والحفظ الجديد والمراجعة والنقاط والتقارير في تجربة واحدة؛ لتصبح المعلومة أقرب والقرار أسرع والمتابعة أدق.</p><button className="featureCta" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>ابدأ من لوحة المنصة</button></div>
@@ -581,8 +561,7 @@ export default function App() {
                   <label className="field"><span>كلمة المرور</span><input type="password" value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete="current-password" required/></label>
                   <button className="secondary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ الدخول…':'الدخول بالبريد وكلمة المرور'}</button>
                 </form>
-                <button className="secondary authSubmit" type="button" disabled title="سيتم تفعيله لاحقًا">الدخول برقم الجوال — قريبًا</button>
-                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
+                                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
               </div>:<div className="authForm authFormPro">
                 {signupStep===1?<><label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} required/></label>
                 <label className="field"><span>رقم الهوية / الوثيقة</span><input value={accountForm.documentNo} onChange={e=>setAccountForm(x=>({...x,documentNo:e.target.value}))} required/></label>
@@ -603,7 +582,7 @@ export default function App() {
                 <button className="tableAction" type="button" onClick={()=>setSignupStep(1)}>← تعديل البيانات</button></>}
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
               </div>}
-              {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro"><div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت للإدارة العامة فقط.</span></div><form className="authForm legacyForm" onSubmit={handleLogin}><label className="field"><span>رمز الإدارة</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز مدير النظام"/></label><button className="secondary" type="submit" disabled={authBusy}>دخول الإدارة</button></form></div>}
+
             </div>
           </section>
         </div>}
