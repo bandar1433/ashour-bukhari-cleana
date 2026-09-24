@@ -53,7 +53,7 @@ export async function teacherToday(req:any,res:any,u:any){
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
     where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
     [u.role,u.center_id,u.id,d]);
-  return json(res,200,{date:d,students:scoredStudents,approvals});
+  return json(res,200,{date:d,students:scoredStudents,approvals,weights:{new:settings.memorization_weight,review:settings.review_weight,attendance:settings.discipline_weight}});
 }
 
 export async function circleRegister(req:any,res:any,u:any){
