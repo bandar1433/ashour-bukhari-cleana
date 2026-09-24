@@ -23,6 +23,7 @@ import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
 import { madinahSurahName } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
+import {riyadhDate,riyadhMonth} from './lib/date';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
@@ -142,11 +143,11 @@ export default function App() {
   const [loginRequests,setLoginRequests]=useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
-  const [dailyDate,setDailyDate]=useState(new Date().toISOString().slice(0,10));
-  const [recordMonth,setRecordMonth]=useState(new Date().toISOString().slice(0,7));
+  const [dailyDate,setDailyDate]=useState(riyadhDate());
+  const [recordMonth,setRecordMonth]=useState(riyadhMonth());
   const [teacherToday,setTeacherToday]=useState<any>({students:[],approvals:[]});
   const [circleRegister,setCircleRegister]=useState<any>({students:[]});
-  const [evaluationRange,setEvaluationRange]=useState({from:new Date().toISOString().slice(0,10),to:new Date().toISOString().slice(0,10)});
+  const [evaluationRange,setEvaluationRange]=useState({from:riyadhDate(),to:riyadhDate()});
   const [evaluations,setEvaluations]=useState<any>({rows:[],average:0,weights:{new:30,review:40,attendance:30}});
   const [studentProfile,setStudentProfile]=useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -166,6 +167,35 @@ export default function App() {
       .catch((err) => setStatus({ configured: false, database: 'error', error: err.message }));
     fetch('/api/public').then(r=>r.json()).then(x=>{setPublicData(x);setSiteImages({...staticSiteImages,...((x?.images||{}) as Record<string,string>)});}).catch(()=>setSiteImages(staticSiteImages));
   }, []);
+
+  useEffect(()=>{
+    const onSessionExpired=(event:Event)=>{
+      const message=(event as CustomEvent<{message?:string}>).detail?.message||'انتهت جلسة الدخول. سجّل الدخول من جديد.';
+      setCode('');
+      setEnteredCode('');
+      setAuthIntent('signin');
+      setAuthOpen(true);
+      setPublicView('الرئيسية');
+      setActiveTab('overview');
+      setTabHistory([]);
+      setSummary(null);
+      setCenters([]);
+      setStudents([]);
+      setCircles([]);
+      setUsers([]);
+      setLoginRequests([]);
+      setRoleData({roles:[],permissions:[]});
+      setPlans([]);
+      setNews([]);
+      setTeacherToday({students:[],approvals:[]});
+      setCircleRegister({students:[]});
+      setStudentProfile(null);
+      setLoadState('idle');
+      setError(message);
+    };
+    window.addEventListener('ashour:session-expired',onSessionExpired);
+    return()=>window.removeEventListener('ashour:session-expired',onSessionExpired);
+  },[]);
 
   async function loadDashboard() {
     setLoadState('loading');
@@ -671,7 +701,7 @@ export default function App() {
         <section className="dashboardContent">
           <div className="adminTopbar">
             <div className="crumb"><span className="crumbPath">لوحة التحكم / {tabMeta[activeTab].short}</span><h1>{tabMeta[activeTab].title}</h1><p>{tabMeta[activeTab].subtitle}</p></div>
-            <div className="adminTopActions"><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
+            <div className="adminTopActions"><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button><button className="mobileLogout" type="button" onClick={handleLogout}>خروج</button></div>
           </div>
           {error&&<div className="notice">{error}</div>}
           {activeTab==='overview'&&<><div className="kpis"><article><span>الطلاب</span><b>{typeof summary?.students==='number'?<CountUp value={summary.students}/>: '—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{typeof summary?.teachers==='number'?<CountUp value={summary.teachers}/>: '—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{typeof summary?.circles==='number'?<CountUp value={summary.circles}/>: '—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{typeof summary?.centers==='number'?<CountUp value={summary.centers}/>: '—'}</b><small>مركز وفرع</small></article></div>{isStaff&&<AgreedFeatures mode="interventions" currentRole={currentRole} students={students}/>}</>}
