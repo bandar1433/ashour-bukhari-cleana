@@ -29,8 +29,12 @@ export async function selfService(req:any,res:any,u:any){
       if(!s.circle_id||s.status!=='active')return json(res,400,{error:'يلزم طالب نشط مرتبط بحلقة'});
       const action=String(req.body?.action||'');
       if(!['check_in','check_out'].includes(action))return json(res,400,{error:'إجراء الحضور غير صالح'});
-      const d=today();const settings=await getOperationalSettings();const operational=await operationalDay(d,s.center_id);if(!operational.open)return json(res,409,{error:'NON_OPERATIONAL_DAY',message:operational.reason});if(await isWeekLocked(s.circle_id,d))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});let a=(await query<any>('select * from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0];
-      if(!a&&action==='check_out')return json(res,400,{error:'سجّل الحضور أولاً قبل تسجيل الانصراف'});
+      const d=today();const settings=await getOperationalSettings();const operational=await operationalDay(d,s.center_id);if(!operational.open)return json(res,409,{error:'NON_OPERATIONAL_DAY',message:operational.reason});
+      if(await isWeekLocked(s.circle_id,d))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});
+      const approved=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2::date',[s.circle_id,d]))[0];
+      if(approved)return json(res,403,{error:'تم اعتماد اليوم',message:'تم اعتماد سجل اليوم ولا يمكن تغييره من حساب الطالب.'});
+      let a=(await query<any>('select * from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0];
+      if(action==='check_out'&&!a?.check_in_at)return json(res,400,{error:'سجّل الحضور أولاً قبل تسجيل الانصراف'});
       if(!a){const late=lateMinutes(d,s.start_time),status=late>settings.grace_minutes?'late':'present',penalty=latePenalty(late,settings);a=(await query<any>(`insert into attendance(student_id,circle_id,attendance_date,status,recorded_by,late_minutes,points_penalty,check_in_at) values($1,$2,$3::date,$4,$5,$6,$7,now()) returning *`,[s.id,s.circle_id,d,status,u.id,late,penalty]))[0];}
       else if(action==='check_in'&&!a.check_in_at){const late=lateMinutes(d,s.start_time),status=late>settings.grace_minutes?'late':'present',penalty=latePenalty(late,settings);a=(await query<any>('update attendance set check_in_at=now(),status=$1,late_minutes=$2,points_penalty=$3,recorded_by=$4 where id=$5 returning *',[status,late,penalty,u.id,a.id]))[0];}
       else if(action==='check_out'&&!a.check_out_at)a=(await query<any>('update attendance set check_out_at=now(),recorded_by=$1 where id=$2 returning *',[u.id,a.id]))[0];
