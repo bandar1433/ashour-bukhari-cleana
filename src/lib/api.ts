@@ -156,9 +156,7 @@ function handleUnauthorized(status:number,payload:any){
 
 function authHeaders(): Record<string,string> {
   const headers: Record<string,string> = {};
-  const code = getAccessCode();
   const session = getSessionToken();
-  if (code) headers['x-access-code'] = code;
   if (session) headers.Authorization = `Bearer ${session}`;
   return headers;
 }
