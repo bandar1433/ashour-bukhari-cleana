@@ -86,7 +86,7 @@ export async function motivation(req:any,res:any,u:any){
       query<any>('select * from rewards where is_active and circle_id=$1 order by points_cost',[circleId]),
       query<any>(`select rr.*,r.name reward_name,s.full_name from reward_requests rr join rewards r on r.id=rr.reward_id join students s on s.id=rr.student_id where r.circle_id=$1 and ($2::uuid is null or rr.student_id=$2) order by rr.requested_at desc`,[circleId,target?.id||null]),
       query<any>(`select s.id,s.full_name,s.points_balance,coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-29),0) quran_average,
-        coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-29),0) attendance_rate
+        coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-29),0) attendance_rate
         from students s where s.circle_id=$1 and s.status='active' order by s.points_balance desc,quran_average desc,attendance_rate desc limit 30`,[circleId])
     ]);
     const top3=rankings.slice(0,3);
