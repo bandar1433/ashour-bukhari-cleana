@@ -730,7 +730,7 @@ export default function App() {
             </>}
             {activeTab==='evaluations'&&<>
               <div className="opsToolbar"><label className="field"><span>من</span><input type="date" value={evaluationRange.from} onChange={e=>setEvaluationRange(x=>({...x,from:e.target.value}))} /></label><label className="field"><span>إلى</span><input type="date" value={evaluationRange.to} onChange={e=>setEvaluationRange(x=>({...x,to:e.target.value}))} /></label><button className="primary" type="button" onClick={()=>loadEvaluations()}>حساب التقييم</button></div>
-              <div className="evaluationSummary"><div><span>المتوسط العام</span><b>{evaluations.average||0}%</b></div><p><strong>المعادلة:</strong> الحفظ الجديد 30% • المراجعة 40% • الحضور والانضباط 30%</p></div>
+              <div className="evaluationSummary"><div><span>المتوسط العام</span><b>{evaluations.average||0}%</b></div><p><strong>المعادلة:</strong> الحفظ الجديد {evaluations.weights?.new??30}% • المراجعة {evaluations.weights?.review??40}% • الحضور والانضباط {evaluations.weights?.attendance??30}%</p></div>
               <GenericTable rows={evaluations.rows||[]} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['new_grade','الحفظ %'],['review_grade','المراجعة %'],['attendance_score','الانضباط'],['daily_score','النتيجة']]}/>
             </>}
             {activeTab==='studentProfile'&&<>
