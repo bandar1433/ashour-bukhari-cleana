@@ -65,23 +65,23 @@ export async function features(req:any,res:any,u:any){
       where s.status='active' and ${scope} order by c.name,h.name,s.full_name`,args);
     const students=rawStudents.map((s:any)=>{
       const done=Number(s.new_pages||0)+Number(s.review_pages||0),planned=Number(s.planned_new||0)+Number(s.planned_review||0);
-      return {...s,achievement_rate:planned>0?Math.min(100,Math.round(100*done/planned)):0};
+      return {...s,achievement_rate:planned>0?Math.min(100,Math.round(100*done/planned)):null};
     });
     const grouped=(key:'circle_id'|'center_id',nameKey:'circle_name'|'center_name')=>{
       const map=new Map<string,any>();
       for(const s of students){
         const id=String(s[key]||'none');let g=map.get(id);
-        if(!g){g={id,name:s[nameKey]||'—',students:0,attendance_sum:0,grade_sum:0,achievement_sum:0,new_pages:0,review_pages:0,struggling:0};map.set(id,g)}
-        g.students++;g.attendance_sum+=Number(s.attendance_rate||0);g.grade_sum+=Number(s.avg_grade||0);g.achievement_sum+=Number(s.achievement_rate||0);g.new_pages+=Number(s.new_pages||0);g.review_pages+=Number(s.review_pages||0);
+        if(!g){g={id,name:s[nameKey]||'—',students:0,attendance_sum:0,grade_sum:0,achievement_sum:0,achievement_count:0,new_pages:0,review_pages:0,struggling:0};map.set(id,g)}
+        g.students++;g.attendance_sum+=Number(s.attendance_rate||0);g.grade_sum+=Number(s.avg_grade||0);if(s.achievement_rate!==null&&s.achievement_rate!==undefined){g.achievement_sum+=Number(s.achievement_rate);g.achievement_count++}g.new_pages+=Number(s.new_pages||0);g.review_pages+=Number(s.review_pages||0);
         if(Number(s.attendance_rate)<75||Number(s.avg_grade)<70)g.struggling++;
       }
-      return [...map.values()].map(g=>({...g,attendance_rate:g.students?Math.round(g.attendance_sum/g.students):0,avg_grade:g.students?Math.round(g.grade_sum/g.students):0,achievement_rate:g.students?Math.round(g.achievement_sum/g.students):0}));
+      return [...map.values()].map(g=>({...g,attendance_rate:g.students?Math.round(g.attendance_sum/g.students):0,avg_grade:g.students?Math.round(g.grade_sum/g.students):0,achievement_rate:g.achievement_count?Math.round(g.achievement_sum/g.achievement_count):null}));
     };
     const circles=grouped('circle_id','circle_name'),centers=grouped('center_id','center_name');
     const struggling=students.filter((s:any)=>Number(s.attendance_rate)<75||Number(s.avg_grade)<70);
     const topPerformers=[...students].sort((a:any,b:any)=>Number(b.avg_grade)-Number(a.avg_grade)||Number(b.attendance_rate)-Number(a.attendance_rate)).slice(0,10);
     const mostImproved=[...students].map((s:any)=>({...s,improvement:Number(s.current_avg||0)-Number(s.previous_avg||0)})).sort((a:any,b:any)=>b.improvement-a.improvement).slice(0,10);
-    const n=students.length,metrics={total_students:n,attendance_rate:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.attendance_rate||0),0)/n):0,avg_grade:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.avg_grade||0),0)/n):0,achievement_rate:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.achievement_rate||0),0)/n):0,new_pages:students.reduce((x:number,s:any)=>x+Number(s.new_pages||0),0),review_pages:students.reduce((x:number,s:any)=>x+Number(s.review_pages||0),0),struggling:struggling.length};
+    const n=students.length,plannedStudents=students.filter((s:any)=>s.achievement_rate!==null&&s.achievement_rate!==undefined),metrics={total_students:n,attendance_rate:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.attendance_rate||0),0)/n):0,avg_grade:n?Math.round(students.reduce((x:number,s:any)=>x+Number(s.avg_grade||0),0)/n):0,achievement_rate:plannedStudents.length?Math.round(plannedStudents.reduce((x:number,s:any)=>x+Number(s.achievement_rate),0)/plannedStudents.length):null,planned_students:plannedStudents.length,new_pages:students.reduce((x:number,s:any)=>x+Number(s.new_pages||0),0),review_pages:students.reduce((x:number,s:any)=>x+Number(s.review_pages||0),0),struggling:struggling.length};
     return json(res,200,{period,from,to,metrics,students,circles,centers,struggling,topPerformers,mostImproved});
   }
 
