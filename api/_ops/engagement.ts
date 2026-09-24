@@ -27,26 +27,41 @@ export async function joinRequests(req:any,res:any,u:any){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const id=validUuid(req.body?.request_id),decision=String(req.body?.decision||'');
     if(!id||!['approved','rejected'].includes(decision))return json(res,400,{error:'بيانات القرار غير صالحة'});
-    const jr=(await query<any>(`select jr.*,h.center_id,h.teacher_user_id,us.full_name from circle_join_requests jr join circles h on h.id=jr.circle_id join users us on us.id=jr.user_id where jr.id=$1`,[id]))[0];
-    if(!jr)return json(res,404,{error:'الطلب غير موجود'});
-    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===jr.center_id)||(u.role==='teacher'&&u.id===jr.teacher_user_id);
-    if(!allowed)return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'});
-    if(decision==='approved'&&jr.requested_role==='student'){
-      await query('alter table students add column if not exists document_no text');
-      await query('alter table students add column if not exists mobile text');
-      const lr=(await query<any>('select document_no,phone from login_requests where auth_subject=(select auth_subject from users where id=$1) order by requested_at desc limit 1',[jr.user_id]))[0]||{};
-      let st=(await query<any>('select * from students where user_id=$1',[jr.user_id]))[0];
-      if(st)await query('update students set center_id=$1,circle_id=$2,status=\'active\',document_no=coalesce($3,document_no),mobile=coalesce($4,mobile),updated_at=now() where id=$5',[jr.center_id,jr.circle_id,lr.document_no||null,lr.phone||null,st.id]);
-      else await query('insert into students(user_id,center_id,circle_id,full_name,status,document_no,mobile) values($1,$2,$3,$4,\'active\',$5,$6)',[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب',lr.document_no||null,lr.phone||null]);
-      await query("update users set is_active=true,role='student',center_id=$2 where id=$1",[jr.user_id,jr.center_id]);
-      await query("update login_requests set status='approved' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
+    const client=await getPool().connect();
+    try{
+      await client.query('begin');
+      const jr=(await client.query(`select jr.*,h.center_id,h.teacher_user_id,us.full_name,us.is_active user_active,
+          st.id student_id,st.circle_id current_circle_id
+        from circle_join_requests jr
+        join circles h on h.id=jr.circle_id
+        join users us on us.id=jr.user_id
+        left join students st on st.user_id=jr.user_id
+        where jr.id=$1 and jr.status='pending'
+        for update of jr`,[id])).rows[0];
+      if(!jr){await client.query('rollback');return json(res,404,{error:'الطلب غير موجود أو سبق اتخاذ قرار بشأنه'})}
+      const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===jr.center_id)||(u.role==='teacher'&&u.id===jr.teacher_user_id);
+      if(!allowed){await client.query('rollback');return json(res,403,{error:'الطلب خارج نطاق صلاحيتك'})}
+      if(decision==='approved'&&jr.requested_role==='student'){
+        const lr=(await client.query('select document_no,phone from login_requests where auth_subject=(select auth_subject from users where id=$1) order by requested_at desc limit 1',[jr.user_id])).rows[0]||{};
+        const st=(await client.query('select * from students where user_id=$1',[jr.user_id])).rows[0];
+        if(st)await client.query("update students set center_id=$1,circle_id=$2,status='active',document_no=coalesce($3,document_no),mobile=coalesce($4,mobile),updated_at=now() where id=$5",[jr.center_id,jr.circle_id,lr.document_no||null,lr.phone||null,st.id]);
+        else await client.query("insert into students(user_id,center_id,circle_id,full_name,status,document_no,mobile) values($1,$2,$3,$4,'active',$5,$6)",[jr.user_id,jr.center_id,jr.circle_id,jr.full_name||'طالب',lr.document_no||null,lr.phone||null]);
+        await client.query("update users set is_active=true,role='student',center_id=$2 where id=$1",[jr.user_id,jr.center_id]);
+        await client.query("update login_requests set status='approved' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
+      }
+      if(jr.requested_role==='student'&&decision==='rejected'&&!jr.user_active){
+        await client.query("update users set is_active=false where id=$1",[jr.user_id]);
+        await client.query("update login_requests set status='rejected' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
+      }
+      await client.query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
+      await client.query('commit');
+      return json(res,200,{success:true,status:decision,transfer_rejected_without_deactivation:decision==='rejected'&&Boolean(jr.user_active)});
+    }catch(e){
+      await client.query('rollback');
+      throw e;
+    }finally{
+      client.release();
     }
-    await query('update circle_join_requests set status=$1,decided_by=$2,decided_at=now() where id=$3',[decision,u.id,id]);
-    if(jr.requested_role==='student'&&decision==='rejected'){
-      await query("update users set is_active=false where id=$1",[jr.user_id]);
-      await query("update login_requests set status='rejected' where auth_subject=(select auth_subject from users where id=$1) and status='pending'",[jr.user_id]);
-    }
-    return json(res,200,{success:true});
   }
   return json(res,405,{error:'Method not allowed'});
 }
