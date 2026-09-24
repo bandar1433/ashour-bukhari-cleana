@@ -156,13 +156,26 @@ export async function motivation(req:any,res:any,u:any){
   }
   if(sub==='reward-request'&&req.method==='POST'){
     if(u.role!=='student')return json(res,403,{error:'هذه الخدمة للطالب'});
-    const s=(await query<any>('select * from students where user_id=$1',[u.id]))[0];if(!s)return json(res,404,{error:'لم يتم ربط الحساب بالطالب'});
-    const reward=(await query<any>('select * from rewards where id=$1 and circle_id=$2 and is_active',[validUuid(req.body?.reward_id),s.circle_id]))[0];
-    if(!reward||Number(reward.stock)<1)return json(res,400,{error:'الجائزة غير متاحة'});
-    if(Number(s.points_balance)<Number(reward.points_cost))return json(res,400,{error:'رصيد النقاط غير كاف'});
-    const pending=(await query<any>(`select id from reward_requests where reward_id=$1 and student_id=$2 and status='pending'`,[reward.id,s.id]))[0];
-    if(pending)return json(res,400,{error:'لديك طلب قائم لهذه الجائزة'});
-    return json(res,201,(await query<any>('insert into reward_requests(reward_id,student_id) values($1,$2) returning *',[reward.id,s.id]))[0]);
+    const rewardId=validUuid(req.body?.reward_id);if(!rewardId)return json(res,400,{error:'الجائزة غير صالحة'});
+    const client=await getPool().connect();
+    try{
+      await client.query('begin');
+      const s=(await client.query('select * from students where user_id=$1 for update',[u.id])).rows[0];
+      if(!s){await client.query('rollback');return json(res,404,{error:'لم يتم ربط الحساب بالطالب'})}
+      const reward=(await client.query('select * from rewards where id=$1 and circle_id=$2 and is_active for update',[rewardId,s.circle_id])).rows[0];
+      if(!reward||Number(reward.stock)<1){await client.query('rollback');return json(res,400,{error:'الجائزة غير متاحة'})}
+      if(Number(s.points_balance)<Number(reward.points_cost)){await client.query('rollback');return json(res,400,{error:'رصيد النقاط غير كاف'})}
+      const pending=(await client.query("select id from reward_requests where reward_id=$1 and student_id=$2 and status='pending'",[reward.id,s.id])).rows[0];
+      if(pending){await client.query('rollback');return json(res,400,{error:'لديك طلب قائم لهذه الجائزة'})}
+      const row=(await client.query('insert into reward_requests(reward_id,student_id) values($1,$2) returning *',[reward.id,s.id])).rows[0];
+      await client.query('commit');
+      return json(res,201,row);
+    }catch(e){
+      await client.query('rollback');
+      throw e;
+    }finally{
+      client.release();
+    }
   }
   if(sub==='reward-approve'&&req.method==='POST'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
