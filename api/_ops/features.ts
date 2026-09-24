@@ -133,7 +133,7 @@ export async function features(req:any,res:any,u:any){
     if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
     const preference=(await query<any>('select frequency from guardian_report_preferences where guardian_user_id=$1',[u.id]))[0]?.frequency||'weekly';
     const children=await query<any>(`select s.id,s.full_name,c.name circle_name,
-      coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '30 days'),0) attendance_rate,
+      coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*) filter(where a.status<>'excused'),0))::int from attendance a where a.student_id=s.id and a.attendance_date>=current_date-interval '30 days'),0) attendance_rate,
       coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date>=current_date-interval '30 days'),0) quran_average,
       coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date>=current_date-interval '30 days'),0)::int new_pages,
       coalesce((select sum(page_count) from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date>=current_date-interval '30 days'),0)::int review_pages,
