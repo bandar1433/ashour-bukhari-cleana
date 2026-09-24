@@ -11,7 +11,6 @@ import {
   getSessionToken,
   getSessionRole, readableError,
   getStatus,
-  setAccessCode,
   setSessionToken,
   StudentRow,
   Summary,
@@ -122,7 +121,6 @@ const EXPLICIT_LOGOUT_KEY = 'ashour_explicit_logout';
 
 export default function App() {
   const [code, setCode] = useState(getAccessCode() || (getSessionToken() ? 'session' : ''));
-  const [enteredCode, setEnteredCode] = useState(getAccessCode());
   const [authOpen,setAuthOpen]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
@@ -172,7 +170,6 @@ export default function App() {
     const onSessionExpired=(event:Event)=>{
       const message=(event as CustomEvent<{message?:string}>).detail?.message||'انتهت جلسة الدخول. سجّل الدخول من جديد.';
       setCode('');
-      setEnteredCode('');
       setAuthIntent('signin');
       setAuthOpen(true);
       setPublicView('الرئيسية');
@@ -239,31 +236,6 @@ export default function App() {
       setAuthOpen(true);
     });
   }, [code]);
-
-  async function handleLogin(event: React.FormEvent) {
-    event.preventDefault();
-    const cleaned = enteredCode.trim();
-    if (!cleaned) {
-      setError('أدخل رمز الدخول الإداري.');
-      return;
-    }
-    setAuthBusy(true);
-    setError('');
-    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
-    clearSessionToken();
-    setAccessCode(cleaned);
-    try {
-      await apiGet<Summary>('/api/ops?action=summary');
-      setCode(cleaned);
-      setAuthOpen(false);
-    } catch (err) {
-      clearAccessCode();
-      setCode('');
-      setError(err instanceof Error ? err.message : 'رمز الدخول غير صحيح.');
-    } finally {
-      setAuthBusy(false);
-    }
-  }
 
   async function finishSocialSession(){
     let headerJwt='';
@@ -389,7 +361,6 @@ export default function App() {
     clearSessionToken();
     setCode('');
     setAuthOpen(false);
-    setEnteredCode('');
     setPublicView('الرئيسية');
     setActiveTab('overview');
     setTabHistory([]);
@@ -656,7 +627,7 @@ export default function App() {
                 <button className="tableAction" type="button" onClick={()=>setSignupStep(1)}>← تعديل البيانات</button></>}
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
               </div>}
-              {new URLSearchParams(window.location.search).get('admin')==='1'&&<div className="legacyAccessPro"><div><b>دخول مدير النظام</b><span>مسار احتياطي مؤقت للإدارة العامة فقط.</span></div><form className="authForm legacyForm" onSubmit={handleLogin}><label className="field"><span>رمز الإدارة</span><input type="password" value={enteredCode} onChange={e=>setEnteredCode(e.target.value)} placeholder="رمز مدير النظام"/></label><button className="secondary" type="submit" disabled={authBusy}>دخول الإدارة</button></form></div>}
+
             </div>
           </section>
         </div>}
