@@ -64,13 +64,6 @@ function permitted(payload:AppSessionPayload,req:any){
 }
 
 export function requireAccess(req: any, res: any): boolean {
-  const expected = process.env.ADMIN_ACCESS_CODE;
-  if (!expected) {
-    json(res, 500, { error: 'ADMIN_ACCESS_CODE is not configured', message: 'أضف متغير ADMIN_ACCESS_CODE في Vercel على كل البيئات.' });
-    return false;
-  }
-  const received = req.headers['x-access-code'];
-  if (received === expected) return true;
   const authorization = String(req.headers.authorization || '');
   if (authorization.startsWith('Bearer ')) {
     const token = authorization.slice(7).trim();
@@ -81,7 +74,7 @@ export function requireAccess(req: any, res: any): boolean {
       return false;
     }
   }
-  json(res, 401, { error: 'Unauthorized', message: 'جلسة الدخول غير صالحة أو انتهت. سجّل الدخول من جديد.' });
+  json(res,401,{error:'Unauthorized',message:'جلسة الدخول غير صالحة أو انتهت. سجّل الدخول من جديد.'});
   return false;
 }
 
