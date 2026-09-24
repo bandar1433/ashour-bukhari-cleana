@@ -1,6 +1,7 @@
 import { query } from './_lib/db.js';
 import { getActor } from './_lib/actor.js';
 import { handleError,json } from './_lib/http.js';
+import {getOperationalSettings} from './_lib/operationalSettings.js';
 
 export default async function handler(req:any,res:any){
   try{
@@ -49,7 +50,7 @@ export default async function handler(req:any,res:any){
       const existing=(await query<any>('select s.*,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1',[b.id]))[0];
       if(!existing)return json(res,404,{error:'الطالب غير موجود'});
       if(u.role==='teacher'&&existing.teacher_user_id!==u.id)return json(res,403,{error:'Forbidden',message:'الطالب خارج حلقتك.'});
-      if(u.role==='teacher'&&Date.now()-new Date(existing.registration_date).getTime()>7*86400000)return json(res,403,{error:'انتهت مهلة التعديل',message:'يسمح للمعلم بتعديل الطالب خلال 7 أيام من التسجيل فقط.'});
+      if(u.role==='teacher'){const settings=await getOperationalSettings(),registeredAt=new Date(existing.registration_date).getTime();if(Number.isFinite(registeredAt)&&Date.now()-registeredAt>settings.edit_window_days*86400000)return json(res,403,{error:'انتهت مهلة التعديل',message:'انتهت مهلة تعديل بيانات الطالب المحددة بـ '+settings.edit_window_days+' يومًا.'});}
       if(['center_manager','supervisor'].includes(u.role)&&existing.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الطالب خارج مركزك.'});
       let centerId=b.center_id!==undefined?(b.center_id||null):existing.center_id;
       let circleId=b.circle_id!==undefined?(b.circle_id||null):existing.circle_id;
