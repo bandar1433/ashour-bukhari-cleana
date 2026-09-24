@@ -14,7 +14,7 @@ export type AppRole='system_admin'|'center_manager'|'supervisor'|'teacher'|'stud
 export type AppSessionPayload = { sub:string; userId:string; role:AppRole; exp:number };
 
 function sessionSecret() {
-  const secret = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_ACCESS_CODE;
+  const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) throw new Error('ADMIN_SESSION_SECRET is not configured');
   return secret;
 }
