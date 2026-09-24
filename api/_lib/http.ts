@@ -14,8 +14,8 @@ export type AppRole='system_admin'|'center_manager'|'supervisor'|'teacher'|'stud
 export type AppSessionPayload = { sub:string; userId:string; role:AppRole; exp:number };
 
 function sessionSecret() {
-  const secret = process.env.ADMIN_ACCESS_CODE;
-  if (!secret) throw new Error('ADMIN_ACCESS_CODE is not configured');
+  const secret = process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_ACCESS_CODE;
+  if (!secret) throw new Error('ADMIN_SESSION_SECRET is not configured');
   return secret;
 }
 
@@ -102,6 +102,7 @@ function safeErrorMessage(error:unknown){
 }
 
 export function handleError(res: any, error: unknown) {
-  const message = safeErrorMessage(error);
-  return json(res, 500, { error: message, message });
+  const errorId=crypto.randomUUID().slice(0,8);
+  console.error('[api-error:'+errorId+']',safeErrorMessage(error),error);
+  return json(res,500,{error:'SERVER_ERROR',message:'تعذر تنفيذ العملية بسبب خطأ في الخادم. رقم المرجع: '+errorId,error_id:errorId});
 }
