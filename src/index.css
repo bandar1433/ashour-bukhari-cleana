@@ -227,6 +227,8 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
   .topNewsSlide{padding:20px 22px}
 }
 @media(max-width:960px){
+  .mobileLogout{display:inline-flex;align-items:center;justify-content:center}
+
   .header{padding:11px 16px;gap:10px;flex-wrap:wrap}
   .brand{order:1}.headerActions{order:2;margin-inline-start:auto}.header nav{order:3;width:100%;flex-basis:100%;justify-content:flex-start;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none;padding:2px 0 4px}
   .header nav::-webkit-scrollbar{display:none}.header nav button{flex:0 0 auto}
@@ -331,3 +333,5 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
 .compactAction{display:block;margin-top:6px}
 .teacherDailyUnified td small{display:block;margin-top:4px}
 @media(max-width:720px){.quran604Grid{grid-template-columns:repeat(6,1fr)}.teacherDailyUnified{font-size:12px}}
+
+.mobileLogout{display:none}
