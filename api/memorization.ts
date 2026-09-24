@@ -4,6 +4,7 @@ import { handleError,json } from './_lib/http.js';
 import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
 import {riyadhDate} from './_lib/prayer.js';
 import {isWeekLocked} from './_lib/weeklyLock.js';
+import {operationalDay} from './_lib/operationalDay.js';
 
 export default async function handler(req:any,res:any){
   try{
@@ -34,6 +35,7 @@ export default async function handler(req:any,res:any){
       if(!s)return json(res,404,{error:'الطالب غير موجود'});
       const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
       if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
+      const operational=await operationalDay(recordDate,s.center_id);if(!operational.open)return json(res,409,{error:'NON_OPERATIONAL_DAY',message:operational.reason});
       const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0];const weekLocked=s.circle_id?await isWeekLocked(s.circle_id,recordDate):false;
       const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
       if(weekLocked&&u.role==='teacher')return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال هذا الأسبوع نهائيًا من الإشراف.'});
