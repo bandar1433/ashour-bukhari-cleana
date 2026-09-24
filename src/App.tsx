@@ -21,6 +21,7 @@ import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
 import { madinahSurahName } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
+import CircleWeeklyRegister from './CircleWeeklyRegister';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
@@ -652,7 +653,7 @@ export default function App() {
             </>}
             {activeTab==='circleRegister'&&<>
               <div className="opsToolbar"><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{setRecordMonth(e.target.value);loadCircleRegister(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadCircleRegister()}>تحديث السجل</button></div>
-              <div className="table-wrap circleRegisterTable"><table><thead><tr><th>الطالب</th><th>الحلقة</th><th>التاريخ</th><th>الحضور</th><th>التأخير</th><th>المراجعة</th><th>الجديد</th><th>الصفحات</th><th>التقييم</th><th>الاعتماد</th></tr></thead><tbody>{(circleRegister.students||[]).flatMap((student:any)=>(student.days||[]).filter((d:any)=>new Date(String(d.date)).getDay()!==5).map((d:any)=><tr key={student.id+String(d.date)}><td><button className="tableAction" onClick={()=>openStudentProfile(student.id)}>{student.full_name}</button></td><td>{student.circle_name}</td><td>{String(d.date).slice(0,10)}</td><td>{d.status||'—'}</td><td>{d.late_minutes||0}</td><td>{d.review?(madinahSurahName(Number(d.review.surah_no))+' آ'+d.review.from_ayah+'-'+d.review.to_ayah):'—'}</td><td>{d.new?(madinahSurahName(Number(d.new.surah_no))+' آ'+d.new.from_ayah+'-'+d.new.to_ayah):'—'}</td><td>{Number(d.review?.pages||0)+Number(d.new?.pages||0)||'—'}</td><td>{Math.round((Number(d.review?.grade||0)+Number(d.new?.grade||0))/((d.review?1:0)+(d.new?1:0)||1))}%</td><td>{d.approved?'معتمد ✓':'مفتوح'}</td></tr>))}</tbody></table></div>
+              <CircleWeeklyRegister data={circleRegister} month={recordMonth} onProfile={openStudentProfile}/>
             </>}
             {activeTab==='evaluations'&&<>
               <div className="opsToolbar"><label className="field"><span>من</span><input type="date" value={evaluationRange.from} onChange={e=>setEvaluationRange(x=>({...x,from:e.target.value}))} /></label><label className="field"><span>إلى</span><input type="date" value={evaluationRange.to} onChange={e=>setEvaluationRange(x=>({...x,to:e.target.value}))} /></label><button className="primary" type="button" onClick={()=>loadEvaluations()}>حساب التقييم</button></div>

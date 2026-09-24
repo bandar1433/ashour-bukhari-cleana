@@ -25,9 +25,11 @@ export default async function handler(req:any,res:any){
       if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};if(b.record_type&&!['new','review'].includes(String(b.record_type)))return json(res,400,{error:'النوع المسموح: الحفظ الجديد أو المراجعة فقط'});
       const recordDate=String(b.record_date||riyadhDate());
-      const fromSurah=Number(b.surah_no),toSurah=Number(b.to_surah_no||b.surah_no),fromAyah=Number(b.from_ayah),toAyah=Number(b.to_ayah);
+      const fromSurah=Number(b.surah_no),toSurah=Number(b.to_surah_no||b.surah_no),rawFromAyah=Number(b.from_ayah||0),rawToAyah=Number(b.to_ayah||0);
       if(!Number.isInteger(fromSurah)||fromSurah<1||fromSurah>114||!Number.isInteger(toSurah)||toSurah<1||toSurah>114)return json(res,400,{error:'السورة غير صالحة'});
-      if(!Number.isInteger(fromAyah)||fromAyah<1||fromAyah>Number(getAyahCountInSurah(fromSurah as any))||!Number.isInteger(toAyah)||toAyah<1||toAyah>Number(getAyahCountInSurah(toSurah as any)))return json(res,400,{error:'رقم الآية غير صالح للسورة المحددة'});
+      const maxFrom=Number(getAyahCountInSurah(fromSurah as any)),maxTo=Number(getAyahCountInSurah(toSurah as any));
+      if((rawFromAyah!==0&&(!Number.isInteger(rawFromAyah)||rawFromAyah<1||rawFromAyah>maxFrom))||(rawToAyah!==0&&(!Number.isInteger(rawToAyah)||rawToAyah<1||rawToAyah>maxTo)))return json(res,400,{error:'رقم الآية غير صالح للسورة المحددة'});
+      const fromAyah=rawFromAyah||1,toAyah=rawToAyah||maxTo;
       if(toSurah<fromSurah||(toSurah===fromSurah&&toAyah<fromAyah))return json(res,400,{error:'نهاية الورد يجب أن تكون بعد بدايته'});
       const fromPage=Number(findPage(fromSurah as any,fromAyah as any)),toPage=Number(findPage(toSurah as any,toAyah as any)),pageCount=Math.max(1,toPage-fromPage+1);
       const s=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];

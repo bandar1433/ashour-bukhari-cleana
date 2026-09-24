@@ -331,3 +331,31 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
 .compactAction{display:block;margin-top:6px}
 .teacherDailyUnified td small{display:block;margin-top:4px}
 @media(max-width:720px){.quran604Grid{grid-template-columns:repeat(6,1fr)}.teacherDailyUnified{font-size:12px}}
+
+
+/* weekly horizontal circle register */
+.weeklyRegisterSection{display:grid;gap:18px;margin-top:16px}
+.weeklyRegisterBlock{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
+.weeklyRegisterHeading{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 16px;background:#f8faf9;border-bottom:1px solid var(--line)}
+.weeklyRegisterHeading b{color:var(--green-deep);font-size:14px}.weeklyRegisterHeading small{display:block;color:#7b8983;margin-top:3px}
+.weeklyRegisterScroll{overflow:auto;max-width:100%;direction:rtl}
+.weeklyRegisterTable{min-width:2050px;width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.weeklyRegisterTable th,.weeklyRegisterTable td{text-align:center;vertical-align:middle;white-space:normal;border-bottom:1px solid #e8eeeb;border-inline-start:1px solid #edf1ef;padding:8px 6px}
+.weeklyRegisterTable thead th{position:relative;background:#eaf3ef;color:var(--green-deep)}
+.weeklyRegisterTable .studentSticky{position:sticky;right:0;z-index:3;min-width:175px;width:175px;text-align:right;background:#fff}
+.weeklyRegisterTable thead .studentSticky{z-index:6;background:#dcebe5}
+.weeklyRegisterTable .dayGroup{background:#dcebe5;font-size:12px}
+.weeklyRegisterTable .dayGroup small{display:block;font-size:9px;color:#667a73;margin-top:3px}
+.weeklyRegisterTable .dayGroup em{display:block;font-style:normal;font-size:8px;color:#39745f;margin-top:3px}
+.weeklyRegisterTable .daySubHead{background:#eff6f3;font-size:9px;padding:7px 4px}
+.weeklyRegisterTable .attendanceCell{width:88px;min-width:88px;font-weight:700}
+.weeklyRegisterTable .quranCell{width:122px;min-width:122px;font-size:9px;line-height:1.55;color:#435b53}
+.weeklyRegisterTable .evalCell{width:72px;min-width:72px;font-weight:800;color:var(--green-deep)}
+.weeklyRegisterTable .summaryCell{width:95px;min-width:95px;font-weight:800;background:#fbfaf5}
+.weeklyRegisterTable .outMonth{background:#fafafa;color:#b0b7b4}
+.weeklyRegisterTable tbody tr:hover td{background:#fbf8ee}.weeklyRegisterTable tbody tr:hover .studentSticky{background:#fbf8ee}
+.registerStatus{display:inline-flex;align-items:center;justify-content:center;padding:4px 7px;border-radius:999px;background:#eef5f2;color:#315e50;font-size:9px}
+.registerStatus.absent{background:#fff0f0;color:#9d4444}.registerStatus.excused{background:#fff7df;color:#866b2e}.registerStatus.late{background:#fff3df;color:#9a6232}
+.registerQuranEmpty{color:#a4aca8}
+@media(max-width:600px){.weeklyRegisterHeading{align-items:flex-start;flex-direction:column}.weeklyRegisterTable{min-width:1900px}.weeklyRegisterTable .studentSticky{min-width:145px;width:145px}}
+@media print{.weeklyRegisterScroll{overflow:visible!important}.weeklyRegisterTable{min-width:1800px!important;font-size:8px}.weeklyRegisterTable th,.weeklyRegisterTable td{padding:4px 3px}}
