@@ -2,6 +2,7 @@ import { query } from '../_lib/db.js';
 import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
 import { json } from '../_lib/http.js';
 import { scopedStudent,today } from './shared.js';
+import { operationalDay } from '../_lib/operationalDay.js';
 
 export async function summary(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
@@ -20,7 +21,7 @@ export async function teacherToday(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لهذه الشاشة.'});
   const d=validDate(req.query?.date)||today();
-  const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,a.status attendance_status,a.late_minutes,a.check_in_at,a.check_out_at,
+  const students=await query<any>(`select s.id,s.full_name,s.center_id,h.id circle_id,h.name circle_name,a.status attendance_status,a.late_minutes,a.check_in_at,a.check_out_at,
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new' order by m.created_at desc limit 1) new_record,
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review' order by m.created_at desc limit 1) review_record,
     coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new'),0)::int new_records,
@@ -37,11 +38,15 @@ export async function teacherToday(req:any,res:any,u:any){
   const planMap=new Map<string,any>();for(const p of planRows)if(!planMap.has(p.student_id))planMap.set(p.student_id,p);
   const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\\d+(?:\\.\\d+)?$/.test(s))return Number(s);const m=s.match(/(\\d+)\\D+(\\d+)\\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
   const isFriday=dateObj.getUTCDay()===5;
+  const centerIds=[...new Set(students.map((x:any)=>String(x.center_id||'')).filter(Boolean))];
+  const operationalPairs=await Promise.all(centerIds.map(async centerId=>[centerId,await operationalDay(d,centerId)] as const));
+  const operationalMap=new Map(operationalPairs);
   const scoredStudents=students.map((r:any)=>{const p=planMap.get(r.id)||{},reviewTarget=targetPages(p.review_target),newTarget=targetPages(p.new_target),reviewDone=Number(r.review_record?.page_count||0),newDone=Number(r.new_record?.page_count||0);
     const attendanceScore=isFriday?null:r.attendance_status==='excused'?null:r.attendance_status==='absent'?0:r.attendance_status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
     const reviewScore=reviewTarget>0?Math.min(40,Math.round(40*reviewDone/reviewTarget)):40;
     const newScore=newTarget>0?Math.min(30,Math.round(30*newDone/newTarget)):30;
-    return {...r,review_target:p.review_target||'',new_target:p.new_target||'',goals:p.goals||'',attendance_score:attendanceScore,review_score:reviewScore,new_score:newScore,daily_score:attendanceScore===null?null:attendanceScore+reviewScore+newScore};
+    const operational=operationalMap.get(String(r.center_id||''))||{open:!isFriday,reason:isFriday?'يوم الجمعة إجازة أسبوعية.':null};
+    return {...r,review_target:p.review_target||'',new_target:p.new_target||'',goals:p.goals||'',attendance_score:attendanceScore,review_score:reviewScore,new_score:newScore,daily_score:attendanceScore===null?null:attendanceScore+reviewScore+newScore,operational_day:operational.open,operational_reason:operational.reason};
   });
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
     where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
@@ -122,8 +127,32 @@ export async function dayApprove(req:any,res:any,u:any){
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لاعتماد اليوم.'});
   const b=req.body||{},circleId=validUuid(b.circle_id),d=validDate(b.approval_date);
   if(!circleId||!d)return json(res,400,{error:'بيانات الاعتماد غير مكتملة'});
-  const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
+  const allowed=(await query<any>(`select id,center_id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
   if(!allowed)return json(res,403,{error:'Forbidden',message:'الحلقة خارج نطاق صلاحيتك.'});
+  const operational=await operationalDay(d,allowed.center_id);if(!operational.open)return json(res,409,{error:'NON_OPERATIONAL_DAY',message:operational.reason});
+  const dateObj=new Date(d+'T00:00:00.000Z'),dayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'],dayName=dayNames[dateObj.getUTCDay()];
+  const back=(dateObj.getUTCDay()+1)%7,weekDate=new Date(dateObj);weekDate.setUTCDate(weekDate.getUTCDate()-back);const weekStart=weekDate.toISOString().slice(0,10);
+  const rows=await query<any>(`select s.id,s.full_name,a.status,
+      w.new_target,w.review_target,
+      exists(select 1 from memorization_records m where m.student_id=s.id and m.record_date=$2::date and m.record_type='new') has_new,
+      exists(select 1 from memorization_records m where m.student_id=s.id and m.record_date=$2::date and m.record_type='review') has_review
+    from students s
+    left join attendance a on a.student_id=s.id and a.attendance_date=$2::date
+    left join weekly_plans w on w.student_id=s.id and w.week_start=$3::date and w.day_name=$4
+    where s.circle_id=$1 and s.status='active'
+    order by s.full_name`,[circleId,d,weekStart,dayName]);
+  const targetPages=(v:any)=>{const raw=String(v||'').trim();if(/^\\d+(?:\\.\\d+)?$/.test(raw))return Number(raw);const m=raw.match(/(\\d+)\\D+(\\d+)\\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
+  const missing:string[]=[];
+  for(const row of rows){
+    const needs:string[]=[];
+    if(!row.status)needs.push('الحضور');
+    if(['present','late'].includes(String(row.status||''))){
+      if(targetPages(row.review_target)>0&&!row.has_review)needs.push('المراجعة');
+      if(targetPages(row.new_target)>0&&!row.has_new)needs.push('الحفظ الجديد');
+    }
+    if(needs.length)missing.push(`${row.full_name}: ${needs.join('، ')}`);
+  }
+  if(missing.length)return json(res,409,{error:'DAY_INCOMPLETE',message:`لا يمكن اعتماد اليوم قبل استكمال السجلات: ${missing.slice(0,6).join(' | ')}${missing.length>6?` | +${missing.length-6} طالب`:''}`});
   const row=(await query<any>(`insert into day_approvals(circle_id,approval_date,approved_by) values($1,$2,$3) on conflict(circle_id,approval_date) do update set approved_by=excluded.approved_by,approved_at=now() returning *`,[circleId,d,u.id]))[0];
   return json(res,200,row);
 }
