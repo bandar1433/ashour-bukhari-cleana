@@ -335,3 +335,19 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
 @media(max-width:720px){.quran604Grid{grid-template-columns:repeat(6,1fr)}.teacherDailyUnified{font-size:12px}}
 
 .mobileLogout{display:none}
+
+
+@media(max-width:720px){
+  .teacherDailyUnified{border:0;background:transparent;overflow:visible}
+  .teacherDailyUnified table,.teacherDailyUnified tbody,.teacherDailyUnified tr,.teacherDailyUnified td{display:block;width:100%}
+  .teacherDailyUnified thead{display:none}
+  .teacherDailyUnified tbody{display:grid;gap:12px}
+  .teacherDailyUnified tr{background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 12px;box-shadow:0 8px 22px rgba(7,70,63,.06)}
+  .teacherDailyUnified tr.nonOperationalRow{opacity:.72}
+  .teacherDailyUnified td{white-space:normal;border:0;border-bottom:1px solid #edf0ee;padding:9px 0;display:grid;grid-template-columns:112px minmax(0,1fr);gap:10px;align-items:center}
+  .teacherDailyUnified td:last-child{border-bottom:0}
+  .teacherDailyUnified td::before{content:attr(data-label);font-weight:800;color:var(--green-deep);font-size:11px}
+  .teacherDailyUnified td>small{display:block;margin-top:3px}
+  .teacherDailyUnified select,.teacherDailyUnified button{max-width:100%}
+  .teacherDailyUnified .tableAction{text-align:right;white-space:normal}
+}
