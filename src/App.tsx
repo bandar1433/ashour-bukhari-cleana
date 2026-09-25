@@ -106,8 +106,8 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   evaluations: { title: 'التقييم والإنجاز', subtitle: 'قياس الإنجاز اليومي وفق الخطة والحضور والمراجعة.', short: 'التقييم' },
   studentProfile: { title: 'ملف الطالب القرآني', subtitle: 'ملف متكامل للحضور والحفظ والمراجعة والخطط والنقاط.', short: 'ملف الطالب' },
   selfService: { title: 'تسجيل الطالب اليومي', subtitle: 'تسجيل الحضور والانصراف لليوم الحالي، مع عرض تقدم الحفظ والمراجعة.', short: 'تسجيلي' },
-  motivation: { title: 'التحفيز والنقاط والجوائز', subtitle: 'المهام اليومية والنقاط والترتيب والجوائز وطلبات الاستبدال.', short: 'التحفيز' },
-  competitions: { title: 'المسابقات', subtitle: 'إنشاء المسابقات وتسجيل النتائج وعرض المتصدرين.', short: 'المسابقات' },
+  motivation: { title: 'مهامي وجوائزي', subtitle: 'السجل اليومي للمهام والنقاط والجوائز، مع إعداد مستقل لكل حلقة.', short: 'المهام والجوائز' },
+  competitions: { title: 'سجل المسابقات', subtitle: 'سجل عام لمسابقات المركز ونتائج الطلاب من جميع الحلقات.', short: 'المسابقات' },
   notifications: { title: 'الإشعارات', subtitle: 'إشعارات داخل المنصة للمستخدمين والمراكز.', short: 'الإشعارات' },
   reports: { title: 'مركز التقارير', subtitle: 'مؤشرات الحلقات والطلاب الذين يحتاجون متابعة.', short: 'التقارير' },
   joinRequests: { title: 'طلبات الانضمام', subtitle: 'اعتماد طلبات الطلاب للانضمام إلى الحلقات.', short: 'طلبات الانضمام' },
@@ -619,7 +619,7 @@ export default function App() {
           <button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span>التقييم والإنجاز</button>
           {['system_admin','center_manager','supervisor','teacher'].includes(currentRole)&&<button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span>طلبات الانضمام</button>}
           <div className="sidebarSectionLabel">التحفيز والإدارة</div>
-          <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span>المسابقات</button>
+          <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>التحفيز والجوائز</button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span>سجل المسابقات</button>
           <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button>
           <button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>مركز التقارير</button>
           <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button>
