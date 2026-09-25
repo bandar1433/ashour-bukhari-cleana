@@ -1,7 +1,8 @@
 import { useMemo,useState } from 'react';
-import { findPage,getAyahCountInSurah,getSurahInfo } from 'quran-meta/hafs';
+import { findPage,getAyahCountInSurah } from 'quran-meta/hafs';
 
-export function madinahSurahName(n:number){const info:any=getSurahInfo(Number(n||1) as any);return String(info?.name?.arabic||info?.arabicName||info?.name||'سورة');}
+const ARABIC_SURAH_NAMES=["الفاتحة","البقرة","آل عمران","النساء","المائدة","الأنعام","الأعراف","الأنفال","التوبة","يونس","هود","يوسف","الرعد","إبراهيم","الحجر","النحل","الإسراء","الكهف","مريم","طه","الأنبياء","الحج","المؤمنون","النور","الفرقان","الشعراء","النمل","القصص","العنكبوت","الروم","لقمان","السجدة","الأحزاب","سبأ","فاطر","يس","الصافات","ص","الزمر","غافر","فصلت","الشورى","الزخرف","الدخان","الجاثية","الأحقاف","محمد","الفتح","الحجرات","ق","الذاريات","الطور","النجم","القمر","الرحمن","الواقعة","الحديد","المجادلة","الحشر","الممتحنة","الصف","الجمعة","المنافقون","التغابن","الطلاق","التحريم","الملك","القلم","الحاقة","المعارج","نوح","الجن","المزمل","المدثر","القيامة","الإنسان","المرسلات","النبأ","النازعات","عبس","التكوير","الانفطار","المطففين","الانشقاق","البروج","الطارق","الأعلى","الغاشية","الفجر","البلد","الشمس","الليل","الضحى","الشرح","التين","العلق","القدر","البينة","الزلزلة","العاديات","القارعة","التكاثر","العصر","الهمزة","الفيل","قريش","الماعون","الكوثر","الكافرون","النصر","المسد","الإخلاص","الفلق","الناس"] as const;
+export function madinahSurahName(n:number){const index=Math.min(114,Math.max(1,Number(n||1)))-1;return ARABIC_SURAH_NAMES[index]||'سورة';}
 const surahs=Array.from({length:114},(_,i)=>{const n=i+1;return {n,name:madinahSurahName(n),ayahs:getAyahCountInSurah(n as any)}});
 
 export type MushafRange={surah_no:number;from_ayah:number;to_surah_no:number;to_ayah:number;from_page:number;to_page:number;page_count:number};

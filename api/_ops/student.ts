@@ -56,15 +56,19 @@ export async function selfService(req:any,res:any,u:any){
       const fromAyah=rawFromAyah||1,toAyah=rawToAyah||maxTo;
       if(toSurah<fromSurah||(toSurah===fromSurah&&toAyah<fromAyah))return json(res,400,{error:'نهاية الورد يجب أن تكون بعد بدايته'});
       const fromPage=Number(findPage(fromSurah as any,fromAyah as any)),toPage=Number(findPage(toSurah as any,toAyah as any));
+      const pageCount=Math.max(1,toPage-fromPage+1),ayahCount=toSurah===fromSurah?Math.max(1,toAyah-fromAyah+1):null;
       const existing=(await query<any>("select id from memorization_records where student_id=$1 and record_date=$2::date and record_type=$3 order by created_at desc limit 1",[s.id,d,recordType]))[0];
       if(existing){
-        const row=(await query<any>(`update memorization_records set surah_no=$1,from_ayah=$2,to_surah_no=$3,to_ayah=$4,from_page=$5,to_page=$6,page_count=greatest(1,$6::int-$5::int+1),ayah_count=case when $3::int=$1::int then $4::int-$2::int+1 else null end,recorded_by=$7 where id=$8 returning *`,
-          [fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,u.id,existing.id]))[0];
+        const row=(await query<any>(`update memorization_records set
+          surah_no=$1::smallint,from_ayah=$2::smallint,to_surah_no=$3::smallint,to_ayah=$4::smallint,
+          from_page=$5::smallint,to_page=$6::smallint,page_count=$7::smallint,ayah_count=$8::smallint,recorded_by=$9
+          where id=$10 returning *`,
+          [fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,pageCount,ayahCount,u.id,existing.id]))[0];
         return json(res,200,row);
       }
       const row=(await query<any>(`insert into memorization_records(student_id,record_type,surah_no,from_ayah,to_surah_no,to_ayah,from_page,to_page,page_count,ayah_count,grade,notes,qiraah,approved,record_date,recorded_by)
-        values($1,$2,$3,$4,$5,$6,$7,$8,greatest(1,$8::int-$7::int+1),case when $5::int=$3::int then $6::int-$4::int+1 else null end,null,null,'حفص عن عاصم',false,$9,$10) returning *`,
-        [s.id,recordType,fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,d,u.id]))[0];
+        values($1,$2,$3::smallint,$4::smallint,$5::smallint,$6::smallint,$7::smallint,$8::smallint,$9::smallint,$10::smallint,null,null,'حفص عن عاصم',false,$11::date,$12) returning *`,
+        [s.id,recordType,fromSurah,fromAyah,toSurah,toAyah,fromPage,toPage,pageCount,ayahCount,d,u.id]))[0];
       return json(res,201,row);
     }
 
