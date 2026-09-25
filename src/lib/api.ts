@@ -84,8 +84,22 @@ export function clearAccessCode() {
   localStorage.removeItem(ACCESS_KEY);
 }
 
+function sessionPayload(token:string):any{
+  try{
+    const encoded=token.split('.')[1]||'',normalized=encoded.replace(/-/g,'+').replace(/_/g,'/'),padded=normalized+'='.repeat((4-normalized.length%4)%4);
+    return JSON.parse(atob(padded));
+  }catch{return null}
+}
+export function getSessionExpiryMs():number{
+  const token=localStorage.getItem(SESSION_KEY)||'',payload=token?sessionPayload(token):null;
+  return Number(payload?.exp||0)*1000;
+}
 export function getSessionToken(): string {
-  return localStorage.getItem(SESSION_KEY) || '';
+  const token=localStorage.getItem(SESSION_KEY)||'';
+  if(!token)return '';
+  const expiry=Number(sessionPayload(token)?.exp||0)*1000;
+  if(expiry&&expiry<=Date.now()){localStorage.removeItem(SESSION_KEY);return ''}
+  return token;
 }
 
 export function setSessionToken(token: string) {
@@ -141,6 +155,11 @@ function responseError(payload:any,status:number){
   const raw=payload?.message ?? payload?.error ?? payload;
   return readableError(raw,`تعذر تنفيذ الطلب (HTTP ${status})`);
 }
+function handleUnauthorized(status:number){
+  if(status!==401)return;
+  clearSessionToken();
+  try{window.dispatchEvent(new CustomEvent('ashour:session-expired'))}catch{}
+}
 
 function authHeaders(): Record<string,string> {
   const headers: Record<string,string> = {};
@@ -169,6 +188,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   }
 
   if (!response.ok) {
+    handleUnauthorized(response.status);
     throw new Error(responseError(payload,response.status));
   }
 
@@ -180,7 +200,7 @@ export async function getStatus() {
   return response.json();
 }
 
-export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok)throw new Error(responseError(payload,response.status));return payload as T;}
+export async function apiPost<T>(path:string,body:unknown):Promise<T>{const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});const text=await response.text();let payload:any;try{payload=text?JSON.parse(text):null}catch{payload={error:text}}if(!response.ok){handleUnauthorized(response.status);throw new Error(responseError(payload,response.status))}return payload as T;}
 
 
 export async function apiPut<T>(path:string,body:unknown):Promise<T>{
@@ -192,6 +212,6 @@ export async function apiPut<T>(path:string,body:unknown):Promise<T>{
   const text=await response.text();
   let payload:any;
   try{payload=text?JSON.parse(text):null}catch{payload={error:text}}
-  if(!response.ok)throw new Error(responseError(payload,response.status));
+  if(!response.ok){handleUnauthorized(response.status);throw new Error(responseError(payload,response.status))}
   return payload as T;
 }

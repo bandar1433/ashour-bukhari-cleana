@@ -8,6 +8,7 @@ import {
   clearAccessCode,
   clearSessionToken,
   getSessionToken,
+  getSessionExpiryMs,
   getSessionRole, readableError,
   getStatus,
   setSessionToken,
@@ -22,6 +23,7 @@ import { madinahSurahName } from './MadinahMushafRange';
 import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
 import CircleWeeklyRegister from './CircleWeeklyRegister';
+import StudentQuranProfile from './StudentQuranProfile';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
@@ -121,6 +123,7 @@ const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
 export default function App() {
   const [code, setCode] = useState(getSessionToken() ? 'session' : '');
   const [authOpen,setAuthOpen]=useState(false);
+  const [publicMode,setPublicMode]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
   const [accountForm,setAccountForm]=useState({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});
@@ -208,6 +211,16 @@ export default function App() {
       setAuthOpen(true);
     });
   }, [code]);
+  useEffect(()=>{
+    if(!code)return;
+    const expiry=getSessionExpiryMs(),remaining=expiry-Date.now();
+    if(!expiry||remaining<=0){void handleLogout();return}
+    const timer=window.setTimeout(()=>void handleLogout(),remaining);
+    const expired=()=>void handleLogout();
+    window.addEventListener('ashour:session-expired',expired);
+    return()=>{window.clearTimeout(timer);window.removeEventListener('ashour:session-expired',expired)};
+  },[code]);
+
 
   async function finishSocialSession():Promise<'ready'|'pending'|'none'>{
     let headerJwt='';
@@ -322,6 +335,7 @@ export default function App() {
     clearAccessCode();
     clearSessionToken();
     setCode('');
+    setPublicMode(false);
     setAuthOpen(false);
     setPublicView('الرئيسية');
     setActiveTab('overview');
@@ -356,8 +370,8 @@ export default function App() {
     try{setError('');const data=await apiGet<any>(`/api/ops?action=evaluations&from=${range.from}&to=${range.to}`);setEvaluations(data)}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
   }
-  async function openStudentProfile(id:string){
-    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${recordMonth}`);setStudentProfile(data);goTab('studentProfile')}
+  async function openStudentProfile(id:string,month=recordMonth){
+    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${month}`);setStudentProfile(data);goTab('studentProfile')}
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
   }
   async function approveDay(circleId:string){
@@ -365,7 +379,7 @@ export default function App() {
     catch(err){setError(err instanceof Error?err.message:'تعذر اعتماد اليوم')}
   }
 
-  useEffect(()=>{if(code&&currentRole==='student'&&activeTab==='overview')goTab('selfService');if(code&&currentRole==='guardian'&&activeTab==='overview')goTab('guardian')},[code,currentRole]);
+  useEffect(()=>{if(code&&currentRole==='student'&&activeTab==='overview')goTab('studentProfile');if(code&&currentRole==='guardian'&&activeTab==='overview')goTab('guardian')},[code,currentRole]);
 
   useEffect(()=>{
     if(!code)return;
@@ -430,8 +444,8 @@ export default function App() {
   }, [circles, query]);
 
   return (
-    <main className={code?'adminApp':'publicApp'}>
-      {!code&&<header className="header">
+    <main className={code&&!publicMode?'adminApp':'publicApp'}>
+      {(!code||publicMode)&&<header className="header">
         <button className="brand" type="button" onClick={()=>setPublicView('الرئيسية')}>
           <img className="brandLogo" src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" />
           <div><b>حلقات عاشور بخاري</b><small>تعليم القرآن الكريم ومتابعة الحلقات</small></div>
@@ -439,10 +453,10 @@ export default function App() {
         <nav aria-label="التنقل الرئيسي">
           {['الرئيسية','عن الحلقات','الحلقات القرآنية','المعلمون','الطلاب','الإنجازات','الأخبار والفعاليات','الوسائط','تواصل معنا'].map(v=><button key={v} className={publicView===v?'active':''} onClick={()=>setPublicView(v)}>{v}</button>)}
         </nav>
-        <div className="headerActions"><button className="secondary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد</button><button className="login" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
+        <div className="headerActions">{code&&publicMode?<><button className="secondary" type="button" onClick={()=>setPublicMode(false)}>العودة للحساب</button><button className="login" type="button" onClick={handleLogout}>خروج</button></>:<><button className="secondary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد</button><button className="login" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></>}</div>
       </header>}
 
-      {!code ? <>
+      {(!code||publicMode) ? <>
         {publicView==='الرئيسية'&&<>
         <section className="topNews reveal reveal-up">
           <div className="topNewsRail">
@@ -611,9 +625,7 @@ export default function App() {
           <button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span>المكتبة</button>
           {['system_admin','center_manager','supervisor'].includes(currentRole)&&<button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">⚙</span>التشغيل والإعدادات</button>}</>}
           {currentRole==='student'&&<><div className="sidebarSectionLabel">بوابة الطالب</div>
-          <button className={activeTab==='selfService'?'selected':''} onClick={()=>goTab('selfService')}><span className="navDot">✓</span>تسجيل اليوم</button>
           <button className={activeTab==='studentProfile'?'selected':''} onClick={()=>goTab('studentProfile')}><span className="navDot">◇</span>ملفي القرآني</button>
-          <button className={activeTab==='quranJourney'?'selected':''} onClick={()=>goTab('quranJourney')}><span className="navDot">▦</span>رحلتي مع القرآن</button>
           <button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span>تقييمي</button>
           <button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span>مهامي وجوائزي</button>
           <button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span>الإشعارات</button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span>تقاريري</button>
@@ -623,12 +635,12 @@ export default function App() {
           {isRoot&&<><div className="sidebarSectionLabel">النظام والمحتوى</div>
           <button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span>الأدوار والصلاحيات</button>
           <button className={activeTab==='news'?'selected':''} onClick={()=>goTab('news')}><span className="navDot">▧</span>الأخبار والفعاليات</button></>}
-          <button className={activeTab==='profile'?'selected':''} onClick={()=>goTab('profile')}><span className="navDot">◉</span>الملف الشخصي</button><div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>جلسة دخول نشطة</small></div><button className="exit" onClick={handleLogout}>خروج</button></div>
+          <button className={activeTab==='profile'?'selected':''} onClick={()=>goTab('profile')}><span className="navDot">◉</span>الملف الشخصي</button><div className="sidebarAccount"><span className="onlineDot"></span><div><b>{roleLabel[currentRole]||'مستخدم'}</b><small>الجلسة تنتهي بعد 30 دقيقة</small></div><button className="accountHome" title="الواجهة الرئيسية" onClick={()=>{setPublicMode(true);setPublicView('الرئيسية')}}>⌂</button><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
           <div className="adminTopbar">
             <div className="crumb"><span className="crumbPath">لوحة التحكم / {tabMeta[activeTab].short}</span><h1>{tabMeta[activeTab].title}</h1><p>{tabMeta[activeTab].subtitle}</p></div>
-            <div className="adminTopActions"><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
+            <div className="adminTopActions"><button className="secondary" type="button" onClick={()=>{setPublicMode(true);setPublicView('الرئيسية')}}>⌂ الواجهة الرئيسية</button><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
           </div>
           {error&&<div className="notice">{error}</div>}
           {activeTab==='overview'&&<><div className="kpis"><article><span>الطلاب</span><b>{typeof summary?.students==='number'?<CountUp value={summary.students}/>: '—'}</b><small>طالب مسجل</small></article><article><span>المعلمون</span><b>{typeof summary?.teachers==='number'?<CountUp value={summary.teachers}/>: '—'}</b><small>معلم في النظام</small></article><article><span>الحلقات</span><b>{typeof summary?.circles==='number'?<CountUp value={summary.circles}/>: '—'}</b><small>حلقة قرآنية</small></article><article><span>المراكز</span><b>{typeof summary?.centers==='number'?<CountUp value={summary.centers}/>: '—'}</b><small>مركز وفرع</small></article></div>{isStaff&&<AgreedFeatures mode="interventions" currentRole={currentRole} students={students}/>}</>}
@@ -653,7 +665,7 @@ export default function App() {
             </>}
             {activeTab==='circleRegister'&&<>
               <div className="opsToolbar"><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{setRecordMonth(e.target.value);loadCircleRegister(e.target.value)}} /></label><button className="secondary" type="button" onClick={()=>loadCircleRegister()}>تحديث السجل</button></div>
-              <CircleWeeklyRegister data={circleRegister} month={recordMonth} onProfile={openStudentProfile}/>
+              <CircleWeeklyRegister data={circleRegister} month={recordMonth} onProfile={openStudentProfile} onRefresh={()=>loadCircleRegister(recordMonth)}/>
             </>}
             {activeTab==='evaluations'&&<>
               <div className="opsToolbar"><label className="field"><span>من</span><input type="date" value={evaluationRange.from} onChange={e=>setEvaluationRange(x=>({...x,from:e.target.value}))} /></label><label className="field"><span>إلى</span><input type="date" value={evaluationRange.to} onChange={e=>setEvaluationRange(x=>({...x,to:e.target.value}))} /></label><button className="primary" type="button" onClick={()=>loadEvaluations()}>حساب التقييم</button></div>
@@ -661,12 +673,14 @@ export default function App() {
               <GenericTable rows={evaluations.rows||[]} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['new_grade','الحفظ %'],['review_grade','المراجعة %'],['attendance_score','الانضباط'],['daily_score','النتيجة']]}/>
             </>}
             {activeTab==='studentProfile'&&<>
-              {isStaff&&<div className="opsToolbar"><label className="field profileSelect"><span>اختر الطالب</span><select defaultValue="" onChange={e=>e.target.value&&openStudentProfile(e.target.value)}><option value="">اختر طالبًا...</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name} — {s.circle_name||'بدون حلقة'}</option>)}</select></label></div>}
-              {!studentProfile?<div className="emptyState">اختر طالبًا لعرض ملفه القرآني.</div>:<>
-                <div className="studentProfileHero"><div><span>الطالب</span><h2>{studentProfile.student?.full_name}</h2><p>{studentProfile.student?.center_name||'—'} • {studentProfile.student?.circle_name||'بدون حلقة'}</p></div><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{setRecordMonth(e.target.value);openStudentProfile(studentProfile.student.id)}} /></label></div>
-                <div className="kpis compactOpsKpis"><article><span>الحضور</span><b>{studentProfile.attendance?.total?Math.round(100*Number(studentProfile.attendance.attended||0)/Number(studentProfile.attendance.total)):0}%</b><small>غياب {studentProfile.attendance?.absent||0}</small></article><article><span>الحفظ الجديد</span><b>{studentProfile.quran?.new_sessions||0}</b><small>{studentProfile.quran?.new_ayahs||0} آية</small></article><article><span>المراجعة</span><b>{studentProfile.quran?.review_sessions||0}</b><small>{studentProfile.quran?.review_ayahs||0} آية</small></article><article><span>متوسط الأداء</span><b>{studentProfile.quran?.average_grade||0}%</b><small>خلال الشهر</small></article></div>
-                <h3>السجل القرآني الأخير</h3><GenericTable rows={studentProfile.recent||[]} columns={[[ 'record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>
-                <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
+              {currentRole==='student'?<StudentQuranProfile data={studentProfile} month={recordMonth} onMonthChange={m=>{setRecordMonth(m);openStudentProfile('me',m)}} onRefresh={()=>openStudentProfile('me',recordMonth)}/>:<>
+                {isStaff&&<div className="opsToolbar"><label className="field profileSelect"><span>اختر الطالب</span><select defaultValue="" onChange={e=>e.target.value&&openStudentProfile(e.target.value)}><option value="">اختر طالبًا...</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name} — {s.circle_name||'بدون حلقة'}</option>)}</select></label></div>}
+                {!studentProfile?<div className="emptyState">اختر طالبًا لعرض ملفه القرآني.</div>:<>
+                  <div className="studentProfileHero"><div><span>الطالب</span><h2>{studentProfile.student?.full_name}</h2><p>{studentProfile.student?.center_name||'—'} • {studentProfile.student?.circle_name||'بدون حلقة'}</p></div><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{const m=e.target.value;setRecordMonth(m);openStudentProfile(studentProfile.student.id,m)}} /></label></div>
+                  <div className="kpis compactOpsKpis"><article><span>الحضور</span><b>{studentProfile.attendance?.total?Math.round(100*Number(studentProfile.attendance.attended||0)/Number(studentProfile.attendance.total)):0}%</b><small>غياب {studentProfile.attendance?.absent||0}</small></article><article><span>الحفظ الجديد</span><b>{studentProfile.quran?.new_sessions||0}</b><small>{studentProfile.quran?.new_ayahs||0} آية</small></article><article><span>المراجعة</span><b>{studentProfile.quran?.review_sessions||0}</b><small>{studentProfile.quran?.review_ayahs||0} آية</small></article><article><span>متوسط الأداء</span><b>{studentProfile.quran?.average_grade||0}%</b><small>خلال الشهر</small></article></div>
+                  <h3>السجل القرآني الأخير</h3><GenericTable rows={studentProfile.recent||[]} columns={[[ 'record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>
+                  <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
+                </>}
               </>}
             </>}
             {['selfService','motivation','competitions','notifications','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
@@ -675,7 +689,7 @@ export default function App() {
           </div>
         </section>
       </div>}
-      {!code&&<footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>}
+      {(!code||publicMode)&&<footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>}
     </main>
   );
 }

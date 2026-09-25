@@ -28,7 +28,7 @@ export function issueAdminSession(input: { sub: string; userId: string; role?: A
     sub: input.sub,
     userId: input.userId,
     role: input.role || 'system_admin',
-    exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+    exp: Math.floor(Date.now() / 1000) + 30 * 60,
   };
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
   return `ashour1.${encoded}.${signValue(encoded)}`;

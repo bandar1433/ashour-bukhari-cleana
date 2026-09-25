@@ -3,6 +3,44 @@ import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
 import { json } from '../_lib/http.js';
 import { scopedStudent,today } from './shared.js';
 
+const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
+function scoreDay(r:any){
+  const reviewTarget=targetPages(r.review_target),newTarget=targetPages(r.new_target);
+  const reviewDone=Number(r.review?.page_count||0),newDone=Number(r.new_record?.page_count||0);
+  const hasPlan=reviewTarget>0||newTarget>0;
+  const attendanceScore=r.status==='excused'?null:r.status==='absent'?0:r.status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
+  const reviewScore=reviewTarget>0?Math.min(40,Math.round(40*reviewDone/reviewTarget)):40;
+  const newScore=newTarget>0?Math.min(30,Math.round(30*newDone/newTarget)):30;
+  const totalTarget=reviewTarget+newTarget,totalDone=reviewDone+newDone;
+  return {...r,review_target_pages:reviewTarget,new_target_pages:newTarget,review_done:reviewDone,new_done:newDone,
+    review_remaining:Math.max(0,reviewTarget-reviewDone),new_remaining:Math.max(0,newTarget-newDone),
+    progress:totalTarget>0?Math.min(100,Math.round(100*totalDone/totalTarget)):null,
+    attendance_score:attendanceScore,review_score:reviewScore,new_score:newScore,
+    daily_score:!hasPlan||attendanceScore===null?null:attendanceScore+reviewScore+newScore};
+}
+async function studentDayRows(studentId:string,circleId:string|null,from:string,to:string){
+  const rows=await query<any>(`with days as (
+    select g.day::date record_date,
+      (g.day::date-((extract(dow from g.day)::int+1)%7))::date week_start,
+      case extract(dow from g.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
+    from generate_series($2::date,$3::date,'1 day') g(day) where extract(dow from g.day)<>5
+  )
+  select d.record_date,d.week_start,d.day_name,a.status,a.late_minutes,a.check_in_at,a.check_out_at,
+    exists(select 1 from day_approvals da where da.circle_id=$4::uuid and da.approval_date=d.record_date) approved,
+    exists(select 1 from weekly_locks wl where wl.circle_id=$4::uuid and wl.week_start=d.week_start) week_locked,
+    w.new_target,w.review_target,w.goals,
+    (select json_build_object('id',m.id,'surah_no',m.surah_no,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count)
+      from memorization_records m where m.student_id=$1 and m.record_date=d.record_date and m.record_type='review' order by m.created_at desc limit 1) review,
+    (select json_build_object('id',m.id,'surah_no',m.surah_no,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count)
+      from memorization_records m where m.student_id=$1 and m.record_date=d.record_date and m.record_type='new' order by m.created_at desc limit 1) new_record
+  from days d
+  left join attendance a on a.student_id=$1 and a.attendance_date=d.record_date
+  left join weekly_plans w on w.student_id=$1 and w.week_start=d.week_start and w.day_name=d.day_name
+  order by d.record_date`,[studentId,from,to,circleId]);
+  return rows.map(scoreDay);
+}
+
+
 export async function summary(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لعرض ملخص الإدارة.'});
@@ -35,7 +73,6 @@ export async function teacherToday(req:any,res:any,u:any){
   const ids=students.map((x:any)=>x.id);
   const planRows=ids.length?await query<any>('select student_id,new_target,review_target,goals from weekly_plans where student_id=any($1::uuid[]) and week_start=$2::date and day_name=$3 order by created_at desc',[ids,weekStart,dayName]):[];
   const planMap=new Map<string,any>();for(const p of planRows)if(!planMap.has(p.student_id))planMap.set(p.student_id,p);
-  const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\\d+(?:\\.\\d+)?$/.test(s))return Number(s);const m=s.match(/(\\d+)\\D+(\\d+)\\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
   const isFriday=dateObj.getUTCDay()===5;
   const scoredStudents=students.map((r:any)=>{const p=planMap.get(r.id)||{},reviewTarget=targetPages(p.review_target),newTarget=targetPages(p.new_target),reviewDone=Number(r.review_record?.page_count||0),newDone=Number(r.new_record?.page_count||0);
     const attendanceScore=isFriday?null:r.attendance_status==='excused'?null:r.attendance_status==='absent'?0:r.attendance_status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
@@ -54,13 +91,17 @@ export async function circleRegister(req:any,res:any,u:any){
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لهذه الشاشة.'});
   const month=validMonth(req.query?.month)||today().slice(0,7);
   const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,
-    coalesce(json_agg(json_build_object('date',d.day,'approved',exists(select 1 from day_approvals da where da.circle_id=h.id and da.approval_date=d.day),
+    coalesce(json_agg(json_build_object('date',d.day,
+    'approved',exists(select 1 from day_approvals da where da.circle_id=h.id and da.approval_date=d.day),
+    'week_locked',exists(select 1 from weekly_locks wl where wl.circle_id=h.id and wl.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date),
     'status',a.status,'late_minutes',coalesce(a.late_minutes,0),'check_in_at',a.check_in_at,'check_out_at',a.check_out_at,
-    'review',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',case when m.from_page is not null and m.to_page is not null then greatest(1,m.to_page-m.from_page+1) else null end,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='review' order by m.created_at desc limit 1),
-    'new',(select json_build_object('surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',case when m.from_page is not null and m.to_page is not null then greatest(1,m.to_page-m.from_page+1) else null end,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='new' order by m.created_at desc limit 1))
+    'review_target',(select w.review_target from weekly_plans w where w.student_id=s.id and w.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date and w.day_name=case extract(dow from d.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end order by w.created_at desc limit 1),
+    'new_target',(select w.new_target from weekly_plans w where w.student_id=s.id and w.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date and w.day_name=case extract(dow from d.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end order by w.created_at desc limit 1),
+    'review',(select json_build_object('id',m.id,'surah_no',m.surah_no,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',m.page_count) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='review' order by m.created_at desc limit 1),
+    'new',(select json_build_object('id',m.id,'surah_no',m.surah_no,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',m.page_count) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='new' order by m.created_at desc limit 1))
     order by d.day),'[]'::json) days
     from students s join circles h on h.id=s.circle_id cross join generate_series(($4||'-01')::date,(($4||'-01')::date+interval '1 month' - interval '1 day')::date,interval '1 day') d(day)
-    left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.status='active' and
+    left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.status='active' and extract(dow from d.day)<>5 and
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
     group by s.id,s.full_name,h.id,h.name order by h.name,s.full_name`,[u.role,u.center_id,u.id,month]);
   return json(res,200,{month,students});
@@ -105,16 +146,20 @@ export async function studentProfile(req:any,res:any,u:any){
     if(s){const names=(await query<any>(`select c.name center_name,h.name circle_name from students s left join centers c on c.id=s.center_id left join circles h on h.id=s.circle_id where s.id=$1`,[s.id]))[0];s={...s,...names}}
   }
   if(!s)return json(res,404,{error:'الطالب غير موجود أو خارج نطاق صلاحيتك'});
-  const month=validMonth(req.query?.month)||today().slice(0,7);
-  const [attendance,quran,plans,points,monthly,recent]=await Promise.all([
+  const month=validMonth(req.query?.month)||today().slice(0,7),monthStart=month+'-01';
+  const monthDate=new Date(monthStart+'T00:00:00Z'),monthEndDate=new Date(Date.UTC(monthDate.getUTCFullYear(),monthDate.getUTCMonth()+1,0)),monthEnd=monthEndDate.toISOString().slice(0,10);
+  const current=today(),currentDate=new Date(current+'T00:00:00Z'),offset=(currentDate.getUTCDay()+1)%7,weekStartDate=new Date(currentDate);weekStartDate.setUTCDate(weekStartDate.getUTCDate()-offset);
+  const weekEndDate=new Date(weekStartDate);weekEndDate.setUTCDate(weekEndDate.getUTCDate()+5);const weekStart=weekStartDate.toISOString().slice(0,10),weekEnd=weekEndDate.toISOString().slice(0,10);
+  const [attendance,quran,plans,points,monthly,recent,weekly]=await Promise.all([
     query<any>(`select count(*)::int total,count(*) filter(where status in ('present','late'))::int attended,count(*) filter(where status='absent')::int absent,count(*) filter(where status='late')::int late from attendance where student_id=$1 and to_char(attendance_date,'YYYY-MM')=$2`,[s.id,month]),
     query<any>(`select count(*) filter(where record_type='new')::int new_sessions,count(*) filter(where record_type='review')::int review_sessions,coalesce(sum(ayah_count) filter(where record_type='new'),0)::int new_ayahs,coalesce(sum(ayah_count) filter(where record_type='review'),0)::int review_ayahs,coalesce(round(avg(grade))::int,0) average_grade from memorization_records where student_id=$1 and to_char(record_date,'YYYY-MM')=$2`,[s.id,month]),
-    query<any>(`select * from weekly_plans where student_id=$1 order by week_start desc,id desc limit 14`,[s.id]),
+    query<any>(`select * from weekly_plans where student_id=$1 order by week_start desc,id desc limit 42`,[s.id]),
     query<any>(`select created_at,points,reason from points_ledger where student_id=$1 order by created_at desc limit 30`,[s.id]),
-    query<any>(`select d.day::date record_date,a.status,a.late_minutes,a.points_penalty,a.check_in_at,a.check_out_at,exists(select 1 from day_approvals da where da.circle_id=s.circle_id and da.approval_date=d.day) approved from students s cross join generate_series(($2||'-01')::date,(($2||'-01')::date+interval '1 month' - interval '1 day')::date,interval '1 day') d(day) left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.id=$1 order by d.day`,[s.id,month]),
-    query<any>(`select record_date,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,grade,notes from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 60`,[s.id])
+    studentDayRows(s.id,s.circle_id,monthStart,monthEnd),
+    query<any>(`select record_date,record_type,surah_no,to_surah_no,from_ayah,to_ayah,from_page,to_page,page_count,grade,notes from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 60`,[s.id]),
+    studentDayRows(s.id,s.circle_id,weekStart,weekEnd)
   ]);
-  return json(res,200,{student:s,month,attendance:attendance[0]||{},quran:quran[0]||{},plans,points,monthly,recent});
+  return json(res,200,{student:s,month,today:current,week_start:weekStart,week_end:weekEnd,attendance:attendance[0]||{},quran:quran[0]||{},plans,points,monthly,recent,weekly});
 }
 
 export async function dayApprove(req:any,res:any,u:any){
