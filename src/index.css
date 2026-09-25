@@ -369,3 +369,9 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
 .sidebarAccount{grid-template-columns:auto 1fr auto auto}.sidebarAccount .accountHome{margin:0;padding:6px 8px;color:#d9ebdf;background:rgba(255,255,255,.08);border-radius:7px;width:auto;font-size:14px}
 @media(max-width:960px){.studentWeekGrid{grid-template-columns:repeat(6,150px)}}
 @media(max-width:600px){.studentPlanHead,.studentMonthlyHead{align-items:flex-start;flex-direction:column}.studentMonthlyRegister{margin-inline:-4px}.studentMonthlyRegister table{min-width:1320px}}
+
+.pageSurahHint{display:block;margin-top:4px;color:#497261;font-size:9px;font-weight:700}
+.planRangeForm{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.planRangeBlock{grid-column:1/-1;border:1px solid var(--line);border-radius:14px;padding:14px;background:#fbfcfb}.planRangeBlock h3{margin:0 0 10px;color:var(--green-deep);font-size:13px}.planRangeBlock .mushafRange{margin:0}
+.planRangeText{display:block;color:#315f50!important;font-weight:700;line-height:1.5}
+.registerAttendanceCell{display:grid;gap:3px;width:100%;padding:5px;background:transparent;color:inherit;text-align:center}.registerAttendanceCell b{font-size:10px}.registerAttendanceCell small{font-size:8px;color:#74837d}.registerAttendanceCell:disabled{opacity:.65;cursor:default}
+@media(max-width:720px){.planRangeForm{grid-template-columns:1fr}.planRangeBlock{grid-column:1}}

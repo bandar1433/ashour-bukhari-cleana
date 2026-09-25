@@ -18,7 +18,7 @@ async function ensureTables(){
   )`);
 }
 function validYoutube(value:any){const v=String(value||'').trim();if(!/^https:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(v))throw new Error('أدخل رابط YouTube صالحًا');return v}
-function targetPages(value:any){const s=String(value||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0}
+function targetPages(value:any){const s=String(value||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const pref=s.match(/^(\d+(?:\.\d+)?)\s*\|/);if(pref)return Number(pref[1]);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0}
 
 export async function features(req:any,res:any,u:any){
   const sub=String(req.query?.sub||'');await ensureTables();
@@ -53,10 +53,10 @@ export async function features(req:any,res:any,u:any){
       coalesce((select sum(m.page_count)::numeric from memorization_records m where m.student_id=s.id and m.record_type='new' and m.record_date between $1 and $2),0) new_pages,
       coalesce((select sum(m.page_count)::numeric from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date between $1 and $2),0) review_pages,
       coalesce((select count(*)::int from attendance a where a.student_id=s.id and a.status='absent' and a.attendance_date between $1 and $2),0) absences,
-      coalesce((select sum(case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end)
+      coalesce((select sum(case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?\\s*\\|' then trim(split_part(w.new_target,'|',1))::numeric when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end)
         from weekly_plans w where w.student_id=s.id and
         (w.week_start + case w.day_name when 'السبت' then 0 when 'الأحد' then 1 when 'الاثنين' then 2 when 'الثلاثاء' then 3 when 'الأربعاء' then 4 when 'الخميس' then 5 else 0 end) between $1::date and $2::date),0) planned_new,
-      coalesce((select sum(case when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?$' then w.review_target::numeric else 0 end)
+      coalesce((select sum(case when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?\\s*\\|' then trim(split_part(w.review_target,'|',1))::numeric when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?$' then w.review_target::numeric else 0 end)
         from weekly_plans w where w.student_id=s.id and
         (w.week_start + case w.day_name when 'السبت' then 0 when 'الأحد' then 1 when 'الاثنين' then 2 when 'الثلاثاء' then 3 when 'الأربعاء' then 4 when 'الخميس' then 5 else 0 end) between $1::date and $2::date),0) planned_review,
       coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between current_date-6 and current_date),0) current_avg,

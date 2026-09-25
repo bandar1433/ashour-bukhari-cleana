@@ -3,7 +3,7 @@ import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
 import { json } from '../_lib/http.js';
 import { scopedStudent,today } from './shared.js';
 
-const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
+const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const pref=s.match(/^(\d+(?:\.\d+)?)\s*\|/);if(pref)return Number(pref[1]);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
 function scoreDay(r:any){
   const reviewTarget=targetPages(r.review_target),newTarget=targetPages(r.new_target);
   const reviewDone=Number(r.review?.page_count||0),newDone=Number(r.new_record?.page_count||0);
@@ -116,8 +116,9 @@ export async function evaluations(req:any,res:any,u:any){
     from students s cross join generate_series($4::date,$5::date,'1 day') d where extract(dow from d)<>5 and
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
   ), plan as (
-    select d.student_id,d.record_day,case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end new_target,
-      case when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?$' then w.review_target::numeric else 0 end review_target
+    select d.student_id,d.record_day,
+      case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?\\s*\\|' then trim(split_part(w.new_target,'|',1))::numeric when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end new_target,
+      case when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?\\s*\\|' then trim(split_part(w.review_target,'|',1))::numeric when coalesce(w.review_target,'')~'^\\d+(\\.\\d+)?$' then w.review_target::numeric else 0 end review_target
     from days d left join weekly_plans w on w.student_id=d.student_id and w.week_start=d.week_start and w.day_name=d.day_name
   ), done as (
     select student_id,record_date,sum(case when record_type='new' then coalesce(page_count,0) else 0 end)::numeric new_pages,
