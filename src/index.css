@@ -386,3 +386,34 @@ form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1
 
 /* Interactive operational numbers */
 .interactiveKpis .metricAction{position:relative;text-align:right;border:1px solid #e2e8e4;background:#fff;border-radius:13px;padding:18px;min-height:122px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}.interactiveKpis .metricAction:hover{transform:translateY(-2px);border-color:#b9cbc4;box-shadow:0 10px 24px rgba(22,61,50,.07)}.interactiveKpis .metricAction:focus-visible{outline:3px solid rgba(184,145,61,.24);outline-offset:2px}.interactiveKpis .metricAction span{font-size:11px;color:#718079}.interactiveKpis .metricAction b{font-size:28px;color:#173f35;margin:5px 0}.interactiveKpis .metricAction small{font-size:10px;color:#849089}.interactiveKpis .metricAction em{font-style:normal;font-size:9px;color:#96742f;margin-top:8px;opacity:0;transform:translateX(4px);transition:.16s}.interactiveKpis .metricAction:hover em,.interactiveKpis .metricAction:focus-visible em{opacity:1;transform:none}
+
+/* Phase 2 — unified institutional workspace */
+:root{--workspace-bg:#f4f7f5;--surface:#fff;--line:#e1e8e4;--ink:#173f35;--muted:#718079;--accent:#9a772f}
+.workspacePro{background:var(--workspace-bg)}
+.dashboardContent{min-width:0}
+.institutionalPanelHead{align-items:flex-end}.institutionalPanelHead>div:first-child{display:grid;gap:3px}.institutionalPanelHead small{font-size:11px;color:var(--muted);font-weight:500}
+.panel,.editPanel,.miniOpsForm,.studentProfileHero,.studentPlanHead,.studentMonthlyHead,.weeklyRegisterBlock{border-color:var(--line)!important;box-shadow:none!important}
+.panel{background:var(--surface)}
+.panelHead h2,.panelHead h3,.studentProfileHero h2,.studentPlanHead h3,.studentMonthlyHead h3{color:var(--ink)}
+.panelEyebrow,.studentProfileHero>div>span,.studentPlanHead>div>span,.studentMonthlyHead>div>span{color:var(--accent);font-weight:800;letter-spacing:0}
+.opsToolbar{background:#f8faf9;border:1px solid var(--line);border-radius:12px;padding:12px;gap:10px;align-items:end}
+.field{gap:6px}.field span{font-size:10px;font-weight:800;color:#53655e}
+input,select,textarea{border:1px solid #d9e2dd!important;border-radius:9px!important;background:#fff!important;min-height:40px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#9db8ad!important;box-shadow:0 0 0 3px rgba(38,91,73,.08)}
+.primary,.secondary,.tableAction,.registerAttendanceCell,.registerEditCell,.studentQuranCell,.taskDoneButton{transition:transform .12s ease,background .15s,border-color .15s,box-shadow .15s}
+.primary:hover:not(:disabled),.secondary:hover:not(:disabled){transform:translateY(-1px)}
+.primary:focus-visible,.secondary:focus-visible,.tableAction:focus-visible,.registerAttendanceCell:focus-visible,.registerEditCell:focus-visible,.studentQuranCell:focus-visible{outline:3px solid rgba(154,119,47,.18);outline-offset:2px}
+.table-wrap{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:auto;box-shadow:none}
+table{border-collapse:separate;border-spacing:0;width:100%}th{position:sticky;top:0;z-index:2;background:#f3f7f5!important;color:#36564c!important;font-size:10px!important;font-weight:800!important;border-bottom:1px solid #dce5e0!important}td{border-bottom:1px solid #edf1ef!important;vertical-align:middle}tbody tr{transition:background .12s}tbody tr:hover{background:#f8fbf9}.todayRow{background:#fffaf0!important}
+.empty{border:1px dashed #cfdad4;border-radius:12px;background:#fafcfb;color:#77867f;padding:28px;text-align:center}
+.studentProfileHero{background:linear-gradient(135deg,#173f35,#245747)!important;color:#fff;border-radius:15px!important;padding:20px!important}.studentProfileHero h2,.studentProfileHero p,.studentProfileHero .field span{color:#fff!important}.studentProfileHero>div>span{color:#dfc47e!important}
+.studentPlanHead,.studentMonthlyHead{margin-top:20px;padding:15px 17px;background:#f8faf9;border:1px solid var(--line);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.studentWeekGrid{gap:10px}.studentDayPlan{border-radius:12px!important;box-shadow:none!important;border:1px solid var(--line)!important}
+.profileSubhead{margin:24px 0 10px;padding-right:10px;border-right:3px solid #b18a38;color:var(--ink)}
+.weeklyRegisterHeading{padding:14px 16px;background:#f5f8f6;border-bottom:1px solid var(--line)}.weeklyRegisterTable .studentSticky{background:#fbfcfb!important}.weeklyRegisterTable .summaryCell{background:#faf8f1!important}
+.teacherDailyUnified td small,.studentMonthlyRegister td small{display:block;margin-top:5px;color:#7b8983;line-height:1.5}
+.editPanel{margin-top:18px;border-radius:14px!important;background:#fff}.editPanel .panelHead{background:#f8faf9;border-radius:14px 14px 0 0;padding:14px}
+.quickForm{gap:12px;padding-top:4px}.quickForm .primary{min-height:42px}
+@media(max-width:1100px){.dashboardContent{padding:22px 20px 40px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.studentWeekGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.workspacePro{display:block}.adminSidebar{position:relative!important;top:auto!important;height:auto!important;max-height:none!important;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:12px}.sidebarBrand,.sidebarAccount{grid-column:1/-1}.sidebarSectionLabel{grid-column:1/-1;padding-top:10px}.adminSidebar>button{width:100%;justify-content:flex-start}.dashboardContent{padding:14px}.adminTopbar{align-items:flex-start;gap:10px}.crumb h1{font-size:22px}.mainPanel{padding:14px!important}.institutionalPanelHead{align-items:flex-start;flex-direction:column}.searchBox{width:100%}.searchBox input{width:100%}.kpis{grid-template-columns:1fr 1fr}.interactiveKpis .metricAction{min-height:105px;padding:13px}.interactiveKpis .metricAction b{font-size:23px}.studentProfileHero,.studentPlanHead,.studentMonthlyHead{align-items:flex-start;flex-direction:column}.studentWeekGrid{grid-template-columns:1fr 1fr}.opsToolbar{display:grid;grid-template-columns:1fr}.opsToolbar>*{width:100%}.quickForm{grid-template-columns:1fr!important}.table-wrap{border-radius:10px}th,td{white-space:nowrap}.teacherDailyUnified{max-height:72vh}.weeklyRegisterScroll{max-height:72vh}}
+@media(max-width:430px){.adminSidebar{grid-template-columns:1fr}.sidebarBrand,.sidebarAccount,.sidebarSectionLabel{grid-column:1}.kpis,.studentWeekGrid{grid-template-columns:1fr}.dashboardContent{padding:10px}.mainPanel{padding:11px!important}.studentProfileHero{padding:16px!important}}
