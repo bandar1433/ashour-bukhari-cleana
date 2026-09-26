@@ -501,32 +501,16 @@ export default function App() {
         </section>
         </>}
         {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<>
-          <AboutSections/>
-          <section className="report1447">
-            <div className="sectionHead"><div><span>حصاد 1447هـ</span><h2>حلقات تمتد من مكة إلى العالم</h2></div></div>
-            <div className="reportStats">{report1447.stats.map(([n,l])=><article key={l}><b><CountUp value={Number(n)}/></b><span>{l}</span></article>)}</div>
-            <SitePhoto src={siteImages['nationalities']} alt="خريطة جنسيات طلاب حلقات عاشور بخاري" className="reportMap" />
-            <div className="sectionHead reportSubhead"><div><span>المسارات</span><h2>تعليم قرآني متدرج</h2></div></div>
-            <div className="reportGallery">{[['talqeen','مسار التلقين والتهجي'],['hifz','مسار حفظ القرآن'],['itqan','مسار الإتقان'],['qiraat','مسار القراءات العشر']].map(([key,title])=><SitePhoto key={key} src={siteImages[key]} alt={title} />)}</div>
-            <div className="sectionHead reportSubhead"><div><span>أخبار الحلقات</span><h2>برامج مصاحبة تصنع الأثر</h2></div></div>
-            <div className="reportCards">{report1447.news.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['madinah','iftar','recreation','khatm','eid'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div>
-            <div className="sectionHead reportSubhead"><div><span>إنجازات عالمية ومتميزة</span><h2>نماذج من حصاد طلاب الحلقات</h2></div></div>
-            <div className="reportCards achievements">{report1447.achievements.map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-tanzania','achievement-omar'][i]]} alt={t} /><div><h3>{t}</h3><p>{b}</p></div></article>)}</div>
+          <section className="homeAboutBrief">
+            <div><span>عن الحلقات</span><h2>تعليم القرآن بإتقان،<br/>ومتابعة تحفظ أثر التعلم.</h2></div>
+            <div><p>حلقات عاشور بخاري منظومة تعليمية تربوية تعتني بالتلاوة والحفظ والمراجعة، وتربط العمل اليومي بمسار واضح للطالب والمعلم والأسرة.</p><button type="button" onClick={()=>setPublicView('عن الحلقات')}>تعرف على الحلقات ←</button></div>
           </section>
-          <section className="section portalsSection">
-            <div className="sectionHead"><div><span>صلاحيات المنصة</span><h2>دخول واحد موحد لجميع المستخدمين</h2></div><button className="secondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
-            <div className="roleGrid">{[
-              ['ولي الأمر','متابعة الحضور والإنجاز والتقارير'],
-              ['الطالب','تعلم ومراجعة وإنجاز'],
-              ['المعلم','إدارة الحلقة والطلاب'],
-              ['المشرف','متابعة الأداء التعليمي'],
-              ['مدير المركز','إدارة المركز والحلقات'],
-              ['المدير','إدارة ومتابعة النظام']
-            ].map(([title,description],index)=><article className="roleCard reveal reveal-up" style={{animationDelay:`${0.12+index*0.08}s`}} key={title}><i>◈</i><b>{title}</b><small>{description}</small><em>تظهر الصلاحيات تلقائيًا بعد الدخول</em></article>)}</div>
+          <section className="homeAchievementRow">
+            {report1447.achievements.slice(0,3).map(([t,b],i)=><article key={t}><SitePhoto src={siteImages[['achievement-anas','achievement-russia','achievement-omar'][i]]} alt={t}/><div><span>إنجاز</span><h3>{t}</h3><p>{b}</p></div></article>)}
           </section>
-          <section className="featureBand reveal reveal-up">
-            <div><span>منظومة واحدة لكل المسيرة</span><h2>من أول حفظ ومراجعة إلى تقرير الأسرة</h2><p>تجمع المنصة الحضور والحفظ الجديد والمراجعة والنقاط والتقارير في تجربة واحدة؛ لتصبح المعلومة أقرب والقرار أسرع والمتابعة أدق.</p><button className="featureCta" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>ابدأ من لوحة المنصة</button></div>
-            <div className="featureList">{['تسجيل ومتابعة الحفظ الجديد والمراجعة','متابعة الحضور والحالة اليومية','نقاط وجوائز تحفّز الاستمرار','تقارير قابلة للطباعة والحفظ','صلاحيات مستقلة للإدارة والمعلم والأسرة'].map(item=><p key={item}>✓ {item}</p>)}</div>
+          <section className="homeFinalCta">
+            <div><span>ابدأ رحلتك</span><h2>بيئة قرآنية واحدة.<br/>مسيرة أوضح.</h2><p>سجّل في الحلقات أو ادخل إلى حسابك لمتابعة مسيرتك.</p></div>
+            <div><button className="homePrimary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد ←</button><button className="homeSecondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button></div>
           </section>
         </>}
         {publicView==='الحلقات القرآنية'&&<section className="section"><div className="innerHero"><span className="sectionLabel">الحلقات القرآنية</span><h1>مسارات تعليمية تناسب مراحل الطلاب</h1><p>من التهجي والتلقين إلى الحفظ والإتقان والقراءات.</p></div><div className="roleGrid">{['مسار التهجي والتلقين','مسار حفظ القرآن للأشبال','مسار حفظ القرآن للشباب','مسار حفظ القرآن والمتون','مسار القراءات'].map((x,i)=><article className="roleCard" key={x}><i>◈</i><b>{x}</b><small>{i===0?'تأسيس القراءة والتلقين الصحيح':'حفظ جديد ومراجعة وفق خطة متدرجة'}</small></article>)}</div><div className="sectionHead reportSubhead"><div><span>الحلقات المسجلة</span><h2>الحلقات النشطة في المنصة</h2></div></div><div className="roleGrid">{publicData.circles?.map((x:any)=><article className="roleCard" key={x.id}><b>{x.name}</b><small>{x.center_name||'—'}</small><em>{x.teacher_name||'لم يحدد المعلم'}</em></article>)}</div></section>}
