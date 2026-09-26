@@ -450,60 +450,55 @@ export default function App() {
 
       {(!code||publicMode) ? <>
         {publicView==='الرئيسية'&&<>
-        <section className="topNews reveal reveal-up">
-          <div className="topNewsRail">
-            <div className="topNewsRailTitle"><span className="newsPulse"></span><b>آخر الأخبار</b></div>
-            <span>مستجدات حلقات عاشور بخاري</span>
-            <small>{String(announcementIndex%announcements.length+1).padStart(2,'0')} / {String(announcements.length).padStart(2,'0')}</small>
-          </div>
-          <div className="topNewsMedia">
-            <SitePhoto src={announcementImage(activeAnnouncement)} alt={activeAnnouncement?.title||'آخر أخبار الحلقات'} />
-          </div>
-          <article className="topNewsSlide" key={activeAnnouncement?.id||announcementIndex}>
-            <div className="topNewsInfo">
-              <span className="newsBadge">{activeAnnouncement?.kind==='achievement'?'إنجاز':activeAnnouncement?.kind==='event'?'فعالية':'خبر'}</span>
-              <time>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'حديثًا'}</time>
+        <section className="homeCommandHero">
+          <div className="homeCommandCopy">
+            <span className="homeOverline">من مكة المكرمة · تعليم قرآني برؤية رقمية</span>
+            <h1>نبني رحلة قرآنية<br/><em>واضحة، متقنة، ومستمرة.</em></h1>
+            <p>حلقات عاشور بخاري تجمع الطالب والمعلم والأسرة والإدارة في منظومة واحدة؛ من الخطة اليومية إلى قياس الإنجاز وصناعة الأثر.</p>
+            <div className="homeCommandActions">
+              <button className="homePrimary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>ابدأ التسجيل <span>←</span></button>
+              <button className="homeSecondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button>
             </div>
-            <h2>{activeAnnouncement?.title}</h2>
-            <p>{activeAnnouncement?.body}</p>
-          </article>
-          <div className="topNewsControls">
-            <button className="newsArrow" type="button" aria-label="الخبر السابق" onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>→</button>
-            <div className="newsDots">{announcements.map((_:any,i:number)=><button type="button" aria-label={`الخبر ${i+1}`} key={i} className={i===announcementIndex%announcements.length?'active':''} onClick={()=>setAnnouncementIndex(i)} />)}</div>
-            <button className="newsArrow" type="button" aria-label="الخبر التالي" onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>←</button>
-            <button type="button" className="allNewsButton" onClick={()=>setPublicView('الأخبار والفعاليات')}>جميع الأخبار <span>←</span></button>
+            <div className="homeTrust"><span>◉ متابعة يومية</span><span>◉ مصحف المدينة</span><span>◉ تقارير وتحفيز</span></div>
+          </div>
+          <div className="homeCommandVisual">
+            <div className="homeVisualBrand"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="حلقات عاشور بخاري"/><div><small>حلقات عاشور بخاري</small><b>القرآن في قلب الرحلة</b></div></div>
+            <div className="homeLiveGrid">
+              <article><span>الطلاب</span><b><CountUp value={Number(publicData?.stats?.students||447)}/></b><small>رحلة تعلم ومتابعة</small></article>
+              <article><span>الحلقات</span><b><CountUp value={Number(publicData?.stats?.circles||16)}/></b><small>بيئات تعليم نشطة</small></article>
+              <article><span>المعلمون</span><b><CountUp value={Number(publicData?.stats?.teachers||18)}/></b><small>تعليم وإشراف</small></article>
+              <article><span>الجنسيات</span><b><CountUp value={61}/></b><small>أثر يمتد إلى العالم</small></article>
+            </div>
+            <div className="homeVisualProgress"><div><span>رحلة الطالب</span><b>حفظ · مراجعة · إتقان</b></div><div className="homeProgressTrack"><i></i></div><small>متابعة متصلة من الخطة إلى التقرير</small></div>
           </div>
         </section>
 
-        <section className="hero legacyHero">
-          <div className="heroText">
-            <span className="eyebrow reveal reveal-right delay-1">بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيمِ</span>
-            <div className="heroKicker reveal reveal-right delay-1">قرآن • تربية • متابعة • أثر</div>
-            <h1 className="reveal reveal-right delay-2">حلقات عاشور بخاري</h1>
-            <h2 className="reveal reveal-right delay-3">منصة تجمع التعليم والإدارة والمتابعة في مكان واحد</h2>
-            <p className="reveal reveal-right delay-4">بيئة رقمية متكاملة لخدمة حلقات القرآن الكريم، وبناء جيل متصل بكتاب الله علمًا وعملًا.</p>
-            <div className="heroHighlights reveal reveal-up delay-4"><span>✓ متابعة يومية</span><span>✓ تقارير دقيقة</span><span>✓ صلاحيات آمنة</span></div>
-            <div className="actions reveal reveal-up delay-5">
-              <button className="primary" type="button" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setAuthOpen(true);setError('')}}>تسجيل جديد</button>
-              <button className="secondary" type="button" onClick={()=>{setAuthIntent('signin');setAuthOpen(true);setError('')}}>دخول المنصة</button>
-            </div>
-          </div>
-          <div className="heroArt reveal reveal-left delay-2">
-            <div className="heroLogoCard">
-              <img className="heroLogo" src="/resources/logo-halaqat-ashour-bukhari.png" alt="شعار حلقات عاشور بخاري" />
-            </div>
+        <section className="homeImpactStrip">
+          <article><b>01</b><div><strong>منصة واحدة</strong><small>للطالب والمعلم والأسرة والإدارة</small></div></article>
+          <article><b>04</b><div><strong>مسارات قرآنية</strong><small>تلقين · حفظ · إتقان · قراءات</small></div></article>
+          <article><b>604</b><div><strong>صفحات المصحف</strong><small>متابعة دقيقة وفق مصحف المدينة</small></div></article>
+          <article><b>24/7</b><div><strong>سجل رقمي</strong><small>يحفظ مسيرة الطالب ويقيس تقدمه</small></div></article>
+        </section>
+
+        <section className="homePathways">
+          <div className="homeSectionIntro"><span>المسارات التعليمية</span><h2>كل طالب يبدأ من مستواه<br/>ويتقدم بخطة واضحة.</h2><p>مسارات مترابطة تراعي التأسيس والحفظ والتثبيت والإتقان، وتمنح المعلم أدوات متابعة عملية.</p></div>
+          <div className="homePathGrid">
+            {homeMediaCards.slice(0,4).map(([key,title,desc],i)=><button type="button" className="homePathCard" key={key} onClick={()=>setPublicView('الحلقات القرآنية')}><SitePhoto src={siteImages[key]} alt={title}/><span>0{i+1}</span><div><h3>{title}</h3><p>{desc}</p><b>استكشف المسار ←</b></div></button>)}
           </div>
         </section>
 
-        <section className="stats platformStats">
-          {[
-            ['01','منصة موحدة','لإدارة التعليم والمتابعة'],
-            ['04','مسارات قرآنية','تلقين • حفظ • إتقان • قراءات'],
-            ['01','دخول موحد','تظهر الصلاحيات حسب الحساب'],
-            ['04','محاور تشغيلية','تعليم • حضور • تقارير • تحفيز']
-          ].map(([number,label,detail],index)=><article key={label} className="statCard reveal reveal-up" style={{animationDelay:`${0.18+index*0.11}s`}}><b>{number}</b><span>{label}</span><small>{detail}</small></article>)}
+        <section className="homeJourneyDark">
+          <div className="homeJourneyIntro"><span>رحلة الطالب</span><h2>من أول لقاء<br/>إلى أثر يمكن قياسه.</h2><p>لا تتوقف الرحلة عند تسجيل الحفظ؛ بل تربط الخطة والحضور والمراجعة والتقييم والتحفيز في سجل واحد.</p></div>
+          <div className="homeJourneySteps">{journey.map(([n,t,x])=><article key={t}><b>{n}</b><div><h3>{t}</h3><p>{x}</p></div></article>)}</div>
         </section>
-        {publicData?.stats&&<section className="stats platformStats liveStats"><article><b><CountUp value={Number(publicData.stats.students||0)}/></b><span>طالب نشط</span></article><article><b><CountUp value={Number(publicData.stats.teachers||0)}/></b><span>معلم</span></article><article><b><CountUp value={Number(publicData.stats.circles||0)}/></b><span>حلقة</span></article><article><b><CountUp value={Number(publicData.stats.centers||0)}/></b><span>مركز</span></article></section>}
+
+        <section className="homeNewsStage">
+          <div className="homeSectionIntro compact"><span>من قلب الحلقات</span><h2>خبر وأثر وإنجاز.</h2></div>
+          <div className="homeNewsFeature">
+            <div className="homeNewsImage"><SitePhoto src={announcementImage(activeAnnouncement)} alt={activeAnnouncement?.title||'أخبار الحلقات'}/><span>{activeAnnouncement?.kind==='achievement'?'إنجاز':'حدث'}</span></div>
+            <article><small>{activeAnnouncement?.published_at?String(activeAnnouncement.published_at).slice(0,10):'حديثًا'}</small><h3>{activeAnnouncement?.title}</h3><p>{activeAnnouncement?.body}</p><div className="homeNewsNav"><button onClick={()=>setAnnouncementIndex(i=>(i-1+announcements.length)%announcements.length)}>→</button><b>{String(announcementIndex%announcements.length+1).padStart(2,'0')} / {String(announcements.length).padStart(2,'0')}</b><button onClick={()=>setAnnouncementIndex(i=>(i+1)%announcements.length)}>←</button></div><button className="homeTextLink" onClick={()=>setPublicView('الأخبار والفعاليات')}>جميع الأخبار والفعاليات ←</button></article>
+          </div>
+        </section>
         </>}
         {publicView==='عن الحلقات'&&<AboutSections/>}{publicView==='الرئيسية'&&<>
           <AboutSections/>
