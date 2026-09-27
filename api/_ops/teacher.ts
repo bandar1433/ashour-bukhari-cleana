@@ -44,14 +44,141 @@ async function studentDayRows(studentId:string,circleId:string|null,from:string,
 export async function summary(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لعرض ملخص الإدارة.'});
-  const row=(await query<any>(`select
-    (select count(*) from centers)::text centers,(select count(*) from circles)::text circles,
-    (select count(*) from students)::text students,(select count(*) from users where role='teacher')::text teachers,
-    (select count(*) from users)::text users,(select count(*) from users where is_active)::text active_users,
-    (select count(*) from attendance)::text attendance,(select count(*) from memorization_records)::text memorization,
-    (select count(*) from weekly_plans)::text plans,(select count(*) from news_events)::text news`))[0];
-  return json(res,200,{centers:+row.centers,circles:+row.circles,students:+row.students,teachers:+row.teachers,
-    users:+row.users,activeUsers:+row.active_users,attendance:+row.attendance,memorization:+row.memorization,plans:+row.plans,news:+row.news});
+
+  const row=(await query<any>(`
+    with scoped_circles as (
+      select c.*
+      from circles c
+      where $1='system_admin'
+         or ($1 in ('center_manager','supervisor') and c.center_id=$2::uuid)
+         or ($1='teacher' and c.teacher_user_id=$3::uuid)
+    ),
+    scoped_students as (
+      select s.*
+      from students s
+      where $1='system_admin'
+         or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid)
+         or ($1='teacher' and exists(select 1 from scoped_circles c where c.id=s.circle_id))
+    ),
+    active_students as (
+      select * from scoped_students where status='active'
+    ),
+    scoped_users as (
+      select x.*
+      from users x
+      where $1='system_admin'
+         or ($1 in ('center_manager','supervisor') and x.center_id=$2::uuid)
+         or ($1='teacher' and x.id=$3::uuid)
+    ),
+    today_attendance as (
+      select a.*
+      from attendance a
+      join active_students s on s.id=a.student_id
+      where a.attendance_date=current_date
+    ),
+    today_memorization as (
+      select m.*
+      from memorization_records m
+      join active_students s on s.id=m.student_id
+      where m.record_date=current_date
+    ),
+    current_plans as (
+      select w.*
+      from weekly_plans w
+      join active_students s on s.id=w.student_id
+      where w.week_start=(current_date-((extract(dow from current_date)::int+1)%7))::date
+    )
+    select
+      case
+        when $1='system_admin' then 'جميع المراكز'
+        when $1 in ('center_manager','supervisor') then coalesce((select name from centers where id=$2::uuid),'المركز')
+        else coalesce((select string_agg(name,'، ' order by name) from scoped_circles),'حلقتي')
+      end scope_label,
+      case when $1='system_admin'
+        then (select count(*) from centers)
+        else (select count(distinct center_id) from scoped_circles)
+      end::int centers,
+      (select count(*) from scoped_circles)::int circles,
+      (select count(*) from scoped_circles where is_active)::int active_circles,
+      (select count(*) from scoped_students)::int students,
+      (select count(*) from active_students)::int active_students,
+      case
+        when $1='teacher' then 1
+        else (select count(*) from scoped_users where role='teacher')
+      end::int teachers,
+      (select count(*) from scoped_users where role='supervisor')::int supervisors,
+      (select count(*) from scoped_users where role='center_manager')::int center_managers,
+      (select count(*) from scoped_users)::int users,
+      (select count(*) from scoped_users where is_active)::int active_users,
+      (select count(*) from attendance a join scoped_students s on s.id=a.student_id)::int attendance,
+      (select count(*) from memorization_records m join scoped_students s on s.id=m.student_id)::int memorization,
+      (select count(*) from weekly_plans w join scoped_students s on s.id=w.student_id)::int plans,
+      case when $1='system_admin' then (select count(*) from news_events) else 0 end::int news,
+      (select count(*) from today_attendance)::int attendance_today,
+      (select count(*) from today_attendance where status in ('present','late'))::int present_today,
+      (select count(*) from today_attendance where status='absent')::int absent_today,
+      (select count(*) from today_attendance where status='late' or coalesce(late_minutes,0)>0)::int late_today,
+      (select count(*) from active_students)-(select count(distinct student_id) from today_attendance)::int unrecorded_attendance_today,
+      case when (select count(*) from active_students)>0
+        then round(100.0*(select count(*) from today_attendance where status in ('present','late'))/(select count(*) from active_students))::int
+        else 0
+      end attendance_rate,
+      coalesce((select sum(coalesce(page_count,0)) from today_memorization),0)::int quran_pages_today,
+      (select count(distinct student_id) from today_memorization)::int memorization_students_today,
+      (select count(distinct student_id) from current_plans)::int planned_students_this_week,
+      case when (select count(*) from active_students)>0
+        then round(100.0*(select count(distinct student_id) from current_plans)/(select count(*) from active_students))::int
+        else 0
+      end plan_coverage,
+      case
+        when $1='system_admin' then (select count(*) from login_requests where status='pending')
+        when $1 in ('center_manager','supervisor') then (select count(*) from login_requests where status='pending' and center_id=$2::uuid)
+        else 0
+      end::int pending_requests,
+      (select count(*) from circle_join_requests r where r.status='pending' and exists(select 1 from scoped_circles c where c.id=r.circle_id))::int pending_join_requests,
+      (select count(*) from scoped_circles where is_active and teacher_user_id is null)::int unassigned_circles,
+      (select count(*) from scoped_students where circle_id is null)::int unassigned_students,
+      (select count(*) from scoped_users where not is_active)::int inactive_users,
+      (select count(*) from scoped_users su where su.role='teacher' and su.is_active and not exists(select 1 from scoped_circles c where c.teacher_user_id=su.id))::int teachers_without_circle,
+      (select count(*) from day_approvals da where da.approval_date=current_date and exists(select 1 from scoped_circles c where c.id=da.circle_id))::int approved_circles_today
+  `,[u.role,u.center_id,u.id]))[0];
+
+  const result={
+    role:u.role,
+    scopeLabel:row.scope_label,
+    centers:Number(row.centers||0),
+    circles:Number(row.circles||0),
+    activeCircles:Number(row.active_circles||0),
+    students:Number(row.students||0),
+    activeStudents:Number(row.active_students||0),
+    teachers:Number(row.teachers||0),
+    supervisors:Number(row.supervisors||0),
+    centerManagers:Number(row.center_managers||0),
+    users:Number(row.users||0),
+    activeUsers:Number(row.active_users||0),
+    attendance:Number(row.attendance||0),
+    memorization:Number(row.memorization||0),
+    plans:Number(row.plans||0),
+    news:Number(row.news||0),
+    attendanceToday:Number(row.attendance_today||0),
+    presentToday:Number(row.present_today||0),
+    absentToday:Number(row.absent_today||0),
+    lateToday:Number(row.late_today||0),
+    unrecordedAttendanceToday:Math.max(0,Number(row.unrecorded_attendance_today||0)),
+    attendanceRate:Number(row.attendance_rate||0),
+    quranPagesToday:Number(row.quran_pages_today||0),
+    memorizationStudentsToday:Number(row.memorization_students_today||0),
+    plannedStudentsThisWeek:Number(row.planned_students_this_week||0),
+    planCoverage:Number(row.plan_coverage||0),
+    pendingRequests:Number(row.pending_requests||0),
+    pendingJoinRequests:Number(row.pending_join_requests||0),
+    unassignedCircles:Number(row.unassigned_circles||0),
+    unassignedStudents:Number(row.unassigned_students||0),
+    inactiveUsers:Number(row.inactive_users||0),
+    teachersWithoutCircle:Number(row.teachers_without_circle||0),
+    approvedCirclesToday:Number(row.approved_circles_today||0),
+  };
+  return json(res,200,result);
 }
 
 export async function teacherToday(req:any,res:any,u:any){
