@@ -21,7 +21,7 @@ export default async function handler(req:any,res:any){
         limit 500
       `,[u.role,u.center_id,u.id]);
       const requests=await query(`
-        select id,auth_subject,email,full_name,status,requested_at,requested_role,phone,document_no,center_id,circle_id
+        select id,auth_subject,email,full_name,status,requested_at,requested_role,phone,national_id as document_no,center_id,requested_circle_id as circle_id
         from login_requests
         where status='pending' and ($1='system_admin' or center_id=$2::uuid)
         order by requested_at desc
@@ -47,7 +47,7 @@ export default async function handler(req:any,res:any){
       if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
       const b=req.body||{};
       if(b.request_id&&b.request_decision==='rejected'){
-        const lr=(await query<any>('select id,auth_subject,center_id,circle_id,requested_role from login_requests where id=$1 and status=\'pending\'',[b.request_id]))[0];
+        const lr=(await query<any>('select id,auth_subject,center_id,requested_circle_id as circle_id,requested_role from login_requests where id=$1 and status=\'pending\'',[b.request_id]))[0];
         if(!lr)return json(res,404,{error:'طلب الاعتماد غير موجود'});
         if(u.role!=='system_admin'&&lr.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'طلب الاعتماد خارج مركزك.'});
         await query("update login_requests set status='rejected' where id=$1",[lr.id]);
@@ -91,7 +91,7 @@ export default async function handler(req:any,res:any){
         b.auth_subject===undefined?e.auth_subject:(b.auth_subject||null)
       ]);
       if(b.request_id&&b.auth_subject){
-        const lr=(await query<any>('select requested_role,circle_id,center_id,document_no,phone from login_requests where id=$1 and auth_subject=$2',[b.request_id,b.auth_subject]))[0];
+        const lr=(await query<any>('select requested_role,requested_circle_id as circle_id,center_id,national_id as document_no,phone from login_requests where id=$1 and auth_subject=$2',[b.request_id,b.auth_subject]))[0];
         if(!lr)return json(res,404,{error:'طلب الاعتماد غير موجود'});
         if(lr.requested_role==='student'&&lr.circle_id){
           await query('alter table students add column if not exists document_no text');
