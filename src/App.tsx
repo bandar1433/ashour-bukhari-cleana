@@ -112,6 +112,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
 };
 
 const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
+const CANONICAL_ORIGIN='https://ashour-bukhari-cleana-abdaullahtahaa-1837s-projects.vercel.app';
 
 export default function App() {
   const [code, setCode] = useState(getSessionToken() ? 'session' : '');
@@ -119,7 +120,7 @@ export default function App() {
   const [publicMode,setPublicMode]=useState(false);
   const [authBusy,setAuthBusy]=useState(false);
   const [authIntent,setAuthIntent]=useState<'signin'|'signup'>('signin');
-  const [accountForm,setAccountForm]=useState({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});
+  const [accountForm,setAccountForm]=useState({name:'',documentNo:'',phone:'',email:'',role:'student',centerId:'',circleId:''});
   const [signupStep,setSignupStep]=useState<1|2>(1);
   const [signupCircles,setSignupCircles]=useState<any[]>([]);
   const [status, setStatus] = useState<any>(null);
@@ -156,10 +157,9 @@ export default function App() {
   const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
 
   useEffect(() => {
-    const stableProductionOrigin='https://ashour-bukhari-cleana-abdaullahtahaa-1837s-projects.vercel.app';
     const host=window.location.hostname;
-    if(host.endsWith('.vercel.app') && window.location.origin!==stableProductionOrigin){
-      window.location.replace(stableProductionOrigin+window.location.pathname+window.location.search+window.location.hash);
+    if(host.endsWith('.vercel.app') && window.location.origin!==CANONICAL_ORIGIN){
+      window.location.replace(CANONICAL_ORIGIN+window.location.pathname+window.location.search+window.location.hash);
       return;
     }
     clearAccessCode();
@@ -206,7 +206,7 @@ export default function App() {
       return;
     }
     if(localStorage.getItem(EXPLICIT_LOGOUT_KEY)==='1') return;
-    finishSocialSession().catch(err=>{
+    finishGoogleSession().catch(err=>{
       const message=err instanceof Error?err.message:'تعذر استكمال تسجيل الدخول.';
       setError(message);
       setAuthOpen(true);
@@ -223,71 +223,78 @@ export default function App() {
   },[code]);
 
 
-  async function finishSocialSession():Promise<'ready'|'pending'|'none'>{
+  async function finishGoogleSession():Promise<'ready'|'pending'|'profile'|'none'>{
     const current:any=await authClient.getSession();
-    if(current?.error) throw new Error(readableError(current.error,'تعذر قراءة جلسة المصادقة.'));
-    const user=current?.data?.user||current?.data?.session?.user;
-    if(!current?.data?.session||!user)return 'none';
+    if(current?.error)throw new Error(readableError(current.error,'تعذر قراءة جلسة Google.'));
+    const session=current?.data?.session;
+    const user=current?.data?.user||session?.user;
+    if(!session||!user)return 'none';
 
-    if(!localStorage.getItem('ashour_signup_draft')&&localStorage.getItem('ashour_signup_google_pending')==='1'){
-      const verifiedName=String(user?.name||user?.displayName||'').trim();
-      const verifiedEmail=String(user?.email||'').trim();
+    const sessionToken=String(session?.token||'').trim();
+    const sessionId=String(session?.id||'').trim();
+    if(!sessionToken&&!sessionId)throw new Error('جلسة Google غير مكتملة. سجّل الدخول من جديد.');
+
+    let draft:any=null;
+    const rawDraft=localStorage.getItem('ashour_signup_draft');
+    if(rawDraft){
+      try{draft=JSON.parse(rawDraft)}catch{localStorage.removeItem('ashour_signup_draft')}
+    }
+
+    const response=await fetch('/api/auth',{
+      method:'POST',
+      headers:{Accept:'application/json','Content-Type':'application/json'},
+      body:JSON.stringify({sessionToken,sessionId,draft})
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة Google.'));
+
+    if(payload?.profile_required){
+      const verifiedName=String(payload?.verified?.name||user?.name||'').trim();
+      const verifiedEmail=String(payload?.verified?.email||user?.email||'').trim();
       setAccountForm(x=>({...x,name:verifiedName||x.name,email:verifiedEmail||x.email}));
       setAuthIntent('signup');
       setSignupStep(2);
       setAuthOpen(true);
-      localStorage.removeItem('ashour_signup_google_pending');
-      return 'none';
+      setError('');
+      window.history.replaceState({},'',window.location.pathname);
+      return 'profile';
     }
 
-    const tokenResult:any=await (authClient as any).getJWTToken();
-    const jwt=String(typeof tokenResult==='string'?tokenResult:(tokenResult?.data?.token||tokenResult?.token||'')).trim();
-    if(!jwt||jwt.split('.').length!==3) throw new Error('تعذر إصدار رمز التحقق الآمن للحساب. أعد تسجيل الدخول.');
-
-    const response=await fetch('/api/status',{
-      method:'POST',
-      headers:{Accept:'application/json',Authorization:`Bearer ${jwt}`,'x-signup-draft':localStorage.getItem('ashour_signup_draft')||''}
-    });
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok) throw new Error(readableError(payload?.message??payload?.error,'تعذر اعتماد جلسة الدخول.'));
     if(payload?.pending){
       localStorage.removeItem('ashour_signup_draft');
       setError(payload.message||'الحساب بانتظار الاعتماد.');
       setAuthOpen(true);
+      window.history.replaceState({},'',window.location.pathname);
       return 'pending';
     }
+
+    if(!payload?.token)throw new Error('لم يتم إنشاء جلسة المنصة.');
     clearAccessCode();
     localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+    localStorage.removeItem('ashour_signup_draft');
     setSessionToken(payload.token);
     setCode('session');
     setAuthOpen(false);
     setError('');
-    localStorage.removeItem('ashour_signup_draft');
+    window.history.replaceState({},'',window.location.pathname);
     return 'ready';
   }
+
   async function handleGoogleLogin(){
-    setAuthBusy(true); setError('');
+    setAuthBusy(true);
+    setError('');
     localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+    localStorage.removeItem('ashour_signup_draft');
     try{
-      if(authIntent==='signup'&&signupStep===2){
-        const draft={name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId};
-        if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال قبل المتابعة.');
-        if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز قبل المتابعة.');
-        if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة قبل المتابعة.');
-        localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
-      }
-      if(authIntent==='signup'&&signupStep===1)localStorage.setItem('ashour_signup_google_pending','1');
       const result:any=await authClient.signIn.social({
         provider:'google',
-        callbackURL:window.location.origin,
-        errorCallbackURL:window.location.origin+'/?auth_error=google',
+        callbackURL:CANONICAL_ORIGIN+'/?auth=google',
+        errorCallbackURL:CANONICAL_ORIGIN+'/?auth_error=google',
         disableRedirect:true
       });
-      if(result?.error){
-        throw new Error(readableError(result.error,'تعذر تسجيل الدخول عبر Google'));
-      }
+      if(result?.error)throw new Error(readableError(result.error,'تعذر بدء الدخول عبر Google.'));
       const url=result?.data?.url||result?.url;
-      if(!url) throw new Error('تعذر بدء تسجيل الدخول عبر Google.');
+      if(!url)throw new Error('تعذر بدء الدخول عبر Google.');
       window.location.assign(url);
     }catch(err){
       setError(err instanceof Error?err.message:'تعذر تسجيل الدخول عبر Google');
@@ -295,41 +302,26 @@ export default function App() {
     }
   }
 
-  async function handleAccountLogin(event:React.FormEvent){
-    event.preventDefault();
-    setAuthBusy(true);
+  async function handleCompleteSignup(){
     setError('');
-    localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
+    const draft={
+      name:accountForm.name.trim(),
+      documentNo:accountForm.documentNo.trim(),
+      phone:accountForm.phone.trim(),
+      role:accountForm.role,
+      centerId:accountForm.centerId,
+      circleId:accountForm.circleId
+    };
+    if(!draft.name||!draft.documentNo||!draft.phone){setError('أكمل الاسم ورقم الهوية ورقم الجوال.');return}
+    if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId){setError('اختر المركز.');return}
+    if(draft.role==='student'&&!draft.circleId){setError('اختر الحلقة.');return}
+    localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
+    setAuthBusy(true);
     try{
-      const email=accountForm.email.trim();
-      const password=accountForm.password;
-      if(!email||!password) throw new Error('أدخل البريد الإلكتروني وكلمة المرور.');
-      const draft=authIntent==='signup'?{
-        name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),
-        role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId
-      }:null;
-      if(draft){
-        if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال.');
-        if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز.');
-        if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة.');
-        localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
-      }
-      let authResult:any;
-      if(authIntent==='signup'){
-        authResult=await authClient.signUp.email({email,password,name:draft!.name});
-        if(authResult?.error) throw new Error(readableError(authResult.error,'تعذر إنشاء الحساب'));
-      }else{
-        authResult=await authClient.signIn.email({email,password});
-        if(authResult?.error) throw new Error(readableError(authResult.error,'بيانات الدخول غير صحيحة'));
-      }
-      const state=await finishSocialSession();
-      if(state==='none')throw new Error(authIntent==='signup'?'تم إنشاء الحساب، لكن لم تبدأ جلسة بعد. تحقق من البريد الإلكتروني ثم سجّل الدخول.':'تم قبول بيانات الدخول، لكن تعذر إنشاء جلسة آمنة. أعد المحاولة.');
-      if(state==='ready'){
-        setAccountForm({name:'',documentNo:'',phone:'',email:'',password:'',role:'student',centerId:'',circleId:''});
-        setSignupStep(1);
-      }
+      const state=await finishGoogleSession();
+      if(state==='none')setError('انتهت جلسة Google. أعد الدخول باستخدام Google.');
     }catch(err){
-      setError(err instanceof Error?err.message:'تعذر تسجيل الدخول');
+      setError(err instanceof Error?err.message:'تعذر إكمال التسجيل');
     }finally{
       setAuthBusy(false);
     }
@@ -549,18 +541,13 @@ export default function App() {
               <div className="authHeading">
                 <span className="authEyebrow">{authIntent==='signin'?'دخول موحد':'إنشاء حساب جديد'}</span>
                 <h2 id="auth-title">{authIntent==='signin'?'دخول المنصة':'التسجيل في المنصة'}</h2>
-                <p className="authLead">{authIntent==='signin'?'سجّل الدخول بحسابك، وسيتم توجيهك تلقائيًا إلى لوحتك حسب دورك.':'أدخل بياناتك ثم اختر نوع الحساب. التسجيل بالجوال مجهز وسيُفعّل لاحقًا مع OTP.'}</p>
+                <p className="authLead">{authIntent==='signin'?'سجّل الدخول بحساب Google الموثق، وسيتم توجيهك تلقائيًا إلى لوحتك حسب دورك.':'ابدأ بحساب Google، ثم أكمل بياناتك الأساسية واختر نوع الحساب.'}</p>
               </div>
               {error&&<div className="authNotice" role="alert">{error}</div>}
               {authIntent==='signin'?<div className="authForm authFormPro">
+                <div className="authSecurityNote">الدخول موحد عبر Google. إذا كان بريدك مرتبطًا بملف موجود فسيتم فتح حسابك مباشرة، وإذا كنت مستخدمًا جديدًا ستظهر لك بيانات التسجيل.</div>
                 <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'الدخول باستخدام Google'}</button>
-                <div className="authDivider"><span>أو</span></div>
-                <form className="authForm" onSubmit={handleAccountLogin}>
-                  <label className="field"><span>البريد الإلكتروني</span><input type="email" value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" required/></label>
-                  <label className="field"><span>كلمة المرور</span><input type="password" value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete="current-password" required/></label>
-                  <button className="secondary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ الدخول…':'الدخول بالبريد وكلمة المرور'}</button>
-                </form>
-                                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
+                <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
               </div>:<div className="authForm authFormPro">
                 {signupStep===1?<>
                 <div className="authSecurityNote">يبدأ التسجيل بحساب Google حتى نجلب الاسم والبريد الإلكتروني الموثقين تلقائيًا، ثم تكمل بياناتك داخل المنصة.</div>
@@ -573,7 +560,7 @@ export default function App() {
                 <label className="field"><span>نوع الحساب</span><select value={accountForm.role} onChange={e=>setAccountForm(x=>({...x,role:e.target.value,centerId:'',circleId:''}))}><option value="supervisor">مشرف مركز</option><option value="teacher">معلم حلقة</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label>
                 {['student','teacher','supervisor'].includes(accountForm.role)&&<><label className="field"><span>المركز</span><select value={accountForm.centerId} onChange={async e=>{const centerId=e.target.value;setAccountForm(x=>({...x,centerId,circleId:''}));try{const r:any=await fetch('/api/public').then(x=>x.json());setSignupCircles((r.circles||[]).filter((q:any)=>q.center_id===centerId))}catch{setSignupCircles([])}}}><option value="">اختر المركز</option>{(publicData.centers||[]).map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
                 {accountForm.role==='student'&&<label className="field"><span>الحلقة</span><select value={accountForm.circleId} onChange={e=>setAccountForm(x=>({...x,circleId:e.target.value}))}><option value="">اختر الحلقة</option>{signupCircles.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}</>}
-                <button className="primary authSubmit" type="button" disabled={authBusy} onClick={async()=>{setError('');if(!accountForm.name.trim()||!accountForm.documentNo.trim()||!accountForm.phone.trim()){setError('أكمل الاسم ورقم الهوية ورقم الجوال.');return}if(['student','teacher','supervisor'].includes(accountForm.role)&&!accountForm.centerId){setError('اختر المركز.');return}if(accountForm.role==='student'&&!accountForm.circleId){setError('اختر الحلقة.');return}localStorage.setItem('ashour_signup_draft',JSON.stringify({name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId}));setAuthBusy(true);try{const state=await finishSocialSession();if(state==='none')setError('تعذر قراءة جلسة Google. أعد التسجيل باستخدام Google.')}catch(err){setError(err instanceof Error?err.message:'تعذر إكمال التسجيل')}finally{setAuthBusy(false)}}}>{authBusy?'جارٍ إكمال التسجيل…':'إكمال التسجيل'}</button>
+                <button className="primary authSubmit" type="button" disabled={authBusy} onClick={handleCompleteSignup}>{authBusy?'جارٍ إكمال التسجيل…':'إكمال التسجيل'}</button>
               </>}
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
               </div>}
