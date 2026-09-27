@@ -156,6 +156,12 @@ export default function App() {
   const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
 
   useEffect(() => {
+    const stableProductionOrigin='https://ashour-bukhari-cleana-abdaullahtahaa-1837s-projects.vercel.app';
+    const host=window.location.hostname;
+    if(host.endsWith('.vercel.app') && window.location.origin!==stableProductionOrigin){
+      window.location.replace(stableProductionOrigin+window.location.pathname+window.location.search+window.location.hash);
+      return;
+    }
     clearAccessCode();
     getStatus()
       .then(setStatus)
