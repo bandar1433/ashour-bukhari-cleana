@@ -131,6 +131,7 @@ export default function App() {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [circles, setCircles] = useState<CircleRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [currentUser,setCurrentUser]=useState<any>(null);
   const [roleData, setRoleData] = useState<any>({roles:[],permissions:[]});
   const [loginRequests,setLoginRequests]=useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
@@ -169,7 +170,7 @@ export default function App() {
       const role=getSessionRole();
       const root=role==='system_admin';
       const staff=['system_admin','center_manager','supervisor','teacher'].includes(role);
-      const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, newsData] = await Promise.all([
+      const [summaryData, centersData, studentsData, circlesData, usersData, rolesData, newsData, profileData] = await Promise.all([
         staff?apiGet<Summary>('/api/ops?action=summary'):Promise.resolve(null),
         staff?apiGet<{ items: CenterRow[] }>('/api/centers'):Promise.resolve({items:[]}),
         staff?apiGet<{ items: StudentRow[] }>('/api/students'):Promise.resolve({items:[]}),
@@ -183,7 +184,7 @@ export default function App() {
       setCenters(centersData.items || []);
       setStudents(studentsData.items || []);
       setCircles(circlesData.items || []);
-      setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setNews(newsData.items||[]);
+      setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setNews(newsData.items||[]); setCurrentUser(profileData||null);
       setLoadState('ready');
     } catch (err) {
       setLoadState('error');
@@ -328,6 +329,7 @@ export default function App() {
     setStudents([]);
     setCircles([]);
     setUsers([]);
+    setCurrentUser(null);
     setLoginRequests([]);
     setRoleData({roles:[],permissions:[]});
     setPlans([]);
@@ -567,7 +569,7 @@ export default function App() {
       <div className="workspace workspacePro">
         <aside className="adminSidebar">
           <div className="sidebarBrand"><div className="sidebarLogo"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></div><div><b>حلقات عاشور بخاري</b><small>المنصة القرآنية التعليمية</small></div></div>
-          <div className="sidebarContext"><span>مساحة العمل</span><b>{roleLabel[currentRole]||'مستخدم'}</b><small>{currentRole==='student'?'متابعة الحفظ والمراجعة والإنجاز':currentRole==='teacher'?'إدارة الحلقة ومتابعة الطلاب':currentRole==='guardian'?'متابعة الأبناء والتقارير':'الإشراف والتشغيل والمؤشرات'}</small></div>
+          <div className="sidebarContext"><span>المستخدم الحالي</span><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong><small>{currentUser?.email||''}</small></div>
           {isStaff&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span><span>لوحة المؤشرات</span></button>
           <div className="sidebarSectionLabel">العمل اليومي</div><button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span><span>سجل اليوم</span></button><button className={activeTab==='circleRegister'?'selected':''} onClick={()=>goTab('circleRegister')}><span className="navDot">▦</span><span>سجل الحلقة</span></button><button className={activeTab==='plans'?'selected':''} onClick={()=>goTab('plans')}><span className="navDot">▤</span><span>الخطط الأسبوعية</span></button><button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span><span>الطلاب</span></button><button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span><span>طلبات الانضمام</span></button>
           <div className="sidebarSectionLabel">الأداء والتحفيز</div><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>التقييم والإنجاز</span></button><button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span><span>المهام والجوائز</span></button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span><span>المسابقات</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>التقارير والمؤشرات</span></button>
