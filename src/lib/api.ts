@@ -1,14 +1,37 @@
 export type Summary = {
+  role?: string;
+  scopeLabel?: string;
   centers: number;
   circles: number;
+  activeCircles?: number;
   students: number;
+  activeStudents?: number;
   teachers: number;
+  supervisors?: number;
+  centerManagers?: number;
   users: number;
   activeUsers: number;
   attendance: number;
   memorization: number;
   plans: number;
   news: number;
+  attendanceToday?: number;
+  presentToday?: number;
+  absentToday?: number;
+  lateToday?: number;
+  unrecordedAttendanceToday?: number;
+  attendanceRate?: number;
+  quranPagesToday?: number;
+  memorizationStudentsToday?: number;
+  plannedStudentsThisWeek?: number;
+  planCoverage?: number;
+  pendingRequests?: number;
+  pendingJoinRequests?: number;
+  unassignedCircles?: number;
+  unassignedStudents?: number;
+  inactiveUsers?: number;
+  teachersWithoutCircle?: number;
+  approvedCirclesToday?: number;
 };
 
 export type UserRow = {
