@@ -56,8 +56,8 @@ async function exchangeAuthSession(req:any,res:any){
     `,[documentNo,phone]);
     if(legacyMatches.length===1){
       const legacy=legacyMatches[0];
-      await query('update public.users set auth_subject=$1,email=$2,phone=coalesce(phone,$3),is_active=true,updated_at=now() where id=$4',[neon.id,neon.email,phone,legacy.id]);
-      resolvedUser={...legacy,email:neon.email,is_active:true};
+      await query('update public.users set auth_subject=$1,email=$2,phone=coalesce(phone,$3),updated_at=now() where id=$4',[neon.id,neon.email,phone,legacy.id]);
+      resolvedUser={...legacy,email:neon.email};
     }else if(legacyMatches.length>1){
       return json(res,409,{error:'AMBIGUOUS_LEGACY_ACCOUNT',message:'وجد أكثر من ملف مطابق للهوية والجوال. راجع مدير النظام لربط الحساب الصحيح.'});
     }
@@ -113,7 +113,7 @@ async function exchangeAuthSession(req:any,res:any){
   if(!resolvedUser.is_active){
     const lr=(await query<any>("select status,requested_role from login_requests where auth_subject=$1 order by requested_at desc limit 1",[neon.id]))[0];
     if(lr?.status==='pending')return json(res,200,{pending:true,code:'PENDING_APPROVAL',role:lr.requested_role,message:'الحساب مسجل وبانتظار الاعتماد.'});
-    return json(res,403,{error:'Inactive',message:'هذا الحساب غير نشط. راجع إدارة المنصة.'});
+    return json(res,200,{pending:true,code:'INACTIVE_ACCOUNT',role:resolvedUser.role,message:'تم ربط حساب Google بالملف الموجود، لكن الحساب موقوف حاليًا. راجع إدارة المنصة لإعادة التفعيل.'});
   }
 
   const session=issueAdminSession({sub:neon.id,userId:resolvedUser.id,role:resolvedUser.role});
