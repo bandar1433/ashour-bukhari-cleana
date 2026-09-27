@@ -196,7 +196,7 @@ export async function apiGet<T>(path: string): Promise<T> {
 }
 
 export async function getStatus() {
-  const response = await fetch('/api/status', { headers: { Accept: 'application/json' } });
+  const response = await fetch('/api/auth', { headers: { Accept: 'application/json' } });
   return response.json();
 }
 
