@@ -178,6 +178,7 @@ export default function App() {
         (['system_admin','center_manager','supervisor'].includes(role))?apiGet<{ items: UserRow[]; requests?: any[] }>('/api/users'):Promise.resolve({items:[],requests:[]}),
         root?apiGet<any>('/api/roles'):Promise.resolve({roles:[],permissions:[]}),
         root?apiGet<{ items:any[] }>('/api/news'):Promise.resolve({items:[]}),
+        apiGet<any>('/api/ops?action=profile'),
       ]);
 
       setSummary(summaryData as Summary | null);
