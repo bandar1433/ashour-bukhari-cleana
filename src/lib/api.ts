@@ -215,3 +215,12 @@ export async function apiPut<T>(path:string,body:unknown):Promise<T>{
   if(!response.ok){handleUnauthorized(response.status);throw new Error(responseError(payload,response.status))}
   return payload as T;
 }
+
+
+export async function apiDelete<T>(path:string,body:unknown):Promise<T>{
+  const response=await fetch(path,{method:'DELETE',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify(body)});
+  const text=await response.text();let payload:any;
+  try{payload=text?JSON.parse(text):null}catch{payload={error:text}}
+  if(!response.ok){handleUnauthorized(response.status);throw new Error(responseError(payload,response.status))}
+  return payload as T;
+}
