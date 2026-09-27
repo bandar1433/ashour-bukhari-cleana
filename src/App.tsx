@@ -240,9 +240,8 @@ export default function App() {
       return 'none';
     }
 
-    const tokenResult:any=await (authClient as any).token();
-    if(tokenResult?.error)throw new Error(readableError(tokenResult.error,'تعذر إصدار رمز التحقق الآمن للحساب.'));
-    const jwt=String(tokenResult?.data?.token||'').trim();
+    const tokenResult:any=await (authClient as any).getJWTToken();
+    const jwt=String(typeof tokenResult==='string'?tokenResult:(tokenResult?.data?.token||tokenResult?.token||'')).trim();
     if(!jwt||jwt.split('.').length!==3) throw new Error('تعذر إصدار رمز التحقق الآمن للحساب. أعد تسجيل الدخول.');
 
     const response=await fetch('/api/status',{
