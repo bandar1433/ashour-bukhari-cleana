@@ -223,6 +223,17 @@ export default function App() {
     const user=current?.data?.user||current?.data?.session?.user;
     if(!current?.data?.session||!user)return 'none';
 
+    if(!localStorage.getItem('ashour_signup_draft')&&localStorage.getItem('ashour_signup_google_pending')==='1'){
+      const verifiedName=String(user?.name||user?.displayName||'').trim();
+      const verifiedEmail=String(user?.email||'').trim();
+      setAccountForm(x=>({...x,name:verifiedName||x.name,email:verifiedEmail||x.email}));
+      setAuthIntent('signup');
+      setSignupStep(2);
+      setAuthOpen(true);
+      localStorage.removeItem('ashour_signup_google_pending');
+      return 'none';
+    }
+
     const tokenResult:any=await (authClient as any).token();
     if(tokenResult?.error)throw new Error(readableError(tokenResult.error,'تعذر إصدار رمز التحقق الآمن للحساب.'));
     const jwt=String(tokenResult?.data?.token||'').trim();
@@ -253,12 +264,14 @@ export default function App() {
     setAuthBusy(true); setError('');
     localStorage.removeItem(EXPLICIT_LOGOUT_KEY);
     try{
-      if(authIntent==='signup'){
+      if(authIntent==='signup'&&signupStep===2){
         const draft={name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId};
         if(!draft.name||!draft.documentNo||!draft.phone)throw new Error('أكمل الاسم ورقم الهوية ورقم الجوال قبل المتابعة.');
-        if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز قبل المتابعة.');if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة قبل المتابعة.');
+        if(['student','teacher','supervisor'].includes(draft.role)&&!draft.centerId)throw new Error('اختر المركز قبل المتابعة.');
+        if(draft.role==='student'&&!draft.circleId)throw new Error('اختر الحلقة قبل المتابعة.');
         localStorage.setItem('ashour_signup_draft',JSON.stringify(draft));
       }
+      if(authIntent==='signup'&&signupStep===1)localStorage.setItem('ashour_signup_google_pending','1');
       const result:any=await authClient.signIn.social({
         provider:'google',
         callbackURL:window.location.origin,
@@ -544,23 +557,19 @@ export default function App() {
                 </form>
                                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signup');setSignupStep(1);setError('')}}>ليس لديك حساب؟ تسجيل جديد</button></div>
               </div>:<div className="authForm authFormPro">
-                {signupStep===1?<><label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} required/></label>
+                {signupStep===1?<>
+                <div className="authSecurityNote">يبدأ التسجيل بحساب Google حتى نجلب الاسم والبريد الإلكتروني الموثقين تلقائيًا، ثم تكمل بياناتك داخل المنصة.</div>
+                <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'المتابعة باستخدام Google'}</button>
+              </>:<>
+                <label className="field"><span>الاسم الكامل</span><input value={accountForm.name} onChange={e=>setAccountForm(x=>({...x,name:e.target.value}))} required/></label>
+                <label className="field"><span>البريد الإلكتروني الموثق</span><input type="email" value={accountForm.email} readOnly/></label>
                 <label className="field"><span>رقم الهوية / الوثيقة</span><input value={accountForm.documentNo} onChange={e=>setAccountForm(x=>({...x,documentNo:e.target.value}))} required/></label>
-                <label className="field"><span>رقم الجوال</span><input type="tel" placeholder="+966..." value={accountForm.phone} onChange={e=>setAccountForm(x=>({...x,phone:e.target.value}))} required/><small>محفوظ للتنبيهات والرسائل؛ التحقق OTP سيُفعّل لاحقًا.</small></label>
+                <label className="field"><span>رقم الجوال</span><input type="tel" placeholder="+966..." value={accountForm.phone} onChange={e=>setAccountForm(x=>({...x,phone:e.target.value}))} required/></label>
                 <label className="field"><span>نوع الحساب</span><select value={accountForm.role} onChange={e=>setAccountForm(x=>({...x,role:e.target.value,centerId:'',circleId:''}))}><option value="supervisor">مشرف مركز</option><option value="teacher">معلم حلقة</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label>
                 {['student','teacher','supervisor'].includes(accountForm.role)&&<><label className="field"><span>المركز</span><select value={accountForm.centerId} onChange={async e=>{const centerId=e.target.value;setAccountForm(x=>({...x,centerId,circleId:''}));try{const r:any=await fetch('/api/public').then(x=>x.json());setSignupCircles((r.circles||[]).filter((q:any)=>q.center_id===centerId))}catch{setSignupCircles([])}}}><option value="">اختر المركز</option>{(publicData.centers||[]).map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-                {accountForm.role==='student'&&<label className="field"><span>الحلقة</span><select value={accountForm.circleId} onChange={e=>setAccountForm(x=>({...x,circleId:e.target.value}))}><option value="">اختر الحلقة</option>{signupCircles.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}{accountForm.role==='student'&&null}</>}
-                <button className="primary authSubmit" type="button" onClick={()=>{if(!accountForm.name.trim()||!accountForm.documentNo.trim()||!accountForm.phone.trim()){setError('أكمل الاسم ورقم الهوية ورقم الجوال.');return}if(['student','teacher','supervisor'].includes(accountForm.role)&&!accountForm.centerId){setError('اختر المركز.');return}if(accountForm.role==='student'&&!accountForm.circleId){setError('اختر الحلقة.');return}setError('');setSignupStep(2)}}>متابعة</button></>:<>
-                <div className="authSecurityNote">بعد التسجيل: الطالب ينتظر قبول الحلقة، والمعلم والمشرف ينتظران الاعتماد، أما حساب ولي الأمر فيتفعّل ثم تظهر بيانات الأبناء بعد ربطهم من الجهة المخولة.</div>
-                <button className="primary authSubmit googleLogin" type="button" onClick={handleGoogleLogin} disabled={authBusy}>{authBusy?'جارٍ التحويل…':'التسجيل عبر Google'}</button>
-                <div className="authDivider"><span>أو</span></div>
-                <form className="authForm" onSubmit={handleAccountLogin}>
-                  <label className="field"><span>البريد الإلكتروني</span><input type="email" value={accountForm.email} onChange={e=>setAccountForm(x=>({...x,email:e.target.value}))} autoComplete="email" required/></label>
-                  <label className="field"><span>كلمة المرور</span><input type="password" minLength={8} value={accountForm.password} onChange={e=>setAccountForm(x=>({...x,password:e.target.value}))} autoComplete="new-password" required/></label>
-                  <button className="secondary authSubmit" type="submit" disabled={authBusy}>{authBusy?'جارٍ إنشاء الحساب…':'التسجيل بالبريد وكلمة المرور'}</button>
-                </form>
-                <button className="secondary authSubmit" type="button" disabled title="تم تجهيز المسار وسيُفعّل لاحقًا مع OTP">التسجيل برقم الجوال — قريبًا</button>
-                <button className="tableAction" type="button" onClick={()=>setSignupStep(1)}>← تعديل البيانات</button></>}
+                {accountForm.role==='student'&&<label className="field"><span>الحلقة</span><select value={accountForm.circleId} onChange={e=>setAccountForm(x=>({...x,circleId:e.target.value}))}><option value="">اختر الحلقة</option>{signupCircles.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}</>}
+                <button className="primary authSubmit" type="button" disabled={authBusy} onClick={async()=>{setError('');if(!accountForm.name.trim()||!accountForm.documentNo.trim()||!accountForm.phone.trim()){setError('أكمل الاسم ورقم الهوية ورقم الجوال.');return}if(['student','teacher','supervisor'].includes(accountForm.role)&&!accountForm.centerId){setError('اختر المركز.');return}if(accountForm.role==='student'&&!accountForm.circleId){setError('اختر الحلقة.');return}localStorage.setItem('ashour_signup_draft',JSON.stringify({name:accountForm.name.trim(),documentNo:accountForm.documentNo.trim(),phone:accountForm.phone.trim(),role:accountForm.role,centerId:accountForm.centerId,circleId:accountForm.circleId}));setAuthBusy(true);try{const state=await finishSocialSession();if(state==='none')setError('تعذر قراءة جلسة Google. أعد التسجيل باستخدام Google.')}catch(err){setError(err instanceof Error?err.message:'تعذر إكمال التسجيل')}finally{setAuthBusy(false)}}}>{authBusy?'جارٍ إكمال التسجيل…':'إكمال التسجيل'}</button>
+              </>}
                 <div className="authAlternate"><button type="button" className="tableAction" onClick={()=>{setAuthIntent('signin');setError('')}}>لديك حساب؟ دخول المنصة</button></div>
               </div>}
 
