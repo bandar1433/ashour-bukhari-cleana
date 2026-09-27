@@ -215,24 +215,15 @@ export default function App() {
 
 
   async function finishSocialSession():Promise<'ready'|'pending'|'none'>{
-    let headerJwt='';
-    const current:any=await authClient.getSession({
-      fetchOptions:{
-        credentials:'include',
-        headers:{'X-Force-Fetch':'1'},
-        onSuccess:(ctx:any)=>{
-          headerJwt=ctx?.response?.headers?.get('set-auth-jwt')||'';
-        }
-      }
-    });
+    const current:any=await authClient.getSession();
     if(current?.error) throw new Error(readableError(current.error,'تعذر قراءة جلسة المصادقة.'));
     const user=current?.data?.user||current?.data?.session?.user;
     if(!current?.data?.session||!user)return 'none';
 
-    const candidates=[headerJwt,current?.data?.session?.access_token,current?.data?.session?.token,current?.data?.token]
-      .map((x:any)=>String(x||'').trim()).filter(Boolean);
-    const jwt=candidates.find((x:string)=>x.split('.').length===3)||'';
-    if(!jwt) throw new Error('تعذر إصدار رمز التحقق الآمن للحساب. أعد تسجيل الدخول.');
+    const tokenResult:any=await (authClient as any).token();
+    if(tokenResult?.error)throw new Error(readableError(tokenResult.error,'تعذر إصدار رمز التحقق الآمن للحساب.'));
+    const jwt=String(tokenResult?.data?.token||'').trim();
+    if(!jwt||jwt.split('.').length!==3) throw new Error('تعذر إصدار رمز التحقق الآمن للحساب. أعد تسجيل الدخول.');
 
     const response=await fetch('/api/status',{
       method:'POST',
@@ -267,8 +258,8 @@ export default function App() {
       }
       const result:any=await authClient.signIn.social({
         provider:'google',
-        callbackURL:'/',
-        errorCallbackURL:'/?auth_error=google',
+        callbackURL:window.location.origin,
+        errorCallbackURL:window.location.origin+'/?auth_error=google',
         disableRedirect:true
       });
       if(result?.error){
