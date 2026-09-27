@@ -1,4 +1,4 @@
-import { query } from './_lib/db.js';
+import { getPool, query } from './_lib/db.js';
 import { handleError, json } from './_lib/http.js';
 import { getActor } from './_lib/actor.js';
 
@@ -106,6 +106,28 @@ export default async function handler(req:any,res:any){
       }
       const finalRow=(await query<any>("select id,full_name,email,phone,role,center_id,is_active,case when auth_subject is null then false else true end linked from users where id=$1",[b.id]))[0];
       return json(res,200,finalRow||rows[0]);
+    }
+    if(req.method==='DELETE'){
+      if(u.role!=='system_admin')return json(res,403,{error:'Forbidden',message:'الحذف الكامل من صلاحية مدير النظام فقط.'});
+      const b=req.body||{};
+      if(!b.id)return json(res,400,{error:'معرف المستخدم مطلوب'});
+      if(b.id===u.id)return json(res,400,{error:'لا يمكن حذف حساب مدير النظام المستخدم حاليًا.'});
+      const target=(await query<any>('select id,full_name,email,auth_subject,role::text role from users where id=$1',[b.id]))[0];
+      if(!target)return json(res,404,{error:'المستخدم غير موجود'});
+      if(target.role==='system_admin')return json(res,400,{error:'لا يمكن حذف حساب مدير نظام من هذه الشاشة.'});
+      const client=await getPool().connect();
+      try{
+        await client.query('begin');
+        await client.query('update centers set manager_user_id=null where manager_user_id=$1',[target.id]);
+        await client.query('update circles set teacher_user_id=null where teacher_user_id=$1',[target.id]);
+        await client.query('delete from circle_join_requests where user_id=$1',[target.id]);
+        await client.query('delete from guardian_students where guardian_user_id=$1',[target.id]).catch(()=>null);
+        await client.query('delete from login_requests where auth_subject=$1 or ($2::text is not null and lower(email)=lower($2))',[target.auth_subject,target.email]);
+        await client.query('delete from students where user_id=$1',[target.id]);
+        await client.query('delete from users where id=$1',[target.id]);
+        await client.query('commit');
+      }catch(e){await client.query('rollback');throw e}finally{client.release()}
+      return json(res,200,{success:true,deleted_id:target.id});
     }
     return json(res,405,{error:'Method not allowed'});
   }catch(e){return handleError(res,e)}
