@@ -74,12 +74,6 @@ async function exchangeAuthSession(req:any,res:any){
     if(['student','teacher','supervisor'].includes(requestedRole)&&!centerId)return json(res,400,{error:'CENTER_REQUIRED',message:'اختر المركز قبل إكمال التسجيل.'});
     if(requestedRole==='student'&&!circleId)return json(res,400,{error:'CIRCLE_REQUIRED',message:'اختر الحلقة قبل إكمال تسجيل الطالب.'});
 
-    await query(`alter table login_requests add column if not exists requested_role text`);
-    await query(`alter table login_requests add column if not exists phone text`);
-    await query(`alter table login_requests add column if not exists document_no text`);
-    await query(`alter table login_requests add column if not exists center_id uuid`);
-    await query(`alter table login_requests add column if not exists circle_id uuid`);
-
     if(requestedRole==='guardian'){
       let gu=(await query<any>('select id from users where lower(email)=lower($1) limit 1',[neon.email]))[0];
       if(gu) await query(`update users set full_name=$2,phone=$3,role='guardian',is_active=true,auth_subject=$4,updated_at=now() where id=$1`,[gu.id,fullName,phone,neon.id]);
@@ -98,10 +92,10 @@ async function exchangeAuthSession(req:any,res:any){
     }
 
     const lr=(await query<any>('select id from login_requests where lower(email)=lower($1) order by requested_at desc limit 1',[neon.email]))[0];
-    if(lr) await query(`update login_requests set auth_subject=$2,full_name=$3,status='pending',requested_at=now(),requested_role=$4,phone=$5,document_no=$6,center_id=$7::uuid,circle_id=$8::uuid where id=$1`,
+    if(lr) await query(`update login_requests set auth_subject=$2,full_name=$3,status='pending',requested_at=now(),requested_role=$4,phone=$5,national_id=$6,requested_circle_id=$8::uuid where id=$1`,
       [lr.id,neon.id,fullName,requestedRole,phone,documentNo,centerId,circleId]);
-    else await query(`insert into login_requests(auth_subject,email,full_name,status,requested_at,requested_role,phone,document_no,center_id,circle_id)
-      values($1,$2,$3,'pending',now(),$4,$5,$6,$7::uuid,$8::uuid)`,
+    else await query(`insert into login_requests(auth_subject,email,full_name,status,requested_at,requested_role,phone,national_id,requested_circle_id)
+      values($1,$2,$3,'pending',now(),$4,$5,$6,$8::uuid)`,
       [neon.id,neon.email||null,fullName,requestedRole,phone,documentNo,centerId,circleId]);
 
     if(requestedRole==='student'){
