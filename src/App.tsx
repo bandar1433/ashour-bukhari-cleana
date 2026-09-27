@@ -655,11 +655,27 @@ function StudentsTable({ rows, circles, currentRole, onChanged }: { rows: Studen
   const [editing,setEditing]=useState<any>(null);
   if (!rows.length) return <div className="empty">لا توجد بيانات طلاب مطابقة.</div>;
   async function updateStudent(id:string,body:any){await apiPut('/api/students',{id,...body});await onChanged();}
-  async function save(e:any){e.preventDefault();const fd=new FormData(e.currentTarget);await updateStudent(editing.id,Object.fromEntries(fd.entries()));setEditing(null)}
+  async function save(e:any){
+    e.preventDefault();
+    const fd=new FormData(e.currentTarget),all:any=Object.fromEntries(fd.entries());
+    await updateStudent(editing.id,{full_name:all.full_name,grade_level:all.grade_level,birth_date:all.birth_date,status:all.status,circle_id:all.circle_id});
+    if(currentRole==='system_admin'&&editing.user_id){
+      await apiPut('/api/users',{id:editing.user_id,full_name:all.full_name,email:all.email||null,phone:all.phone||null,role:all.role||'student',is_active:all.account_state!=='inactive'});
+      await onChanged();
+    }
+    setEditing(null);
+  }
+  async function suspend(row:any){
+    if(!window.confirm(`إيقاف ملف ${row.full_name} مؤقتًا؟`))return;
+    await updateStudent(row.id,{status:'suspended'});
+    if(currentRole==='system_admin'&&row.user_id)await apiPut('/api/users',{id:row.user_id,is_active:false});
+    await onChanged();
+  }
   return <><div className="table-wrap"><table><thead><tr><th>الاسم</th><th>البريد</th><th>الحلقة</th><th>المركز</th><th>الحالة</th><th>النقاط</th><th>التعديل</th></tr></thead>
-    <tbody>{rows.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email||'—'}</td><td>{row.circle_name||'غير مسند'}</td><td>{row.center_name||'غير مسند'}</td><td>{row.status}</td><td>{row.points_balance??0}</td><td><button className="secondary" onClick={()=>setEditing(row)}>تعديل الملف</button></td></tr>)}</tbody></table></div>
+    <tbody>{rows.map(row=><tr key={row.id}><td>{row.full_name}</td><td>{row.email||'—'}</td><td>{row.circle_name||'غير مسند'}</td><td>{row.center_name||'غير مسند'}</td><td>{row.status}</td><td>{row.points_balance??0}</td><td><div className="rowActions"><button className="secondary" onClick={()=>setEditing(row)}>تعديل الملف</button>{currentRole==='system_admin'&&row.status!=='suspended'&&<button className="secondary" onClick={()=>suspend(row)}>إيقاف مؤقت</button>}</div></td></tr>)}</tbody></table></div>
     {editing&&<div className="panel editPanel"><div className="panelHead"><h3>تعديل ملف الطالب</h3><button className="secondary" onClick={()=>setEditing(null)}>إغلاق</button></div><form className="quickForm" onSubmit={save}>
       <label className="field"><span>اسم الطالب</span><input name="full_name" defaultValue={editing.full_name} required/></label>
+      {currentRole==='system_admin'&&<><label className="field"><span>البريد الإلكتروني</span><input name="email" type="email" defaultValue={editing.email||''}/></label><label className="field"><span>رقم الجوال</span><input name="phone" defaultValue={editing.phone||''}/></label><label className="field"><span>الدور</span><select name="role" defaultValue={editing.role||'student'}><option value="student">طالب</option><option value="guardian">ولي أمر</option><option value="teacher">معلم</option><option value="supervisor">مشرف</option><option value="center_manager">مدير مركز</option></select></label><label className="field"><span>حالة حساب الدخول</span><select name="account_state" defaultValue={editing.is_active===false?'inactive':'active'}><option value="active">نشط</option><option value="inactive">موقوف مؤقتًا</option></select></label></>}
       <label className="field"><span>المرحلة/المستوى</span><input name="grade_level" defaultValue={editing.grade_level||''}/></label>
       <label className="field"><span>تاريخ الميلاد</span><input name="birth_date" type="date" defaultValue={editing.birth_date?String(editing.birth_date).slice(0,10):''}/></label>
       <label className="field"><span>الحالة</span><select name="status" defaultValue={editing.status||'active'}><option value="active">نشط</option><option value="excused">مستأذن</option><option value="suspended">موقوف</option></select></label>
