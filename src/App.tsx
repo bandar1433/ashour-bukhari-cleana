@@ -3,6 +3,7 @@ import {
   apiGet,
   apiPost,
   apiPut,
+  apiDelete,
   CenterRow,
   CircleRow,
   clearAccessCode,
@@ -705,22 +706,43 @@ function CirclesTable({ rows, users, onChanged }: { rows: CircleRow[]; users: Us
 }
 
 function UsersTable({ rows, centers, onChanged }: { rows: UserRow[]; centers: CenterRow[]; onChanged:()=>Promise<void> }) {
+  const [editing,setEditing]=useState<UserRow|null>(null);
   if (!rows.length) return <div className="empty">لا توجد حسابات مطابقة.</div>;
   async function updateUser(id:string,body:any){await apiPut('/api/users',{id,...body});await onChanged();}
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>المركز</th><th>الحالة</th><th>ربط الهوية</th></tr></thead>
-        <tbody>{rows.map(row=><tr key={row.id}>
-          <td>{row.full_name}</td><td>{row.email||'—'}</td>
-          <td><select aria-label={`دور ${row.full_name}`} value={row.role} disabled={row.role==='system_admin'} onChange={e=>updateUser(row.id,{role:e.target.value})}><option value="system_admin">مدير النظام</option><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></td>
-          <td><select aria-label={`مركز ${row.full_name}`} value={row.center_id||''} onChange={e=>updateUser(row.id,{center_id:e.target.value||null})}><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></td>
-          <td><select aria-label={`حالة ${row.full_name}`} value={row.is_active?'active':'inactive'} disabled={row.role==='system_admin'} onChange={e=>updateUser(row.id,{is_active:e.target.value==='active'})}><option value="active">نشط</option><option value="inactive">غير نشط</option></select></td>
-          <td>{row.linked?'مرتبط':'بانتظار ربط الدخول'}</td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-  );
+  async function save(e:React.FormEvent<HTMLFormElement>){
+    e.preventDefault();if(!editing)return;
+    const b:any=Object.fromEntries(new FormData(e.currentTarget).entries());
+    await updateUser(editing.id,{full_name:b.full_name,email:b.email||null,phone:b.phone||null,role:b.role,center_id:b.center_id||null,is_active:b.is_active==='true'});
+    setEditing(null);
+  }
+  async function remove(row:UserRow){
+    if(!window.confirm(`حذف ملف "${row.full_name}" بالكامل؟ سيُحذف حساب المنصة وملف الطالب المرتبط ولا يمكن التراجع عن ذلك.`))return;
+    await apiDelete('/api/users',{id:row.id});await onChanged();
+  }
+  return (<>
+    <div className="table-wrap"><table>
+      <thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>المركز</th><th>الحالة</th><th>ربط الدخول</th><th>الإدارة</th></tr></thead>
+      <tbody>{rows.map(row=><tr key={row.id}>
+        <td>{row.full_name}</td><td>{row.email||<span>غير مضاف</span>}</td>
+        <td>{roleLabel[row.role]||row.role}</td>
+        <td>{centers.find(x=>x.id===row.center_id)?.name||'بدون مركز'}</td>
+        <td>{row.is_active?'نشط':'موقوف مؤقتًا'}</td>
+        <td>{row.linked?'مرتبط':'بانتظار ربط الدخول'}</td>
+        <td><div className="rowActions"><button className="secondary" type="button" onClick={()=>setEditing(row)}>تعديل كامل</button>{row.role!=='system_admin'&&<><button className="secondary" type="button" onClick={()=>updateUser(row.id,{is_active:!row.is_active})}>{row.is_active?'إيقاف مؤقت':'إعادة التفعيل'}</button><button className="dangerButton" type="button" onClick={()=>remove(row)}>حذف نهائي</button></>}</div></td>
+      </tr>)}</tbody>
+    </table></div>
+    {editing&&<div className="panel editPanel"><div className="panelHead"><div><h3>إدارة حساب المستخدم</h3><small>يمكن لمدير النظام تعديل الاسم والبريد والجوال والدور والمركز وحالة الحساب.</small></div><button className="secondary" type="button" onClick={()=>setEditing(null)}>إغلاق</button></div>
+      <form className="quickForm" onSubmit={save}>
+        <label className="field"><span>الاسم الكامل</span><input name="full_name" defaultValue={editing.full_name} required/></label>
+        <label className="field"><span>البريد الإلكتروني</span><input name="email" type="email" defaultValue={editing.email||''} placeholder="يُستخدم لربط الدخول بالحساب"/></label>
+        <label className="field"><span>رقم الجوال</span><input name="phone" defaultValue={editing.phone||''}/></label>
+        <label className="field"><span>الدور</span><select name="role" defaultValue={editing.role} disabled={editing.role==='system_admin'}><option value="system_admin">مدير النظام</option><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label>
+        <label className="field"><span>المركز</span><select name="center_id" defaultValue={editing.center_id||''}><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        <label className="field"><span>حالة الحساب</span><select name="is_active" defaultValue={editing.is_active?'true':'false'} disabled={editing.role==='system_admin'}><option value="true">نشط</option><option value="false">موقوف مؤقتًا</option></select></label>
+        <button className="primary">حفظ جميع التعديلات</button>
+      </form>
+    </div>}
+  </>);
 }
 
 
