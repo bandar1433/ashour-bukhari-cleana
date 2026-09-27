@@ -16,10 +16,11 @@ async function exchangeAuthSession(req:any,res:any){
   const {payload}=await jwtVerify(token,JWKS,{issuer:AUTH_ORIGIN});
   const neon={
     id:String(payload.sub||payload.id||''),
-    email:String(payload.email||''),
-    name:String(payload.name||'')
+    email:String(payload.email||(payload as any).user?.email||(payload as any).user_email||'').trim(),
+    name:String(payload.name||(payload as any).user?.name||(payload as any).display_name||'').trim()
   };
   if(!neon.id) return json(res,401,{error:'Unauthorized',message:'تعذر التحقق من هوية حساب المصادقة.'});
+  if(!neon.email) return json(res,400,{error:'EMAIL_REQUIRED',message:'جلسة المصادقة لم تُرجع البريد الإلكتروني الموثق. أعد تسجيل الدخول بالبريد الإلكتروني أو Google.'});
 
   const appUser=(await query<any>(`
     select id,full_name,email,role::text role,is_active
@@ -37,8 +38,8 @@ async function exchangeAuthSession(req:any,res:any){
       limit 1
     `,[neon.email]))[0];
     if(byEmail){
-      await query('update public.users set auth_subject=$1 where id=$2',[neon.id,byEmail.id]);
-      resolvedUser=byEmail;
+      await query('update public.users set auth_subject=$1,email=$2,updated_at=now() where id=$3',[neon.id,neon.email,byEmail.id]);
+      resolvedUser={...byEmail,email:neon.email};
     }
   }
 
