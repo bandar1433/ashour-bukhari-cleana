@@ -43,6 +43,26 @@ async function exchangeAuthSession(req:any,res:any){
     }
   }
 
+  if(!resolvedUser && draft.documentNo && draft.phone){
+    const documentNo=String(draft.documentNo||'').trim();
+    const phone=String(draft.phone||'').replace(/[\s-]/g,'').trim();
+    const legacyMatches=await query<any>(`
+      select distinct u.id,u.full_name,u.email,u.role::text role,u.is_active
+      from public.users u
+      join public.students s on s.user_id=u.id
+      where s.document_no=$1
+        and regexp_replace(coalesce(s.mobile,u.phone,''),'[\\s-]','','g')=$2
+      limit 2
+    `,[documentNo,phone]);
+    if(legacyMatches.length===1){
+      const legacy=legacyMatches[0];
+      await query('update public.users set auth_subject=$1,email=$2,phone=coalesce(phone,$3),is_active=true,updated_at=now() where id=$4',[neon.id,neon.email,phone,legacy.id]);
+      resolvedUser={...legacy,email:neon.email,is_active:true};
+    }else if(legacyMatches.length>1){
+      return json(res,409,{error:'AMBIGUOUS_LEGACY_ACCOUNT',message:'وجد أكثر من ملف مطابق للهوية والجوال. راجع مدير النظام لربط الحساب الصحيح.'});
+    }
+  }
+
   if(!resolvedUser){
     const requestedRole=['supervisor','teacher','student','guardian'].includes(String(draft.role))?String(draft.role):null;
     const fullName=String(draft.name||neon.name||'').trim()||null;
