@@ -112,7 +112,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
 };
 
 const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
-const CANONICAL_ORIGIN='https://ashour-bukhari-cleana-abdaullahtahaa-1837s-projects.vercel.app';
+const CANONICAL_ORIGIN='https://ashour-bukhari-cleana.vercel.app';
 
 export default function App() {
   const [code, setCode] = useState(getSessionToken() ? 'session' : '');
