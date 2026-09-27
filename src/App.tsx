@@ -69,6 +69,98 @@ function SitePhoto({src,alt,className=''}:{src?:string;alt:string;className?:str
 }
 function CountUp({value,decimals=0,suffix=''}:{value:number;decimals?:number;suffix?:string}){const [shown,setShown]=useState(0);useEffect(()=>{const target=Number(value)||0;if(target===0){setShown(0);return}const start=performance.now(),duration=1250;let frame=0;const tick=(now:number)=>{const p=Math.min(1,(now-start)/duration),ease=1-Math.pow(1-p,2.15);setShown(target*ease);if(p<1)frame=requestAnimationFrame(tick)};frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame)},[value]);return <>{shown.toLocaleString('ar-SA',{minimumFractionDigits:decimals,maximumFractionDigits:decimals})}{suffix}</>}
 function InteractiveMetric({label,value,note,onClick,suffix='',decimals=0}:{label:string;value?:number;note:string;onClick?:()=>void;suffix?:string;decimals?:number}){const body=<><span>{label}</span><b>{typeof value==='number'?<CountUp value={value} decimals={decimals} suffix={suffix}/>:'—'}</b><small>{note}</small></>;return onClick?<button type="button" className="metricAction" onClick={onClick}>{body}<em>عرض التفاصيل ←</em></button>:<article>{body}</article>}
+
+function RoleOverview({role,summary,onNavigate,currentUser}:{role:string;summary:Summary|null;onNavigate:(tab:Tab)=>void;currentUser:any}){
+  const s:any=summary||{};
+  const isAdmin=role==='system_admin';
+  const isSupervisor=role==='supervisor'||role==='center_manager';
+  const title=isAdmin?'لوحة الإدارة العامة':isSupervisor?(role==='center_manager'?'لوحة مدير المركز':'لوحة الإشراف'):'لوحة المعلم';
+  const description=isAdmin
+    ?'رؤية تنفيذية شاملة لحالة المراكز والحلقات والحسابات والأداء اليومي.'
+    :isSupervisor
+      ?'متابعة تشغيل المركز والحلقات والمعلمين والطلاب من شاشة واحدة.'
+      :'إدارة الحلقة يوميًا: الحضور، الإنجاز، الخطط، الطلبات والمتابعة الفردية.';
+  const metrics:any[]=isAdmin?[
+    ['المراكز',s.centers,'نطاق الإدارة العام','centers',''],
+    ['الحلقات',s.circles,`${s.activeCircles||0} حلقة نشطة`,'circles',''],
+    ['الطلاب',s.students,`${s.activeStudents||0} طالب نشط`,'students',''],
+    ['المستخدمون النشطون',s.activeUsers,`من أصل ${s.users||0} حساب`,'users',''],
+    ['حضور اليوم',s.attendanceRate,`${s.presentToday||0} حاضر من ${s.activeStudents||0}`,'teacherToday','%'],
+    ['القرآن اليوم',s.quranPagesToday,`${s.memorizationStudentsToday||0} طالبًا سجل لهم إنجاز`,'reports',' صفحة'],
+    ['طلبات الاعتماد',s.pendingRequests,'حسابات بانتظار المعالجة','users',''],
+    ['حلقات بلا معلم',s.unassignedCircles,'تحتاج إسنادًا إداريًا','circles',''],
+  ]:isSupervisor?[
+    ['طلاب المركز',s.students,`${s.activeStudents||0} طالب نشط`,'students',''],
+    ['الحلقات',s.circles,`${s.activeCircles||0} حلقة نشطة`,'circles',''],
+    ['المعلمون',s.teachers,`${s.teachersWithoutCircle||0} بلا حلقة`,'users',''],
+    ['حضور اليوم',s.attendanceRate,`${s.presentToday||0} حاضر`,'teacherToday','%'],
+    ['الغياب اليوم',s.absentToday,'حالات تحتاج متابعة','teacherToday',''],
+    ['القرآن اليوم',s.quranPagesToday,`${s.memorizationStudentsToday||0} طالبًا له سجل قرآني`,'reports',' صفحة'],
+    ['تغطية الخطط',s.planCoverage,`${s.plannedStudentsThisWeek||0} طالب بخطة هذا الأسبوع`,'plans','%'],
+    ['طلبات الاعتماد',s.pendingRequests,`${s.pendingJoinRequests||0} طلب انضمام للحلقات`,'users',''],
+  ]:[
+    ['طلاب حلقتي',s.students,`${s.activeStudents||0} طالب نشط`,'students',''],
+    ['حضور اليوم',s.attendanceRate,`${s.presentToday||0} حاضر من ${s.activeStudents||0}`,'teacherToday','%'],
+    ['الغياب اليوم',s.absentToday,'حالات تحتاج متابعة','teacherToday',''],
+    ['التأخر',s.lateToday,'حالات تأخر مسجلة','teacherToday',''],
+    ['القرآن اليوم',s.quranPagesToday,`${s.memorizationStudentsToday||0} طالبًا له إنجاز مسجل`,'circleRegister',' صفحة'],
+    ['تغطية الخطط',s.planCoverage,`${s.plannedStudentsThisWeek||0} طالب بخطة هذا الأسبوع`,'plans','%'],
+    ['طلبات الانضمام',s.pendingJoinRequests,'طلبات تنتظر المعالجة','joinRequests',''],
+    ['اعتماد اليوم',s.approvedCirclesToday,`من أصل ${s.circles||0} حلقة`,'teacherToday',''],
+  ];
+
+  const actions:any[]=isAdmin?[
+    ['◎','الحسابات والاعتمادات','مراجعة المستخدمين وطلبات الدخول','users'],
+    ['◇','المراكز','إدارة المراكز ومديريها','centers'],
+    ['◫','الحلقات','الإسناد والتشغيل والمسارات','circles'],
+    ['⚙','الأدوار والصلاحيات','ضبط صلاحيات النظام','roles'],
+    ['▥','التقارير','قراءة مؤشرات الأداء والمتابعة','reports'],
+  ]:isSupervisor?[
+    ['◈','متابعة اليوم','الحضور والإنجاز اليومي','teacherToday'],
+    ['◫','الحلقات','المعلمون وأعداد الطلاب','circles'],
+    ['◉','الطلاب','ملفات طلاب المركز','students'],
+    ['＋','طلبات الانضمام','طلبات الطلاب الجديدة','joinRequests'],
+    ['▥','التقارير','أداء المركز والحلقات','reports'],
+  ]:[
+    ['◈','سجل اليوم','الحضور والحفظ والمراجعة','teacherToday'],
+    ['▤','الخطط الأسبوعية','إعداد ومراجعة أهداف الطلاب','plans'],
+    ['▦','سجل الحلقة','السجل الشهري والاعتمادات','circleRegister'],
+    ['＋','طلبات الانضمام','قبول طلاب الحلقة','joinRequests'],
+    ['▥','تقارير حلقتي','متابعة الأداء والحالات','reports'],
+  ];
+
+  const alerts:any[]=isAdmin?[
+    [s.pendingRequests,'طلبات حسابات تنتظر الاعتماد','users'],
+    [s.unassignedCircles,'حلقات نشطة بلا معلم','circles'],
+    [s.inactiveUsers,'حسابات غير مفعلة','users'],
+    [s.unassignedStudents,'طلاب غير مسندين إلى حلقة','students'],
+    [s.unrecordedAttendanceToday,'طلاب لم يسجل حضورهم اليوم حتى الآن','teacherToday'],
+  ]:isSupervisor?[
+    [s.unassignedCircles,'حلقات بلا معلم','circles'],
+    [s.teachersWithoutCircle,'معلمون بلا حلقة مسندة','users'],
+    [s.pendingRequests,'طلبات حسابات تنتظر الاعتماد','users'],
+    [s.pendingJoinRequests,'طلبات انضمام تنتظر المعالجة','joinRequests'],
+    [s.unrecordedAttendanceToday,'طلاب لم يسجل حضورهم اليوم حتى الآن','teacherToday'],
+  ]:[
+    [s.unrecordedAttendanceToday,'طلاب لم يسجل حضورهم اليوم حتى الآن','teacherToday'],
+    [Math.max(0,Number(s.activeStudents||0)-Number(s.memorizationStudentsToday||0)),'طلاب لم يسجل لهم إنجاز قرآني اليوم حتى الآن','circleRegister'],
+    [s.pendingJoinRequests,'طلبات انضمام تنتظر المعالجة','joinRequests'],
+  ];
+  const visibleAlerts=alerts.filter(x=>Number(x[0]||0)>0);
+
+  return <div className="roleDashboard">
+    <section className="roleDashboardHero">
+      <div><span className="roleDashboardEyebrow">{roleLabel[role]||'مستخدم'}</span><h2>{title}</h2><p>{description}</p></div>
+      <div className="roleScopeCard"><small>نطاق المسؤولية</small><b>{s.scopeLabel||'—'}</b><span>{currentUser?.full_name||''}</span></div>
+    </section>
+    <div className="roleMetricsGrid interactiveKpis">{metrics.map(([label,value,note,tab,suffix])=><InteractiveMetric key={label} label={label} value={Number(value||0)} note={note} suffix={suffix} onClick={()=>onNavigate(tab as Tab)}/>)}</div>
+    <div className="roleDashboardColumns">
+      <section className="roleQuickPanel"><div className="rolePanelHead"><div><span>الوصول السريع</span><h3>مهامي الأساسية</h3></div><small>بحسب صلاحيات حسابك</small></div><div className="roleActionsGrid">{actions.map(([icon,title,note,tab])=><button type="button" key={title} onClick={()=>onNavigate(tab as Tab)}><span>{icon}</span><div><b>{title}</b><small>{note}</small></div><em>←</em></button>)}</div></section>
+      <section className="roleAttentionPanel"><div className="rolePanelHead"><div><span>المتابعة</span><h3>تحتاج انتباهك</h3></div><small>مؤشرات حية</small></div>{visibleAlerts.length?<div className="roleAlerts">{visibleAlerts.map(([value,label,tab])=><button type="button" key={label} onClick={()=>onNavigate(tab as Tab)}><b>{Number(value||0).toLocaleString('ar-SA')}</b><span>{label}</span><em>عرض ←</em></button>)}</div>:<div className="roleAllClear"><span>✓</span><b>لا توجد عناصر عاجلة ضمن نطاقك الآن</b><small>ستظهر هنا الحالات التي تحتاج متابعة مباشرة.</small></div>}</section>
+    </div>
+  </div>;
+}
+
 const objectives = [
 ['01','إتقان التلاوة والحفظ','بناء قراءة صحيحة وحفظ متدرج يقوم على الإتقان والمراجعة المستمرة.'],['02','تعميق الصلة بالقرآن','تربية الطالب على ملازمة كتاب الله وتعظيمه وتحويل التعلم إلى أثر في السلوك.'],['03','متابعة فردية دقيقة','خطة واضحة لكل طالب مع رصد الحضور والإنجاز والحفظ والمراجعة بصورة منتظمة.'],['04','تمكين المعلم','توفير أدوات عملية تساعد المعلم على إدارة الحلقة وقياس تقدم طلابه بوضوح.'],['05','تعزيز شراكة الأسرة','إتاحة تقارير مختصرة وواضحة تعين الأسرة على متابعة مسيرة الطالب وتشجيعه.'],['06','التحفيز والاستدامة','بناء بيئة مشجعة بالنقاط والجوائز والإنجازات بما يحافظ على الدافعية والاستمرار.']];
 const values=[['الإخلاص','نستحضر شرف خدمة كتاب الله وابتغاء الأجر في التعليم والتعلم.'],['الإتقان','نعتمد الجودة والدقة في التلاوة والحفظ والمتابعة والتقويم.'],['الرحمة','نبني علاقة تعليمية راشدة تجمع الرفق والاحتواء والتوجيه.'],['القدوة','نجعل السلوك القرآني جزءاً أصيلاً من شخصية المعلم والمتعلم.'],['الانضباط','نلتزم بالمواعيد والخطط والمتابعة المنتظمة لتحقيق نتائج قابلة للقياس.'],['التعاون','نعزز الشراكة بين الإدارة والمعلم والطالب والأسرة لخدمة المسيرة القرآنية.']];
@@ -86,7 +178,7 @@ const roleLabel: Record<string, string> = {
 };
 
 const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> = {
-  overview: { title: 'نظرة عامة', subtitle: 'ملخص مباشر لأهم مؤشرات المنصة وتشغيل الحلقات.', short: 'الرئيسية' },
+  overview: { title: 'لوحة القيادة', subtitle: 'مؤشرات تشغيلية مخصصة بحسب صلاحيات الحساب ونطاق إدارته.', short: 'الرئيسية' },
   centers: { title: 'المراكز والفروع', subtitle: 'إدارة المراكز وربطها بالمديرين والحلقات.', short: 'المراكز' },
   students: { title: 'الطلاب', subtitle: 'إدارة سجلات الطلاب وإسنادهم إلى الحلقات ومتابعة حالتهم.', short: 'الطلاب' },
   circles: { title: 'الحلقات القرآنية', subtitle: 'تنظيم الحلقات والمعلمين والمسارات التعليمية.', short: 'الحلقات' },
@@ -573,14 +665,20 @@ export default function App() {
         <aside className="adminSidebar">
           <div className="sidebarBrand"><div className="sidebarLogo"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></div><div><b>حلقات عاشور بخاري</b><small>المنصة القرآنية التعليمية</small></div></div>
           <div className="sidebarContext"><span>المستخدم الحالي</span><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong><small>{currentUser?.email||''}</small></div>
-          {isStaff&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span><span>لوحة المؤشرات</span></button>
-          <div className="sidebarSectionLabel">العمل اليومي</div><button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span><span>سجل اليوم</span></button><button className={activeTab==='circleRegister'?'selected':''} onClick={()=>goTab('circleRegister')}><span className="navDot">▦</span><span>سجل الحلقة</span></button><button className={activeTab==='plans'?'selected':''} onClick={()=>goTab('plans')}><span className="navDot">▤</span><span>الخطط الأسبوعية</span></button><button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span><span>الطلاب</span></button><button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span><span>طلبات الانضمام</span></button>
-          <div className="sidebarSectionLabel">الأداء والتحفيز</div><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>التقييم والإنجاز</span></button><button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span><span>المهام والجوائز</span></button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span><span>المسابقات</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>التقارير والمؤشرات</span></button>
-          {['system_admin','center_manager','supervisor'].includes(currentRole)&&<><div className="sidebarSectionLabel">الإدارة</div><button className={activeTab==='centers'?'selected':''} onClick={()=>goTab('centers')}><span className="navDot">◇</span><span>المراكز</span></button><button className={activeTab==='circles'?'selected':''} onClick={()=>goTab('circles')}><span className="navDot">◫</span><span>الحلقات</span></button><button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span><span>الحسابات والدخول</span></button><button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">⚙</span><span>التشغيل والإعدادات</span></button></>}
+          {currentRole==='teacher'&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span><span>لوحة المعلم</span></button>
+          <div className="sidebarSectionLabel">حلقتي</div><button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span><span>سجل اليوم</span></button><button className={activeTab==='circleRegister'?'selected':''} onClick={()=>goTab('circleRegister')}><span className="navDot">▦</span><span>سجل الحلقة</span></button><button className={activeTab==='plans'?'selected':''} onClick={()=>goTab('plans')}><span className="navDot">▤</span><span>الخطط الأسبوعية</span></button><button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span><span>طلاب حلقتي</span></button><button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span><span>طلبات الانضمام</span></button>
+          <div className="sidebarSectionLabel">الأداء</div><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>التقييم والإنجاز</span></button><button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span><span>المهام والجوائز</span></button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span><span>المسابقات</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>تقارير حلقتي</span></button>
           <div className="sidebarSectionLabel">التواصل والمصادر</div><button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span><span>الإشعارات</span></button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span><span>المكتبة</span></button></>}
+          {['supervisor','center_manager'].includes(currentRole)&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span><span>{currentRole==='center_manager'?'لوحة مدير المركز':'لوحة المشرف'}</span></button>
+          <div className="sidebarSectionLabel">إشراف المركز</div><button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span><span>متابعة اليوم</span></button><button className={activeTab==='circles'?'selected':''} onClick={()=>goTab('circles')}><span className="navDot">◫</span><span>الحلقات والمعلمون</span></button><button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span><span>طلاب المركز</span></button><button className={activeTab==='joinRequests'?'selected':''} onClick={()=>goTab('joinRequests')}><span className="navDot">＋</span><span>طلبات الانضمام</span></button><button className={activeTab==='plans'?'selected':''} onClick={()=>goTab('plans')}><span className="navDot">▤</span><span>الخطط الأسبوعية</span></button><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>التقييم والإنجاز</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>تقارير المركز</span></button>
+          <div className="sidebarSectionLabel">إدارة المركز</div><button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span><span>الحسابات والاعتمادات</span></button><button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">⚙</span><span>إعدادات التشغيل</span></button>
+          <div className="sidebarSectionLabel">التواصل</div><button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span><span>الإشعارات</span></button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span><span>المسابقات</span></button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span><span>المكتبة</span></button></>}
+          {currentRole==='system_admin'&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span className="navDot">⌂</span><span>لوحة الإدارة العامة</span></button>
+          <div className="sidebarSectionLabel">الإدارة العامة</div><button className={activeTab==='centers'?'selected':''} onClick={()=>goTab('centers')}><span className="navDot">◇</span><span>المراكز والفروع</span></button><button className={activeTab==='circles'?'selected':''} onClick={()=>goTab('circles')}><span className="navDot">◫</span><span>الحلقات والمعلمون</span></button><button className={activeTab==='users'?'selected':''} onClick={()=>goTab('users')}><span className="navDot">◎</span><span>الحسابات والاعتمادات</span></button><button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span><span>الأدوار والصلاحيات</span></button><button className={activeTab==='operations'?'selected':''} onClick={()=>goTab('operations')}><span className="navDot">▣</span><span>التشغيل والإعدادات</span></button>
+          <div className="sidebarSectionLabel">المتابعة والأداء</div><button className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span className="navDot">◉</span><span>جميع الطلاب</span></button><button className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span className="navDot">◈</span><span>متابعة اليوم</span></button><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>الأداء والإنجاز</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>التقارير العامة</span></button><button className={activeTab==='competitions'?'selected':''} onClick={()=>goTab('competitions')}><span className="navDot">◇</span><span>المسابقات</span></button>
+          <div className="sidebarSectionLabel">المحتوى والتواصل</div><button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span><span>الإشعارات</span></button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span><span>المكتبة</span></button><button className={activeTab==='news'?'selected':''} onClick={()=>goTab('news')}><span className="navDot">▤</span><span>الموقع والأخبار</span></button></>}
           {currentRole==='student'&&<><div className="sidebarSectionLabel">الرئيسية</div><button className={activeTab==='studentProfile'?'selected':''} onClick={()=>goTab('studentProfile')}><span className="navDot">◇</span><span>ملفي القرآني</span></button><div className="sidebarSectionLabel">متابعتي</div><button className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span className="navDot">◎</span><span>تقييمي وإنجازي</span></button><button className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span className="navDot">★</span><span>مهامي وجوائزي</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>تقاريري</span></button><div className="sidebarSectionLabel">التواصل</div><button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span><span>الإشعارات</span></button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span><span>المكتبة</span></button></>}
           {currentRole==='guardian'&&<><div className="sidebarSectionLabel">ولي الأمر</div><button className={activeTab==='guardian'?'selected':''} onClick={()=>goTab('guardian')}><span className="navDot">◉</span><span>متابعة الأبناء</span></button><button className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span className="navDot">▥</span><span>تقارير الأبناء</span></button><button className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span className="navDot">◌</span><span>الإشعارات</span></button><button className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span className="navDot">▧</span><span>المكتبة</span></button></>}
-          {isRoot&&<><div className="sidebarSectionLabel">إدارة النظام</div><button className={activeTab==='roles'?'selected':''} onClick={()=>goTab('roles')}><span className="navDot">⚙</span><span>الأدوار والصلاحيات</span></button><button className={activeTab==='news'?'selected':''} onClick={()=>goTab('news')}><span className="navDot">▧</span><span>الموقع والأخبار</span></button></>}
           <div className="sidebarSectionLabel">الحساب</div><button className={activeTab==='profile'?'selected':''} onClick={()=>goTab('profile')}><span className="navDot">◉</span><span>الملف الشخصي</span></button><div className="sidebarAccount"><span className="onlineDot"></span><div className="sidebarAccountIdentity"><b>{currentUser?.full_name||'مستخدم المنصة'}</b><small>{roleLabel[currentUser?.role||currentRole]||'مستخدم'} · جلسة آمنة 30 دقيقة</small></div><button className="accountHome" title="الواجهة الرئيسية" onClick={()=>{setPublicMode(true);setPublicView('الرئيسية')}}>⌂</button><button className="exit" onClick={handleLogout}>خروج</button></div>
         </aside>
         <section className="dashboardContent">
@@ -589,8 +687,8 @@ export default function App() {
             <div className="adminTopActions"><div className="topbarIdentity" title={currentUser?.email||''}><span className="topbarAvatar">{currentUser?.full_name?.trim()?.charAt(0)||'م'}</span><div><small>المستخدم الحالي</small><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong></div></div><button className="secondary" type="button" onClick={()=>{setPublicMode(true);setPublicView('الرئيسية')}}>⌂ الواجهة الرئيسية</button><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
           </div>
           {error&&<div className="notice">{error}</div>}
-          {activeTab==='overview'&&<><div className="kpis interactiveKpis"><InteractiveMetric label="الطلاب" value={summary?.students} note="طالب مسجل" onClick={()=>goTab('students')}/><InteractiveMetric label="المعلمون" value={summary?.teachers} note="معلم في النظام" onClick={()=>goTab('users')}/><InteractiveMetric label="الحلقات" value={summary?.circles} note="حلقة قرآنية" onClick={()=>goTab('circles')}/><InteractiveMetric label="المراكز" value={summary?.centers} note="مركز وفرع" onClick={()=>goTab('centers')}/></div>{isStaff&&<AgreedFeatures mode="interventions" currentRole={currentRole} students={students}/>} </>}
-          <div className="panel mainPanel">
+          {activeTab==='overview'&&isStaff&&<RoleOverview role={currentRole} summary={summary} onNavigate={goTab} currentUser={currentUser}/>} 
+          {activeTab!=='overview'&&<div className="panel mainPanel">
             <div className="panelHead institutionalPanelHead"><div><span className="panelEyebrow">{activeTab==='overview'?'ملخص تنفيذي':currentRole==='student'?'مساحة الطالب':currentRole==='teacher'?'مساحة المعلم':'إدارة البيانات'}</span><h2>{tabMeta[activeTab].title}</h2><small>{tabMeta[activeTab].subtitle}</small></div>{!['overview','roles','teacherToday','circleRegister','evaluations','studentProfile','selfService','motivation','competitions','notifications','reports','operations','joinRequests','library','guardian','quranJourney'].includes(activeTab)&&<div className="searchBox"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="بحث في السجلات..." /></div>}</div>
             {loadState==='loading'&&<div className="emptyState">جارٍ تحميل البيانات...</div>}
 
@@ -632,7 +730,7 @@ export default function App() {
             {['selfService','motivation','competitions','notifications','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
             {['library','guardian','quranJourney','profile','reports'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>صورة الخبر</span><input name="image_url" type="url" placeholder="https://..." /></label><label className="field"><span>رابط الفيديو</span><input name="video_url" type="url" placeholder="https://..." /></label><label className="field"><span>تاريخ الفعالية</span><input name="event_date" type="date" /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
-          </div>
+          </div>}
         </section>
       </div>}
       {(!code||publicMode)&&<footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>}
