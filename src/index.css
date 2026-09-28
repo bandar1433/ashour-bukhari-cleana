@@ -554,3 +554,14 @@ footer{background:#082f29;padding:42px max(5%,calc((100vw - 1380px)/2));margin-t
 @media(max-width:1180px){.roleMetricsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.roleDashboardColumns{grid-template-columns:1fr}}
 @media(max-width:700px){.roleDashboardHero{align-items:flex-start;flex-direction:column;padding:19px}.roleDashboardHero h2{font-size:23px}.roleScopeCard{width:100%;min-width:0}.roleMetricsGrid{grid-template-columns:1fr 1fr}.roleActionsGrid{grid-template-columns:1fr}}
 @media(max-width:480px){.roleMetricsGrid{grid-template-columns:1fr}}
+
+.studentMobileNav{display:none}
+@media(max-width:760px){
+  .workspacePro.role-student .adminSidebar{display:none!important}
+  .workspacePro.role-student .dashboardContent{padding-bottom:94px!important}
+  .studentMobileNav{position:fixed;z-index:70;right:0;left:0;bottom:0;height:76px;padding:7px max(7px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom));background:#063f39;display:grid;grid-template-columns:repeat(6,1fr);align-items:center;box-shadow:0 -8px 28px rgba(4,45,40,.14);direction:rtl}
+  .studentMobileNav button{min-width:0;height:58px;padding:4px 2px;border-radius:14px;background:transparent;color:#d5e5e0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .studentMobileNav button span{font-size:21px;line-height:1}.studentMobileNav button small{font-size:8px;white-space:nowrap}
+  .studentMobileNav button.selected{background:#fff;color:#0b5649;box-shadow:0 5px 18px rgba(0,0,0,.16)}
+  .studentMobileNav button.selected small{font-weight:800}
+}
