@@ -565,3 +565,10 @@ footer{background:#082f29;padding:42px max(5%,calc((100vw - 1380px)/2));margin-t
   .studentMobileNav button.selected{background:#fff;color:#0b5649;box-shadow:0 5px 18px rgba(0,0,0,.16)}
   .studentMobileNav button.selected small{font-weight:800}
 }
+
+
+/* Immediate record editor: keep the form in view and close it after successful save */
+.recordModalBackdrop{position:fixed;inset:0;z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:clamp(18px,7vh,72px) 16px;background:rgba(7,35,29,.42);backdrop-filter:blur(3px);overflow:auto}
+.recordModal{width:min(760px,100%);max-height:calc(100vh - 36px);overflow:auto;margin:0!important;border-radius:18px!important;box-shadow:0 22px 70px rgba(4,34,27,.22)!important}
+.recordModal .panelHead{position:sticky;top:0;z-index:3}
+@media(max-width:760px){.recordModalBackdrop{padding:12px 8px;align-items:flex-start}.recordModal{max-height:calc(100dvh - 24px);border-radius:16px!important}.recordModal .quickForm{margin-bottom:0!important}}
