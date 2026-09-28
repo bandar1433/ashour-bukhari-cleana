@@ -661,7 +661,7 @@ export default function App() {
           </section>
         </div>}
       </> :
-      <div className="workspace workspacePro">
+      <div className={`workspace workspacePro role-${currentRole}`}>
         <aside className="adminSidebar">
           <div className="sidebarBrand"><div className="sidebarLogo"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></div><div><b>حلقات عاشور بخاري</b><small>المنصة القرآنية التعليمية</small></div></div>
           <div className="sidebarContext"><span>المستخدم الحالي</span><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong><small>{currentUser?.email||''}</small></div>
@@ -727,11 +727,19 @@ export default function App() {
                 </>}
               </>}
             </>}
-            {['selfService','motivation','competitions','notifications','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
+            {['selfService','motivation','competitions','notifications','operations','joinRequests'].includes(activeTab)&&<ExtendedOperations key={activeTab} mode={activeTab as any} currentRole={currentRole} students={students} circles={circles} centers={centers}/>} 
             {['library','guardian','quranJourney','profile','reports'].includes(activeTab)&&<AgreedFeatures mode={activeTab as any} currentRole={currentRole} students={students}/>}
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>صورة الخبر</span><input name="image_url" type="url" placeholder="https://..." /></label><label className="field"><span>رابط الفيديو</span><input name="video_url" type="url" placeholder="https://..." /></label><label className="field"><span>تاريخ الفعالية</span><input name="event_date" type="date" /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>}
         </section>
+        {currentRole==='student'&&<nav className="studentMobileNav" aria-label="تنقل الطالب">
+          <button type="button" className={activeTab==='studentProfile'?'selected':''} onClick={()=>goTab('studentProfile')}><span>◇</span><small>ملفي</small></button>
+          <button type="button" className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span>◎</span><small>تقييمي</small></button>
+          <button type="button" className={activeTab==='motivation'?'selected':''} onClick={()=>goTab('motivation')}><span>★</span><small>مهامي</small></button>
+          <button type="button" className={activeTab==='reports'?'selected':''} onClick={()=>goTab('reports')}><span>▥</span><small>تقاريري</small></button>
+          <button type="button" className={activeTab==='notifications'?'selected':''} onClick={()=>goTab('notifications')}><span>◌</span><small>الإشعارات</small></button>
+          <button type="button" className={activeTab==='library'?'selected':''} onClick={()=>goTab('library')}><span>▧</span><small>المكتبة</small></button>
+        </nav>}
       </div>}
       {(!code||publicMode)&&<footer><div><b>حلقات عاشور بخاري</b><p>منصة قرآنية للتعليم والمتابعة والإدارة.</p></div><div>جميع الحقوق محفوظة</div></footer>}
     </main>
