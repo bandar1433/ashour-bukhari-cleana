@@ -1,4 +1,5 @@
 import {query} from '../_lib/db.js';
+import {riyadhDate} from '../_lib/date.js';
 import {isStaff,validUuid} from '../_lib/actor.js';
 import {json} from '../_lib/http.js';
 
@@ -26,7 +27,7 @@ export async function features(req:any,res:any,u:any){
   if(sub==='reports'){
     if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
     const period=String(req.query?.period||'weekly');
-    const nowFmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const nowFmt=riyadhDate();
     const today=new Date(nowFmt+'T00:00:00Z');
     const iso=(d:Date)=>d.toISOString().slice(0,10);
     let from=String(req.query?.from||''),to=String(req.query?.to||'');
