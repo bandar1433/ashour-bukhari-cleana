@@ -121,8 +121,17 @@ export function getSessionToken(): string {
   const token=localStorage.getItem(SESSION_KEY)||'';
   if(!token)return '';
   const expiry=Number(sessionPayload(token)?.exp||0)*1000;
-  if(expiry&&expiry<=Date.now()){localStorage.removeItem(SESSION_KEY);return ''}
+  if(expiry&&expiry<=Date.now()){
+    const offline=typeof navigator!=='undefined'&&navigator.onLine===false;
+    const offlineGrace=offline&&(Date.now()-expiry)<=12*60*60*1000;
+    if(!offlineGrace){localStorage.removeItem(SESSION_KEY);return ''}
+  }
   return token;
+}
+
+export function getSessionUserId():string{
+  const token=localStorage.getItem(SESSION_KEY)||'';
+  return String(sessionPayload(token)?.userId||'');
 }
 
 export function setSessionToken(token: string) {
