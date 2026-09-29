@@ -19,6 +19,7 @@ import {
 } from './lib/api';
 import { authClient } from './lib/auth';
 import {cacheStudentProfile,getCachedStudentProfile} from './lib/offline';
+import {riyadhDate} from './lib/date';
 import ExtendedOperations from './ExtendedOperations';
 import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
 import { MadinahMushafRange, madinahSurahName } from './MadinahMushafRange';
@@ -206,7 +207,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
 };
 
-const riyadhToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const riyadhToday=()=>riyadhDate();
 const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
 const CANONICAL_ORIGIN='https://ashour-bukhari-cleana.vercel.app';
 
