@@ -257,9 +257,9 @@ export async function evaluations(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   const from=validDate(req.query?.from)||today(),to=validDate(req.query?.to)||from;
   const rows=await query<any>(`with days as (
-    select s.id student_id,s.full_name,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start,
+    select s.id student_id,s.full_name,s.circle_id,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start,
       case extract(dow from d)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
-    from students s cross join generate_series($4::date,$5::date,'1 day') d where extract(dow from d)<>5 and
+    from students s cross join generate_series($4::date,$5::date,'1 day') d where extract(dow from d)<>5 and s.status='active' and
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
   ), plan as (
     select d.student_id,d.record_day,
@@ -271,17 +271,42 @@ export async function evaluations(req:any,res:any,u:any){
       sum(case when record_type='review' then coalesce(page_count,0) else 0 end)::numeric review_pages
     from memorization_records where record_date between $4 and $5 group by student_id,record_date
   )
-  select d.student_id,d.full_name,d.record_day as record_date,a.status,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
-    coalesce(p.new_target,0) new_daily_target,coalesce(p.review_target,0) review_daily_target,
-    case when coalesce(p.new_target,0)>0 then least(30,round(30*coalesce(done.new_pages,0)/p.new_target))::int else 30 end new_grade,
-    case when coalesce(p.review_target,0)>0 then least(40,round(40*coalesce(done.review_pages,0)/p.review_target))::int else 40 end review_grade,
-    case when a.status='excused' then null when a.status='absent' then 0 when a.status in ('present','late') and coalesce(a.late_minutes,0)<=30 then 30 when a.status in ('present','late') and coalesce(a.late_minutes,0)<=60 then 20 when a.status in ('present','late') then 10 else 0 end attendance_score
+  select d.student_id,d.full_name,d.circle_id,d.record_day as record_date,a.status,a.late_minutes,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
+    coalesce(p.new_target,0) new_daily_target,coalesce(p.review_target,0) review_daily_target
   from days d left join plan p on p.student_id=d.student_id and p.record_day=d.record_day left join done on done.student_id=d.student_id and done.record_date=d.record_day
   left join attendance a on a.student_id=d.student_id and a.attendance_date=d.record_day order by d.record_day desc,d.full_name`,[u.role,u.center_id,u.id,from,to]);
-  const enriched=rows.map((r:any)=>({...r,daily_score:r.attendance_score===null?null:Number(r.new_grade)+Number(r.review_grade)+Number(r.attendance_score)}));
-  const scored=enriched.filter((r:any)=>r.daily_score!==null);
-  return json(res,200,{rows:enriched,weights:{new:30,review:40,attendance:30},formula:'الحفظ الجديد 30 + المراجعة 40 + الحضور 30',average:scored.length?Math.round(scored.reduce((n:number,r:any)=>n+Number(r.daily_score),0)/scored.length):0});
+  const studentIds=[...new Set(rows.map((x:any)=>String(x.student_id)))];
+  const custom=studentIds.length?await query<any>('select * from student_criterion_records where student_id=any($1::uuid[]) and record_date between $2::date and $3::date',[studentIds,from,to]):[];
+  const cache=new Map<string,any[]>(),enriched:any[]=[];
+  for(const r of rows){
+    const date=String(r.record_date).slice(0,10),key=String(r.circle_id)+'|'+date.slice(0,7);
+    if(!cache.has(key))cache.set(key,await criteriaForCircle(String(r.circle_id),date,u.id));
+    const base={...r,new_done:Number(r.new_pages||0),review_done:Number(r.review_pages||0),new_target_pages:Number(r.new_daily_target||0),review_target_pages:Number(r.review_daily_target||0)};
+    const score=scoreCriteria(cache.get(key)||[],base,custom.filter((x:any)=>x.student_id===r.student_id&&String(x.record_date).slice(0,10)===date));
+    enriched.push({...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)});
+  }
+  const grouped=new Map<string,any>();for(const r of enriched){if(r.daily_score===null)continue;const k=String(r.student_id);if(!grouped.has(k))grouped.set(k,{student_id:r.student_id,full_name:r.full_name,circle_id:r.circle_id,scores:[]});grouped.get(k).scores.push(Number(r.daily_score))}
+  const monthly=[...grouped.values()].map((x:any)=>{const score=Math.round(x.scores.reduce((a:number,b:number)=>a+b,0)/x.scores.length*10)/10;return {...x,score,band:bandFor(score),days:x.scores.length}});
+  const average=monthly.length?Math.round(monthly.reduce((n:number,x:any)=>n+x.score,0)/monthly.length*10)/10:0;
+  const sameMonth=from.slice(0,7)===to.slice(0,7),month=from.slice(0,7)+'-01',monthEnd=new Date(Date.UTC(Number(from.slice(0,4)),Number(from.slice(5,7)),0)).toISOString().slice(0,10),canFinalize=sameMonth&&to===monthEnd&&to<today();
+  if(canFinalize){
+    for(const x of monthly){
+      const prevDate=new Date(month+'T00:00:00Z');prevDate.setUTCMonth(prevDate.getUTCMonth()-1);const prevMonth=prevDate.toISOString().slice(0,10);
+      const prev=(await query<any>('select band,warning_count from student_monthly_evaluations where student_id=$1 and month=$2::date',[x.student_id,prevMonth]))[0];
+      const warnings=x.band==='yellow'?(prev?.band==='yellow'?Number(prev.warning_count||0)+1:1):0,supervisor=x.band==='red'?'pending':null;
+      await query(`insert into student_monthly_evaluations(student_id,circle_id,month,score,band,warning_count,supervisor_status)
+       values($1,$2,$3::date,$4,$5,$6,$7)
+       on conflict(student_id,month) do update set score=excluded.score,band=excluded.band,warning_count=excluded.warning_count,supervisor_status=case when excluded.band='red' then coalesce(student_monthly_evaluations.supervisor_status,'pending') else null end,updated_at=now()`,
+       [x.student_id,x.circle_id,month,x.score,x.band,warnings,supervisor]);
+      x.warning_count=warnings;x.supervisor_status=supervisor;
+    }
+  }else{
+    const stored=studentIds.length?await query<any>('select student_id,warning_count,supervisor_status from student_monthly_evaluations where student_id=any($1::uuid[]) and month=$2::date',[studentIds,month]):[];
+    const sm=new Map(stored.map((x:any)=>[String(x.student_id),x]));for(const x of monthly){const v=sm.get(String(x.student_id));if(v){x.warning_count=Number(v.warning_count||0);x.supervisor_status=v.supervisor_status}}
+  }
+  return json(res,200,{rows:enriched,monthly,average,thresholds:{green:85,yellow:75},finalized:canFinalize});
 }
+
 
 export async function studentProfile(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
