@@ -1,6 +1,6 @@
 import {apiPost,getSessionUserId} from './api';
 
-export type OfflineKind='punch'|'quran';
+export type OfflineKind='punch'|'quran'|'criterion'|'note';
 export type OfflineOperation={
   id:string;
   userId:string;
@@ -59,7 +59,8 @@ export async function syncOfflineOperations(){
   const mine=q.filter(x=>x.userId===uid).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   for(const op of mine){
     try{
-      await apiPost('/api/ops?action=self-service&kind='+op.kind,{
+      const path=op.kind==='criterion'?'/api/ops?action=criterion-record':op.kind==='note'?'/api/ops?action=student-note':'/api/ops?action=self-service&kind='+op.kind;
+      await apiPost(path,{
         ...op.body,
         offline_operation_id:op.id,
         offline_event_at:op.event_at,
