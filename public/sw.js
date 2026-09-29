@@ -1,7 +1,20 @@
-const CACHE='ashour-offline-v1';
+const CACHE='ashour-offline-v2';
 const SHELL=['/','/index.html','/manifest.webmanifest','/resources/logo-halaqat-ashour-bukhari.png'];
+
+async function precache(){
+  const cache=await caches.open(CACHE);
+  await cache.addAll(SHELL);
+  try{
+    const response=await fetch('/index.html',{cache:'no-store'});
+    const html=await response.clone().text();
+    await cache.put('/index.html',response);
+    const assets=[...html.matchAll(/(?:src|href)=["']([^"']+\.(?:js|css))["']/g)]
+      .map(x=>x[1]).filter(x=>x.startsWith('/'));
+    if(assets.length)await cache.addAll([...new Set(assets)]);
+  }catch{}
+}
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
+  event.waitUntil(precache().then(()=>self.skipWaiting()));
 });
 self.addEventListener('activate',event=>{
   event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
