@@ -18,6 +18,7 @@ import {
   UserRow,
 } from './lib/api';
 import { authClient } from './lib/auth';
+import {cacheStudentProfile,getCachedStudentProfile} from './lib/offline';
 import ExtendedOperations from './ExtendedOperations';
 import { LoginRequestsPanel,RolesPanel } from './AdminAccessPanels';
 import { MadinahMushafRange, madinahSurahName } from './MadinahMushafRange';
@@ -287,6 +288,14 @@ export default function App() {
       setUsers(usersData.items || []); setLoginRequests(usersData.requests||[]); setRoleData(rolesData||{roles:[],permissions:[]}); setNews(newsData.items||[]); setCurrentUser(profileData||null);
       setLoadState('ready');
     } catch (err) {
+      const cached=currentRole==='student'?getCachedStudentProfile():null;
+      if(cached&&typeof navigator!=='undefined'&&!navigator.onLine){
+        setStudentProfile(cached);
+        setCurrentUser({...(cached.student||{}),role:'student'});
+        setLoadState('ready');
+        setError('');
+        return;
+      }
       setLoadState('error');
       setError(err instanceof Error ? err.message : 'حدث خطأ غير معروف');
     }
@@ -306,13 +315,35 @@ export default function App() {
   }, [code]);
   useEffect(()=>{
     if(!code)return;
-    const expiry=getSessionExpiryMs(),remaining=expiry-Date.now();
-    if(!expiry||remaining<=0){void handleLogout();return}
-    const timer=window.setTimeout(()=>void handleLogout(),remaining);
-    const expired=()=>void handleLogout();
+    let timer:number|undefined;
+    const check=()=>{
+      const expiry=getSessionExpiryMs(),remaining=expiry-Date.now();
+      if(expiry&&remaining>0){timer=window.setTimeout(check,Math.max(1000,remaining+100));return}
+      if(currentRole==='student'&&typeof navigator!=='undefined'&&!navigator.onLine){
+        timer=window.setTimeout(check,60000);
+        return;
+      }
+      void handleLogout();
+    };
+    check();
+    const expired=()=>{if(currentRole==='student'&&!navigator.onLine)return;void handleLogout()};
     window.addEventListener('ashour:session-expired',expired);
-    return()=>{window.clearTimeout(timer);window.removeEventListener('ashour:session-expired',expired)};
-  },[code]);
+    return()=>{if(timer)window.clearTimeout(timer);window.removeEventListener('ashour:session-expired',expired)};
+  },[code,currentRole]);
+
+  useEffect(()=>{
+    if(!code||currentRole!=='student')return;
+    const reconnect=async()=>{
+      try{
+        const state=await finishGoogleSession();
+        if(state==='ready')window.dispatchEvent(new CustomEvent('ashour:session-refreshed'));
+      }catch{
+        setError('عاد الإنترنت. أعد الدخول باستخدام Google لإرسال التسجيلات المحفوظة على الجهاز.');
+      }
+    };
+    window.addEventListener('online',reconnect);
+    return()=>window.removeEventListener('online',reconnect);
+  },[code,currentRole]);
 
 
   async function finishGoogleSession():Promise<'ready'|'pending'|'profile'|'none'>{
@@ -460,8 +491,17 @@ export default function App() {
     catch(err){setError(err instanceof Error?err.message:'تعذر تحميل التقييم')}
   }
   async function openStudentProfile(id:string,month=recordMonth){
-    try{setError('');const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${month}`);setStudentProfile(data);goTab('studentProfile')}
-    catch(err){setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب')}
+    try{
+      setError('');
+      const data=await apiGet<any>(`/api/ops?action=student-profile&id=${id}&month=${month}`);
+      setStudentProfile(data);
+      if(currentRole==='student')cacheStudentProfile(data);
+      goTab('studentProfile');
+    }catch(err){
+      const cached=currentRole==='student'?getCachedStudentProfile():null;
+      if(cached&&typeof navigator!=='undefined'&&!navigator.onLine){setStudentProfile(cached);goTab('studentProfile');return}
+      setError(err instanceof Error?err.message:'تعذر تحميل ملف الطالب');
+    }
   }
   async function approveDay(circleId:string){
     try{setError('');await apiPost('/api/ops?action=day-approve',{circle_id:circleId,approval_date:dailyDate});await loadTeacherToday(dailyDate)}
