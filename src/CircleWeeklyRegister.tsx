@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {madinahSurahName,MadinahMushafRange} from './MadinahMushafRange';
 import {apiPost,apiPut} from './lib/api';
+import {riyadhDate} from './lib/date';
 const days=[['السبت',0],['الأحد',1],['الاثنين',2],['الثلاثاء',3],['الأربعاء',4],['الخميس',5]] as const;
 const iso=(d:Date)=>d.toISOString().slice(0,10),normalize=(v:any)=>String(v||'').slice(0,10);
 const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const pref=s.match(/^(\d+(?:\.\d+)?)\s*\|/);if(pref)return Number(pref[1]);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
@@ -10,7 +11,7 @@ function statusText(d:any){if(!d?.status)return 'لم يسجل';return d.status=
 function quranText(item:any){if(!item)return 'لم يسجل';const toS=Number(item.to_surah_no||item.surah_no||1);return madinahSurahName(Number(item.surah_no||1))+' ص'+(item.from_page||'—')+' ← '+madinahSurahName(toS)+' ص'+(item.to_page||'—')+(item.pages?' • '+item.pages+'ص':'')}
 function autoScore(d:any){const rt=targetPages(d?.review_target),nt=targetPages(d?.new_target),hasPlan=rt>0||nt>0;if(!hasPlan)return null;if(d?.status==='excused')return null;const att=d?.status==='absent'?0:d?.status?Number(d.late_minutes||0)<=30?30:Number(d.late_minutes||0)<=60?20:10:0,rd=Number(d?.review?.pages||0),nd=Number(d?.new?.pages||0),rs=rt>0?Math.min(40,Math.round(40*rd/rt)):40,ns=nt>0?Math.min(30,Math.round(30*nd/nt)):30;return att+rs+ns}
 function shortDate(date:string){return new Date(date+'T00:00:00Z').toLocaleDateString('ar-SA',{day:'2-digit',month:'2-digit'})}
-function makkahToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
+function makkahToday(){return riyadhDate()}
 function timeValue(v:any){return v?new Date(v).toLocaleTimeString('en-GB',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit',hour12:false}):''}
 const stamp=(date:string,time:string)=>time?date+'T'+time+':00+03:00':'';
 export default function CircleWeeklyRegister({data,month,onProfile,onRefresh}:{data:any;month:string;onProfile:(id:string)=>void;onRefresh:()=>Promise<void>}){
