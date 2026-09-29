@@ -2,6 +2,7 @@ import { query } from '../_lib/db.js';
 import { isStaff,validDate,validMonth,validUuid } from '../_lib/actor.js';
 import { json } from '../_lib/http.js';
 import { scopedStudent,today } from './shared.js';
+import {criteriaForCircle,scoreCriteria,bandFor} from '../_lib/evaluation.js';
 
 const targetPages=(v:any)=>{const s=String(v||'').trim();if(/^\d+(?:\.\d+)?$/.test(s))return Number(s);const pref=s.match(/^(\d+(?:\.\d+)?)\s*\|/);if(pref)return Number(pref[1]);const m=s.match(/(\d+)\D+(\d+)\s*$/);return m?Math.max(0,Number(m[2])-Number(m[1])+1):0};
 function scoreDay(r:any){
@@ -189,34 +190,39 @@ export async function teacherToday(req:any,res:any,u:any){
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new' order by m.created_at desc limit 1) new_record,
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review' order by m.created_at desc limit 1) review_record,
     coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new'),0)::int new_records,
-    coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review'),0)::int review_records,
-    coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date=$4),0)::int grade
+    coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review'),0)::int review_records
     from students s join circles h on h.id=s.circle_id left join attendance a on a.student_id=s.id and a.attendance_date=$4
     where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
     order by h.name,s.full_name`,[u.role,u.center_id,u.id,d]);
   const dayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const dateObj=new Date(d+'T00:00:00Z'),dayName=dayNames[dateObj.getUTCDay()],offset=(dateObj.getUTCDay()+1)%7;
   const weekDate=new Date(dateObj);weekDate.setUTCDate(weekDate.getUTCDate()-offset);const weekStart=weekDate.toISOString().slice(0,10);
-  const ids=students.map((x:any)=>x.id);
-  const planRows=ids.length?await query<any>('select student_id,new_target,review_target,goals from weekly_plans where student_id=any($1::uuid[]) and week_start=$2::date and day_name=$3 order by created_at desc',[ids,weekStart,dayName]):[];
+  const ids=students.map((x:any)=>x.id),circleIds=[...new Set(students.map((x:any)=>String(x.circle_id)).filter(Boolean))];
+  const [planRows,customRows,notes]=await Promise.all([
+    ids.length?query<any>('select student_id,new_target,review_target,goals from weekly_plans where student_id=any($1::uuid[]) and week_start=$2::date and day_name=$3 order by created_at desc',[ids,weekStart,dayName]):Promise.resolve([]),
+    ids.length?query<any>('select * from student_criterion_records where student_id=any($1::uuid[]) and record_date=$2::date',[ids,d]):Promise.resolve([]),
+    ids.length?query<any>('select student_id,note from student_daily_notes where student_id=any($1::uuid[]) and record_date=$2::date',[ids,d]):Promise.resolve([])
+  ]);
   const planMap=new Map<string,any>();for(const p of planRows)if(!planMap.has(p.student_id))planMap.set(p.student_id,p);
-  const isFriday=dateObj.getUTCDay()===5;
-  const scoredStudents=students.map((r:any)=>{const p=planMap.get(r.id)||{},reviewTarget=targetPages(p.review_target),newTarget=targetPages(p.new_target),reviewDone=Number(r.review_record?.page_count||0),newDone=Number(r.new_record?.page_count||0);
-    const attendanceScore=isFriday?null:r.attendance_status==='excused'?null:r.attendance_status==='absent'?0:r.attendance_status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
-    const reviewScore=reviewTarget>0?Math.min(40,Math.round(40*reviewDone/reviewTarget)):40;
-    const newScore=newTarget>0?Math.min(30,Math.round(30*newDone/newTarget)):30;
-    return {...r,review_target:p.review_target||'',new_target:p.new_target||'',goals:p.goals||'',attendance_score:attendanceScore,review_score:reviewScore,new_score:newScore,daily_score:attendanceScore===null?null:attendanceScore+reviewScore+newScore};
+  const noteMap=new Map(notes.map((x:any)=>[String(x.student_id),x.note]));
+  const criteriaMap=new Map<string,any[]>();for(const id of circleIds)criteriaMap.set(id,await criteriaForCircle(id,d,u.id));
+  const scoredStudents=students.map((r:any)=>{
+    const p=planMap.get(r.id)||{},reviewTarget=targetPages(p.review_target),newTarget=targetPages(p.new_target);
+    const base={...r,status:r.attendance_status,review_target:p.review_target||'',new_target:p.new_target||'',goals:p.goals||'',review_target_pages:reviewTarget,new_target_pages:newTarget,student_note:noteMap.get(String(r.id))||''};
+    const score=scoreCriteria(criteriaMap.get(String(r.circle_id))||[],base,customRows.filter((x:any)=>x.student_id===r.id));
+    return {...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)};
   });
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
     where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
     [u.role,u.center_id,u.id,d]);
-  return json(res,200,{date:d,students:scoredStudents,approvals});
+  return json(res,200,{date:d,students:scoredStudents,approvals,criteria_by_circle:Object.fromEntries(criteriaMap)});
 }
+
 
 export async function circleRegister(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لهذه الشاشة.'});
-  const month=validMonth(req.query?.month)||today().slice(0,7);
+  const month=validMonth(req.query?.month)||today().slice(0,7),monthStart=month+'-01',monthEnd=new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),0)).toISOString().slice(0,10),current=today();
   const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,
     coalesce(json_agg(json_build_object('date',d.day,
     'approved',exists(select 1 from day_approvals da where da.circle_id=h.id and da.approval_date=d.day),
@@ -231,8 +237,21 @@ export async function circleRegister(req:any,res:any,u:any){
     left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.status='active' and extract(dow from d.day)<>5 and
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
     group by s.id,s.full_name,h.id,h.name order by h.name,s.full_name`,[u.role,u.center_id,u.id,month]);
-  return json(res,200,{month,students});
+  const ids=students.map((x:any)=>x.id),circleIds=[...new Set(students.map((x:any)=>String(x.circle_id)).filter(Boolean))];
+  const [customRows,notes]=await Promise.all([
+   ids.length?query<any>('select * from student_criterion_records where student_id=any($1::uuid[]) and record_date between $2::date and $3::date',[ids,monthStart,monthEnd]):Promise.resolve([]),
+   ids.length?query<any>('select student_id,record_date,note from student_daily_notes where student_id=any($1::uuid[]) and record_date between $2::date and $3::date',[ids,monthStart,monthEnd]):Promise.resolve([])
+  ]);
+  const criteriaMap=new Map<string,any[]>();for(const id of circleIds)criteriaMap.set(id,await criteriaForCircle(id,month,u.id));
+  const noteMap=new Map(notes.map((x:any)=>[String(x.student_id)+'|'+String(x.record_date).slice(0,10),x.note]));
+  const enriched=students.map((s:any)=>({...s,days:(s.days||[]).filter((d:any)=>month!==current.slice(0,7)||String(d.date).slice(0,10)<=current).map((d:any)=>{
+    const date=String(d.date).slice(0,10),reviewTarget=targetPages(d.review_target),newTarget=targetPages(d.new_target),base={...d,review_target_pages:reviewTarget,new_target_pages:newTarget,student_note:noteMap.get(String(s.id)+'|'+date)||''};
+    const score=scoreCriteria(criteriaMap.get(String(s.circle_id))||[],base,customRows.filter((x:any)=>x.student_id===s.id&&String(x.record_date).slice(0,10)===date));
+    return {...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)};
+  }).sort((a:any,b:any)=>String(b.date).localeCompare(String(a.date)))}));
+  return json(res,200,{month,today:current,students:enriched,criteria_by_circle:Object.fromEntries(criteriaMap)});
 }
+
 
 export async function evaluations(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
@@ -278,17 +297,29 @@ export async function studentProfile(req:any,res:any,u:any){
   const monthDate=new Date(monthStart+'T00:00:00Z'),monthEndDate=new Date(Date.UTC(monthDate.getUTCFullYear(),monthDate.getUTCMonth()+1,0)),monthEnd=monthEndDate.toISOString().slice(0,10);
   const current=today(),currentDate=new Date(current+'T00:00:00Z'),offset=(currentDate.getUTCDay()+1)%7,weekStartDate=new Date(currentDate);weekStartDate.setUTCDate(weekStartDate.getUTCDate()-offset);
   const weekEndDate=new Date(weekStartDate);weekEndDate.setUTCDate(weekEndDate.getUTCDate()+5);const weekStart=weekStartDate.toISOString().slice(0,10),weekEnd=weekEndDate.toISOString().slice(0,10);
-  const [attendance,quran,plans,points,monthly,recent,weekly]=await Promise.all([
+  const [attendance,quran,plans,points,monthlyRaw,recent,weeklyRaw,customMonth,customWeek,notes]=await Promise.all([
     query<any>(`select count(*)::int total,count(*) filter(where status in ('present','late'))::int attended,count(*) filter(where status='absent')::int absent,count(*) filter(where status='late')::int late from attendance where student_id=$1 and to_char(attendance_date,'YYYY-MM')=$2`,[s.id,month]),
-    query<any>(`select count(*) filter(where record_type='new')::int new_sessions,count(*) filter(where record_type='review')::int review_sessions,coalesce(sum(ayah_count) filter(where record_type='new'),0)::int new_ayahs,coalesce(sum(ayah_count) filter(where record_type='review'),0)::int review_ayahs,coalesce(round(avg(grade))::int,0) average_grade from memorization_records where student_id=$1 and to_char(record_date,'YYYY-MM')=$2`,[s.id,month]),
+    query<any>(`select count(*) filter(where record_type='new')::int new_sessions,count(*) filter(where record_type='review')::int review_sessions,coalesce(sum(ayah_count) filter(where record_type='new'),0)::int new_ayahs,coalesce(sum(ayah_count) filter(where record_type='review'),0)::int review_ayahs from memorization_records where student_id=$1 and to_char(record_date,'YYYY-MM')=$2`,[s.id,month]),
     query<any>(`select * from weekly_plans where student_id=$1 order by week_start desc,id desc limit 42`,[s.id]),
     query<any>(`select created_at,points,reason from points_ledger where student_id=$1 order by created_at desc limit 30`,[s.id]),
     studentDayRows(s.id,s.circle_id,monthStart,monthEnd),
-    query<any>(`select record_date,record_type,surah_no,to_surah_no,from_ayah,to_ayah,from_page,to_page,page_count,grade,notes from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 60`,[s.id]),
-    studentDayRows(s.id,s.circle_id,weekStart,weekEnd)
+    query<any>(`select record_date,record_type,surah_no,to_surah_no,from_ayah,to_ayah,from_page,to_page,page_count,notes from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 60`,[s.id]),
+    studentDayRows(s.id,s.circle_id,weekStart,weekEnd),
+    query<any>('select * from student_criterion_records where student_id=$1 and record_date between $2::date and $3::date',[s.id,monthStart,monthEnd]),
+    query<any>('select * from student_criterion_records where student_id=$1 and record_date between $2::date and $3::date',[s.id,weekStart,weekEnd]),
+    query<any>('select record_date,note from student_daily_notes where student_id=$1 and record_date between $2::date and $3::date',[s.id,monthStart,monthEnd])
   ]);
-  return json(res,200,{student:s,month,today:current,week_start:weekStart,week_end:weekEnd,attendance:attendance[0]||{},quran:quran[0]||{},plans,points,monthly,recent,weekly});
+  const criteria=s.circle_id?await criteriaForCircle(s.circle_id,month,u.id):[],weekCriteria=s.circle_id?await criteriaForCircle(s.circle_id,current,u.id):[];
+  const noteMap=new Map(notes.map((x:any)=>[String(x.record_date).slice(0,10),x.note]));
+  const monthly=monthlyRaw.filter((d:any)=>month!==current.slice(0,7)||String(d.record_date).slice(0,10)<=current).map((d:any)=>{
+    const date=String(d.record_date).slice(0,10),base={...d,student_note:noteMap.get(date)||''},score=scoreCriteria(criteria,base,customMonth.filter((x:any)=>String(x.record_date).slice(0,10)===date));
+    return {...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)}
+  }).sort((a:any,b:any)=>String(b.record_date).localeCompare(String(a.record_date)));
+  const weekly=weeklyRaw.map((d:any)=>{const date=String(d.record_date).slice(0,10),score=scoreCriteria(weekCriteria,d,customWeek.filter((x:any)=>String(x.record_date).slice(0,10)===date));return {...d,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)}});
+  const scored=monthly.filter((x:any)=>x.daily_score!==null),monthlyScore=scored.length?Math.round(scored.reduce((n:number,x:any)=>n+Number(x.daily_score),0)/scored.length*10)/10:null;
+  return json(res,200,{student:s,month,today:current,week_start:weekStart,week_end:weekEnd,attendance:attendance[0]||{},quran:quran[0]||{},plans,points,monthly,recent,weekly,criteria,monthly_score:monthlyScore,monthly_band:monthlyScore===null?null:bandFor(monthlyScore)});
 }
+
 
 export async function dayApprove(req:any,res:any,u:any){
   if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
