@@ -20,6 +20,7 @@ export default function StudentQuranProfile({data,month,onMonthChange,onRefresh}
  },[onRefresh]);
  if(!data)return <div className="emptyState">جارٍ تحميل ملفك القرآني...</div>;
  const today=online?String(data.today||''):riyadhDateNow(),weekly=data.weekly||[],monthly=data.monthly||[];
+ const currentDay=monthly.find((d:any)=>norm(d.record_date)===today)||weekly.find((d:any)=>norm(d.record_date)===today)||null;
  const queuedPunch=offlinePunchState();
  const displayedMonthly=[...monthly].filter((d:any)=>month!==today.slice(0,7)||norm(d.record_date)<=today).sort((a:any,b:any)=>norm(b.record_date).localeCompare(norm(a.record_date)));
  const attendanceLabel=(d:any)=>d.status==='late'?'متأخر'+(Number(d.late_minutes||0)>0?' — '+Number(d.late_minutes)+' دقيقة':''):d.status==='present'?'حاضر':d.status==='absent'?'غائب':d.status==='excused'?'مستأذن':'لم يسجل';
@@ -43,6 +44,14 @@ export default function StudentQuranProfile({data,month,onMonthChange,onRefresh}
  const editable=(d:any)=>norm(d.record_date)===today&&!d.approved&&!d.week_locked;
  return <div className="studentQuranProfile"><div className={'offlineStatus '+(online?'isOnline':'isOffline')}><b>{online?'● متصل':'● بدون إنترنت'}</b><span>{pending>0?pending+' تسجيلات محفوظة على الجهاز بانتظار المزامنة':online?'جميع التسجيلات متزامنة':'يمكنك تسجيل الحضور والانصراف والحفظ والمراجعة الآن'}</span></div>{error&&<div className="notice">{error}</div>}{success&&<div className="notice">{success}</div>}
   <div className="studentProfileHero"><div><span>ملفي القرآني</span><h2>{data.student?.full_name}</h2><p>{data.student?.center_name||'—'} • {data.student?.circle_name||'—'}</p></div><label className="field"><span>الشهر</span><input type="month" value={month} onChange={e=>onMonthChange(e.target.value)}/></label></div>
+  <section className="studentTodayEntry">
+    <div className="studentTodayEntryHead"><div><span>تسجيل اليوم</span><h3>{today}</h3><p>سجّل حضورك ومراجعتك وحفظك الجديد مباشرة من هنا.</p></div><strong>{currentDay?.approved?'تم اعتماد اليوم':currentDay?.week_locked?'الأسبوع مقفل':currentDay?'متاح للتسجيل':'لا يوجد تسجيل اليوم'}</strong></div>
+    {currentDay?<div className="studentTodayActions">
+      <article className="todayActionCard"><span>الحضور والانصراف</span><b>{attendanceLabel(currentDay)}</b><small>{fmt(currentDay.check_in_at||queuedPunch.checkIn?.event_at)} — {fmt(currentDay.check_out_at||queuedPunch.checkOut?.event_at)}</small>{editable(currentDay)&&(!currentDay.check_in_at&&!queuedPunch.checkIn?<button className="primary" disabled={busy} onClick={()=>punch('check_in')}>تسجيل الحضور</button>:!currentDay.check_out_at&&!queuedPunch.checkOut&&(currentDay.check_in_at||queuedPunch.checkIn)?<button className="primary" disabled={busy} onClick={()=>punch('check_out')}>تسجيل الانصراف</button>:<button className="secondary" disabled>تم تسجيل الحضور والانصراف</button>)}</article>
+      <article className="todayActionCard"><span>المراجعة</span><b>{quranText(currentDay.review)}</b><small>الخطة: {targetDetail(currentDay.review_target)} • المنجز {currentDay.review_done||0} ص</small><button className="primary" disabled={!editable(currentDay)||busy} onClick={()=>setEdit({kind:'review',old:currentDay.review})}>{currentDay.review?'تعديل المراجعة':'تسجيل المراجعة'}</button></article>
+      <article className="todayActionCard"><span>الحفظ الجديد</span><b>{quranText(currentDay.new_record)}</b><small>الخطة: {targetDetail(currentDay.new_target)} • المنجز {currentDay.new_done||0} ص</small><button className="primary" disabled={!editable(currentDay)||busy} onClick={()=>setEdit({kind:'new',old:currentDay.new_record})}>{currentDay.new_record?'تعديل الحفظ الجديد':'تسجيل الحفظ الجديد'}</button></article>
+    </div>:<div className="studentTodayEmpty">اليوم إجازة أو لا يوجد يوم تسجيل متاح.</div>}
+  </section>
   <div className="studentPlanHead"><div><span>الخطة الأسبوعية الحالية</span><h3>{data.week_start} — {data.week_end}</h3></div><small>الألوان تبين المنجز والمتبقي لكل يوم</small></div>
   <div className="studentWeekGrid">{weekly.map((d:any)=><article className={'studentDayPlan '+progressClass(d.progress)} key={norm(d.record_date)}>
     <div className="dayPlanTop"><b>{d.day_name}</b><small>{norm(d.record_date)}</small><strong>{norm(d.record_date)>today?'—':d.daily_score==null?'—':d.daily_score+'%'}</strong></div>
