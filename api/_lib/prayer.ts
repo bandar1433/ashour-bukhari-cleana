@@ -1,8 +1,7 @@
+import {riyadhDate as stableRiyadhDate} from './date.js';
 const MAKKAH_LAT=21.4225,MAKKAH_LON=39.8262,TZ=3;
 const rad=(x:number)=>x*Math.PI/180,deg=(x:number)=>x*180/Math.PI;
-export function riyadhDate(d=new Date()){
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-}
+export function riyadhDate(d=new Date()){return stableRiyadhDate(d)}
 export function riyadhClockMinutes(d=new Date()){
   const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Riyadh',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
   const h=Number(parts.find(x=>x.type==='hour')?.value||0),m=Number(parts.find(x=>x.type==='minute')?.value||0);return h*60+m;
