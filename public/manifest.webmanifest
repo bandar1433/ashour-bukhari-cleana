@@ -1,0 +1,12 @@
+{
+  "name":"منصة حلقات عاشور بخاري",
+  "short_name":"حلقات عاشور",
+  "lang":"ar",
+  "dir":"rtl",
+  "start_url":"/",
+  "scope":"/",
+  "display":"standalone",
+  "background_color":"#f6f4ed",
+  "theme_color":"#063f39",
+  "description":"منصة إدارة ومتابعة حلقات القرآن الكريم"
+}
