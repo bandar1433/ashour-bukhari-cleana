@@ -1,4 +1,5 @@
 import {apiPost,getSessionUserId} from './api';
+import {riyadhDate} from './date';
 
 export type OfflineKind='punch'|'quran'|'criterion'|'note';
 export type OfflineOperation={
@@ -15,9 +16,7 @@ export type OfflineOperation={
 const QUEUE_KEY='ashour_offline_queue_v1';
 const PROFILE_PREFIX='ashour_student_profile_cache_v1:';
 
-export function riyadhDateNow(d=new Date()){
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-}
+export function riyadhDateNow(d=new Date()){return riyadhDate(d)}
 function readQueue():OfflineOperation[]{
   try{const x=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]');return Array.isArray(x)?x:[]}catch{return []}
 }
