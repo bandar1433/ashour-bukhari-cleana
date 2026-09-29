@@ -7,6 +7,10 @@ function cleanPhone(value:unknown){
   return String(value||'').replace(/[\s-]/g,'').trim();
 }
 
+function normalizeEmail(value:unknown){
+  return String(value||'').trim().toLowerCase();
+}
+
 function bodyOf(req:any):any{
   if(req.body && typeof req.body==='object') return req.body;
   if(typeof req.body==='string'){
@@ -38,6 +42,7 @@ async function verifiedAuthSession(sessionToken:string,sessionId:string){
 }
 
 async function appUserFor(authUserId:string,email:string){
+  const normalizedEmail=normalizeEmail(email);
   let user=(await query<any>(`
     select id,full_name,email,phone,role::text role,center_id,is_active,auth_subject
     from public.users
@@ -45,33 +50,38 @@ async function appUserFor(authUserId:string,email:string){
     limit 1
   `,[authUserId]))[0];
 
-  if(!user){
+  if(!user&&normalizedEmail){
     user=(await query<any>(`
       select id,full_name,email,phone,role::text role,center_id,is_active,auth_subject
       from public.users
-      where lower(email)=lower($1)
+      where lower(trim(email))=$1
       limit 1
-    `,[email]))[0];
+    `,[normalizedEmail]))[0];
 
     if(user){
       await query(
         'update public.users set auth_subject=$1,email=$2,updated_at=now() where id=$3',
-        [authUserId,email,user.id]
+        [authUserId,normalizedEmail,user.id]
       );
-      user={...user,auth_subject:authUserId,email};
+      await query(
+        'update public.login_requests set auth_subject=$1,email=$2 where lower(trim(email))=$2',
+        [authUserId,normalizedEmail]
+      );
+      user={...user,auth_subject:authUserId,email:normalizedEmail};
     }
   }
   return user||null;
 }
 
 async function pendingState(authUserId:string,email:string,role:string){
+  const normalizedEmail=normalizeEmail(email);
   const lr=(await query<any>(`
     select status,requested_role
     from public.login_requests
-    where auth_subject=$1 or lower(email)=lower($2)
+    where auth_subject=$1 or lower(trim(email))=$2
     order by requested_at desc
     limit 1
-  `,[authUserId,email]))[0];
+  `,[authUserId,normalizedEmail]))[0];
 
   if(lr?.status==='pending'){
     return {
@@ -93,12 +103,16 @@ async function createPendingAccount(auth:any,draft:any){
   const role=allowedRoles.includes(String(draft?.role) as AppRole)
     ? String(draft.role) as AppRole
     : null;
+  const verifiedEmail=normalizeEmail(auth.auth_email);
   const fullName=String(draft?.name||auth.auth_name||'').trim();
   const documentNo=String(draft?.documentNo||'').trim();
   const phone=cleanPhone(draft?.phone);
   const centerId=String(draft?.centerId||'').trim()||null;
   const circleId=String(draft?.circleId||'').trim()||null;
 
+  if(!verifiedEmail){
+    return {status:400,body:{error:'VERIFIED_EMAIL_REQUIRED',message:'تعذر التعرف على بريد Google الموثق. أعد تسجيل الدخول بحساب Google.'}};
+  }
   if(!role||!fullName||!documentNo||!phone){
     return {status:400,body:{error:'INCOMPLETE_SIGNUP',message:'أكمل الاسم ورقم الهوية ورقم الجوال ونوع الحساب.'}};
   }
@@ -125,12 +139,30 @@ async function createPendingAccount(auth:any,draft:any){
   try{
     await client.query('begin');
 
+    const existing=await client.query(
+      `select id from public.users
+       where auth_subject=$1 or lower(trim(email))=$2
+       limit 1
+       for update`,
+      [auth.auth_user_id,verifiedEmail]
+    );
+    if(existing.rowCount){
+      await client.query('rollback');
+      return {
+        status:409,
+        body:{
+          error:'ACCOUNT_ALREADY_EXISTS',
+          message:'هذا البريد الإلكتروني مسجل بالفعل. استخدم «الدخول باستخدام Google» للوصول إلى الحساب الموجود.'
+        }
+      };
+    }
+
     if(role==='guardian'){
       const result=await client.query(
         `insert into public.users(full_name,email,phone,national_id,role,is_active,auth_subject)
          values($1,$2,$3,$4,'guardian',true,$5)
          returning id,full_name,email,role::text role`,
-        [fullName,auth.auth_email,phone,documentNo,auth.auth_user_id]
+        [fullName,verifiedEmail,phone,documentNo,auth.auth_user_id]
       );
       const created=result.rows[0];
       await client.query('commit');
@@ -148,7 +180,7 @@ async function createPendingAccount(auth:any,draft:any){
       `insert into public.users(full_name,email,phone,national_id,role,center_id,is_active,auth_subject)
        values($1,$2,$3,$4,$5::app_role,$6::uuid,false,$7)
        returning id,full_name,email,role::text role`,
-      [fullName,auth.auth_email,phone,documentNo,role,centerId,auth.auth_user_id]
+      [fullName,verifiedEmail,phone,documentNo,role,centerId,auth.auth_user_id]
     );
     const created=createdResult.rows[0];
 
@@ -167,7 +199,7 @@ async function createPendingAccount(auth:any,draft:any){
          national_id=excluded.national_id,
          center_id=excluded.center_id,
          requested_circle_id=excluded.requested_circle_id`,
-      [auth.auth_user_id,auth.auth_email,fullName,role,phone,documentNo,centerId,circleId]
+      [auth.auth_user_id,verifiedEmail,fullName,role,phone,documentNo,centerId,circleId]
     );
 
     if(role==='student'){
@@ -196,8 +228,17 @@ async function createPendingAccount(auth:any,draft:any){
             :'تم التسجيل. حساب المشرف بانتظار الاعتماد.'
       }
     };
-  }catch(error){
+  }catch(error:any){
     await client.query('rollback');
+    if(error?.code==='23505'){
+      return {
+        status:409,
+        body:{
+          error:'ACCOUNT_ALREADY_EXISTS',
+          message:'هذا البريد الإلكتروني مسجل بالفعل. لا يمكن إنشاء حساب آخر بالبريد نفسه.'
+        }
+      };
+    }
     throw error;
   }finally{
     client.release();
