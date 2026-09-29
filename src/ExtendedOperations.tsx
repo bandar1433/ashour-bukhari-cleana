@@ -1,8 +1,9 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {apiGet,apiPost,apiPut,CenterRow,CircleRow,StudentRow} from './lib/api';
 import {madinahSurahName} from './MadinahMushafRange';
+import {riyadhDate} from './lib/date';
 
-const makkahToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const makkahToday=()=>riyadhDate();
 const monthDays=(month:string)=>{const [y,m]=month.split('-').map(Number),last=new Date(Date.UTC(y,m,0)).getUTCDate(),out:{date:string;day:string}[]=[];for(let d=1;d<=last;d++){const dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCDay()===5)continue;out.push({date:dt.toISOString().slice(0,10),day:new Intl.DateTimeFormat('ar-SA',{weekday:'long',timeZone:'UTC'}).format(dt)})}return out};
 const fmtPoints=(v:any)=>{const n=Number(v||0);return Number.isInteger(n)?String(n):n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')};
 
