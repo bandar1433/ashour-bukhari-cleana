@@ -26,6 +26,7 @@ import TeacherDailyTable from './TeacherDailyTable';
 import AgreedFeatures from './AgreedFeatures';
 import CircleWeeklyRegister from './CircleWeeklyRegister';
 import StudentQuranProfile from './StudentQuranProfile';
+import EvaluationCriteriaPanel from './EvaluationCriteriaPanel';
 
 type Tab = 'overview' | 'centers' | 'students' | 'circles' | 'users' | 'roles' | 'plans' | 'news' | 'teacherToday' | 'circleRegister' | 'evaluations' | 'studentProfile' | 'selfService' | 'motivation' | 'competitions' | 'notifications' | 'reports' | 'operations' | 'joinRequests' | 'library' | 'guardian' | 'quranJourney'|'profile';
 
@@ -204,6 +205,7 @@ const tabMeta: Record<Tab, { title: string; subtitle: string; short: string }> =
   profile: { title: 'الملف الشخصي', subtitle: 'بيانات الحساب والجوال والبريد ونوع الحساب.', short: 'حسابي' },
 };
 
+const riyadhToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Riyadh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const EXPLICIT_LOGOUT_KEY='ashour_explicit_logout';
 const CANONICAL_ORIGIN='https://ashour-bukhari-cleana.vercel.app';
 
@@ -231,12 +233,12 @@ export default function App() {
   const [loginRequests,setLoginRequests]=useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
-  const [dailyDate,setDailyDate]=useState(new Date().toISOString().slice(0,10));
-  const [recordMonth,setRecordMonth]=useState(new Date().toISOString().slice(0,7));
+  const [dailyDate,setDailyDate]=useState(riyadhToday());
+  const [recordMonth,setRecordMonth]=useState(riyadhToday().slice(0,7));
   const [teacherToday,setTeacherToday]=useState<any>({students:[],approvals:[]});
   const [circleRegister,setCircleRegister]=useState<any>({students:[]});
-  const [evaluationRange,setEvaluationRange]=useState({from:new Date().toISOString().slice(0,10),to:new Date().toISOString().slice(0,10)});
-  const [evaluations,setEvaluations]=useState<any>({rows:[],average:0,weights:{new:30,review:40,attendance:30}});
+  const [evaluationRange,setEvaluationRange]=useState({from:riyadhToday().slice(0,7)+'-01',to:riyadhToday()});
+  const [evaluations,setEvaluations]=useState<any>({rows:[],monthly:[],average:0});
   const [studentProfile,setStudentProfile]=useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [tabHistory,setTabHistory]=useState<Tab[]>([]);
@@ -752,16 +754,18 @@ export default function App() {
               <CircleWeeklyRegister data={circleRegister} month={recordMonth} onProfile={openStudentProfile} onRefresh={()=>loadCircleRegister(recordMonth)}/>
             </>}
             {activeTab==='evaluations'&&<>
+              {currentRole==='teacher'&&<EvaluationCriteriaPanel circles={circles} month={recordMonth}/>}
               <div className="opsToolbar"><label className="field"><span>من</span><input type="date" value={evaluationRange.from} onChange={e=>setEvaluationRange(x=>({...x,from:e.target.value}))} /></label><label className="field"><span>إلى</span><input type="date" value={evaluationRange.to} onChange={e=>setEvaluationRange(x=>({...x,to:e.target.value}))} /></label><button className="primary" type="button" onClick={()=>loadEvaluations()}>حساب التقييم</button></div>
-              <div className="evaluationSummary"><div><span>المتوسط العام</span><b>{evaluations.average||0}%</b></div><p><strong>المعادلة:</strong> الحفظ الجديد 30% • المراجعة 40% • الحضور والانضباط 30%</p></div>
-              <GenericTable rows={evaluations.rows||[]} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['new_grade','الحفظ %'],['review_grade','المراجعة %'],['attendance_score','الانضباط'],['daily_score','النتيجة']]}/>
+              <div className="evaluationSummary"><div><span>المتوسط العام</span><b>{evaluations.average||0}%</b></div><p><strong>التصنيف:</strong> أخضر 85 فأكثر • أصفر من 75 إلى أقل من 85 • أحمر أقل من 75 ويحال للمشرف عند إغلاق الشهر.</p></div>
+              <div className="monthlyEvaluationCards">{(evaluations.monthly||[]).map((x:any)=><article key={x.student_id} className={'monthlyEvalCard band-'+x.band}><div><b>{x.full_name}</b><small>{x.days} أيام محتسبة</small></div><strong>{x.score}/100</strong><span>{x.band==='green'?'أخضر':x.band==='yellow'?'أصفر'+(x.warning_count?' • إنذار '+x.warning_count:''):x.band==='red'?'أحمر • متابعة المشرف':'—'}</span></article>)}</div>
+              <GenericTable rows={evaluations.rows||[]} columns={[[ 'full_name','الطالب'],['record_date','التاريخ'],['daily_score','النتيجة اليومية'],['band','النطاق']]}/>
             </>}
             {activeTab==='studentProfile'&&<>
               {currentRole==='student'?<StudentQuranProfile data={studentProfile} month={recordMonth} onMonthChange={m=>{setRecordMonth(m);openStudentProfile('me',m)}} onRefresh={()=>openStudentProfile('me',recordMonth)}/>:<>
                 {isStaff&&<div className="opsToolbar"><label className="field profileSelect"><span>اختر الطالب</span><select defaultValue="" onChange={e=>e.target.value&&openStudentProfile(e.target.value)}><option value="">اختر طالبًا...</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name} — {s.circle_name||'بدون حلقة'}</option>)}</select></label></div>}
                 {!studentProfile?<div className="emptyState">اختر طالبًا لعرض ملفه القرآني.</div>:<>
                   <div className="studentProfileHero"><div><span>الطالب</span><h2>{studentProfile.student?.full_name}</h2><p>{studentProfile.student?.center_name||'—'} • {studentProfile.student?.circle_name||'بدون حلقة'}</p></div><label className="field"><span>الشهر</span><input type="month" value={recordMonth} onChange={e=>{const m=e.target.value;setRecordMonth(m);openStudentProfile(studentProfile.student.id,m)}} /></label></div>
-                  <div className="kpis compactOpsKpis interactiveKpis"><InteractiveMetric label="الحضور" value={studentProfile.attendance?.total?Math.round(100*Number(studentProfile.attendance.attended||0)/Number(studentProfile.attendance.total)):0} suffix="%" note={`غياب ${studentProfile.attendance?.absent||0}`} onClick={()=>goTab('reports')}/><InteractiveMetric label="الحفظ الجديد" value={Number(studentProfile.quran?.new_sessions||0)} note={`${studentProfile.quran?.new_ayahs||0} آية`} onClick={()=>goTab('circleRegister')}/><InteractiveMetric label="المراجعة" value={Number(studentProfile.quran?.review_sessions||0)} note={`${studentProfile.quran?.review_ayahs||0} آية`} onClick={()=>goTab('circleRegister')}/><InteractiveMetric label="متوسط الأداء" value={Number(studentProfile.quran?.average_grade||0)} suffix="%" note="خلال الشهر" onClick={()=>goTab('evaluations')}/></div>
+                  <div className="kpis compactOpsKpis interactiveKpis"><InteractiveMetric label="الحضور" value={studentProfile.attendance?.total?Math.round(100*Number(studentProfile.attendance.attended||0)/Number(studentProfile.attendance.total)):0} suffix="%" note={`غياب ${studentProfile.attendance?.absent||0}`} onClick={()=>goTab('reports')}/><InteractiveMetric label="الحفظ الجديد" value={Number(studentProfile.quran?.new_sessions||0)} note={`${studentProfile.quran?.new_ayahs||0} آية`} onClick={()=>goTab('circleRegister')}/><InteractiveMetric label="المراجعة" value={Number(studentProfile.quran?.review_sessions||0)} note={`${studentProfile.quran?.review_ayahs||0} آية`} onClick={()=>goTab('circleRegister')}/><InteractiveMetric label="التقييم الشهري" value={Number(studentProfile.monthly_score||0)} suffix="%" note={studentProfile.monthly_band==='green'?'أخضر':studentProfile.monthly_band==='yellow'?'أصفر':studentProfile.monthly_band==='red'?'أحمر':'خلال الشهر'} onClick={()=>goTab('evaluations')}/></div>
                   <h3>السجل القرآني الأخير</h3><GenericTable rows={studentProfile.recent||[]} columns={[[ 'record_date','التاريخ'],['record_type','النوع'],['surah_no','السورة'],['from_ayah','من آية'],['to_ayah','إلى آية'],['grade','الدرجة']]}/>
                   <h3 className="profileSubhead">الخطة الأسبوعية</h3><GenericTable rows={studentProfile.plans||[]} columns={[[ 'week_start','الأسبوع'],['day_name','اليوم'],['new_target','الجديد'],['review_target','المراجعة'],['goals','الأهداف']]}/>
                 </>}
