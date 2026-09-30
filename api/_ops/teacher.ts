@@ -9,7 +9,7 @@ function scoreDay(r:any){
   const reviewTarget=targetPages(r.review_target),newTarget=targetPages(r.new_target);
   const reviewDone=Number(r.review?.page_count||0),newDone=Number(r.new_record?.page_count||0);
   const hasPlan=reviewTarget>0||newTarget>0;
-  const attendanceScore=r.status==='excused'?null:r.status==='absent'?0:r.status?Number(r.late_minutes||0)<=30?30:Number(r.late_minutes||0)<=60?20:10:0;
+  const attendanceScore=r.status==='excused'?null:r.status==='absent'?0:r.status?Math.round(30*Number(r.attendance_percent??100)/100):0;
   const reviewScore=reviewTarget>0?Math.min(40,Math.round(40*reviewDone/reviewTarget)):40;
   const newScore=newTarget>0?Math.min(30,Math.round(30*newDone/newTarget)):30;
   const totalTarget=reviewTarget+newTarget,totalDone=reviewDone+newDone;
@@ -26,7 +26,7 @@ async function studentDayRows(studentId:string,circleId:string|null,from:string,
       case extract(dow from g.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
     from generate_series($2::date,$3::date,'1 day') g(day) where extract(dow from g.day)<>5
   )
-  select d.record_date,d.week_start,d.day_name,a.status,a.late_minutes,a.check_in_at,a.check_out_at,
+  select d.record_date,d.week_start,d.day_name,a.status,a.late_minutes,a.attendance_percent,a.check_in_at,a.check_out_at,
     exists(select 1 from day_approvals da where da.circle_id=$4::uuid and da.approval_date=d.record_date) approved,
     exists(select 1 from weekly_locks wl where wl.circle_id=$4::uuid and wl.week_start=d.week_start) week_locked,
     w.new_target,w.review_target,w.goals,
@@ -186,7 +186,7 @@ export async function teacherToday(req:any,res:any,u:any){
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لهذه الشاشة.'});
   const d=validDate(req.query?.date)||today();
-  const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,a.status attendance_status,a.late_minutes,a.check_in_at,a.check_out_at,
+  const students=await query<any>(`select s.id,s.full_name,h.id circle_id,h.name circle_name,a.status attendance_status,a.late_minutes,a.attendance_percent,a.check_in_at,a.check_out_at,
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new' order by m.created_at desc limit 1) new_record,
     (select json_build_object('id',m.id,'surah_no',m.surah_no,'from_ayah',m.from_ayah,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'page_count',m.page_count,'grade',m.grade) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review' order by m.created_at desc limit 1) review_record,
     coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new'),0)::int new_records,
@@ -227,7 +227,7 @@ export async function circleRegister(req:any,res:any,u:any){
     coalesce(json_agg(json_build_object('date',d.day,
     'approved',exists(select 1 from day_approvals da where da.circle_id=h.id and da.approval_date=d.day),
     'week_locked',exists(select 1 from weekly_locks wl where wl.circle_id=h.id and wl.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date),
-    'status',a.status,'late_minutes',coalesce(a.late_minutes,0),'check_in_at',a.check_in_at,'check_out_at',a.check_out_at,
+    'status',a.status,'late_minutes',coalesce(a.late_minutes,0),'attendance_percent',a.attendance_percent,'check_in_at',a.check_in_at,'check_out_at',a.check_out_at,
     'review_target',(select w.review_target from weekly_plans w where w.student_id=s.id and w.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date and w.day_name=case extract(dow from d.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end order by w.created_at desc limit 1),
     'new_target',(select w.new_target from weekly_plans w where w.student_id=s.id and w.week_start=(d.day::date-((extract(dow from d.day)::int+1)%7))::date and w.day_name=case extract(dow from d.day)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end order by w.created_at desc limit 1),
     'review',(select json_build_object('id',m.id,'surah_no',m.surah_no,'to_surah_no',coalesce(m.to_surah_no,m.surah_no),'from_ayah',m.from_ayah,'to_ayah',m.to_ayah,'from_page',m.from_page,'to_page',m.to_page,'pages',m.page_count) from memorization_records m where m.student_id=s.id and m.record_date=d.day and m.record_type='review' order by m.created_at desc limit 1),
@@ -271,7 +271,7 @@ export async function evaluations(req:any,res:any,u:any){
       sum(case when record_type='review' then coalesce(page_count,0) else 0 end)::numeric review_pages
     from memorization_records where record_date between $4 and $5 group by student_id,record_date
   )
-  select d.student_id,d.full_name,d.circle_id,d.record_day as record_date,a.status,a.late_minutes,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
+  select d.student_id,d.full_name,d.circle_id,d.record_day as record_date,a.status,a.late_minutes,a.attendance_percent,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
     coalesce(p.new_target,0) new_daily_target,coalesce(p.review_target,0) review_daily_target
   from days d left join plan p on p.student_id=d.student_id and p.record_day=d.record_day left join done on done.student_id=d.student_id and done.record_date=d.record_day
   left join attendance a on a.student_id=d.student_id and a.attendance_date=d.record_day order by d.record_day desc,d.full_name`,[u.role,u.center_id,u.id,from,to]);

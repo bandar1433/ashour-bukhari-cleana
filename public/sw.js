@@ -1,4 +1,4 @@
-const CACHE='ashour-offline-v2';
+const CACHE='ashour-offline-v3';
 const SHELL=['/','/index.html','/manifest.webmanifest','/resources/logo-halaqat-ashour-bukhari.png'];
 
 async function precache(){

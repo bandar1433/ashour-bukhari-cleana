@@ -17,12 +17,14 @@
     "pg": "^8.13.1",
     "@neondatabase/neon-js": "0.7.0-beta",
     "jose": "6.2.12",
-    "quran-meta": "^6.0.17"
+    "quran-meta": "^6.0.17",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "@types/pg": "^8.11.10",
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1"
+    "@types/react-dom": "^18.3.1",
+    "@types/qrcode": "^1.5.5"
   }
 }

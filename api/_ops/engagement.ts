@@ -180,6 +180,21 @@ export async function motivation(req:any,res:any,u:any){
     const circle=await allowedCircle(u,circleId);if(!circle)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
     return json(res,201,(await query<any>('insert into rewards(name,description,points_cost,stock,circle_id,image_path) values($1,$2,$3,$4,$5,$6) returning *',[txt(b.name,200),txt(b.description,1000)||null,int(b.points_cost,1,100000),int(b.stock,0,100000),circleId,txt(b.image_path,1000)||null]))[0]);
   }
+  if(sub==='reward-edit'&&req.method==='PUT'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const b=req.body||{},id=validUuid(b.reward_id||b.id);if(!id)return json(res,400,{error:'الجائزة غير صالحة'});
+    const reward=(await query<any>('select r.*,c.center_id,is_circle_teacher(c.id,$2::uuid) teacher_allowed from rewards r join circles c on c.id=r.circle_id where r.id=$1',[id,u.id]))[0];if(!reward)return json(res,404,{error:'الجائزة غير موجودة'});
+    const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===reward.center_id)||(u.role==='teacher'&&reward.teacher_allowed);if(!allowed)return json(res,403,{error:'الجائزة خارج نطاق صلاحيتك'});
+    const row=(await query<any>('update rewards set name=$2,description=$3,points_cost=$4,stock=$5,image_path=$6 where id=$1 returning *',[id,txt(b.name||reward.name,200),txt(b.description,1000)||null,int(b.points_cost??reward.points_cost,1,100000),int(b.stock??reward.stock,0,100000),txt(b.image_path,1000)||null]))[0];
+    return json(res,200,row);
+  }
+  if(sub==='reward-delete'&&req.method==='POST'){
+    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
+    const id=validUuid(req.body?.reward_id);if(!id)return json(res,400,{error:'الجائزة غير صالحة'});
+    const reward=(await query<any>('select r.*,c.center_id,is_circle_teacher(c.id,$2::uuid) teacher_allowed from rewards r join circles c on c.id=r.circle_id where r.id=$1',[id,u.id]))[0];if(!reward)return json(res,404,{error:'الجائزة غير موجودة'});
+    const allowed=u.role==='system_admin'||(managers.includes(u.role)&&u.center_id===reward.center_id)||(u.role==='teacher'&&reward.teacher_allowed);if(!allowed)return json(res,403,{error:'الجائزة خارج نطاق صلاحيتك'});
+    await query('update rewards set is_active=false where id=$1',[id]);return json(res,200,{success:true});
+  }
   if(sub==='reward-request'&&req.method==='POST'){
     if(u.role!=='student')return json(res,403,{error:'هذه الخدمة للطالب'});
     const s=(await query<any>('select * from students where user_id=$1',[u.id]))[0];if(!s)return json(res,404,{error:'لم يتم ربط الحساب بالطالب'});
@@ -242,28 +257,47 @@ export async function notifications(req:any,res:any,u:any){
 }
 
 export async function competitions(req:any,res:any,u:any){
-  await query('alter table competitions add column if not exists circle_id uuid references circles(id)');
-  await query('alter table competitions add column if not exists max_points integer not null default 100');
-  const sub=String(req.query?.sub||'list'),canManage=['system_admin','center_manager','supervisor'].includes(u.role);
+  const sub=String(req.query?.sub||'list'),centerManagers=['system_admin','center_manager','supervisor'].includes(u.role);
+  const selectSql=`select c.*,h.name circle_name,ce.name center_name,
+    case when c.circle_id is null then 'center' else 'circle' end scope,
+    coalesce((select json_agg(x order by x.score desc) from (
+      select e.score,e.notes,s.id student_id,s.full_name,ch.name student_circle
+      from competition_entries e join students s on s.id=e.student_id left join circles ch on ch.id=s.circle_id
+      where e.competition_id=c.id
+    )x),'[]'::json) entries
+    from competitions c left join circles h on h.id=c.circle_id left join centers ce on ce.id=c.center_id`;
   if(req.method==='GET'){
     let rows:any[]=[];
-    if(u.role==='system_admin')rows=await query<any>(`select c.*,h.name circle_name,ce.name center_name,coalesce((select json_agg(x order by x.score desc) from (select e.score,e.notes,s.id student_id,s.full_name,ch.name student_circle from competition_entries e join students s on s.id=e.student_id left join circles ch on ch.id=s.circle_id where e.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id left join centers ce on ce.id=c.center_id order by c.start_date desc`);
-    else if(u.role==='teacher')rows=await query<any>(`select c.*,h.name circle_name,ce.name center_name,coalesce((select json_agg(x order by x.score desc) from (select e.score,e.notes,s.id student_id,s.full_name,ch.name student_circle from competition_entries e join students s on s.id=e.student_id left join circles ch on ch.id=s.circle_id where e.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id left join centers ce on ce.id=c.center_id where c.center_id=$1::uuid and (c.circle_id is null or c.circle_id in(select id from circles where is_circle_teacher(id,$2))) order by c.start_date desc`,[u.center_id,u.id]);
-    else rows=await query<any>(`select c.*,h.name circle_name,ce.name center_name,coalesce((select json_agg(x order by x.score desc) from (select e.score,e.notes,s.id student_id,s.full_name,ch.name student_circle from competition_entries e join students s on s.id=e.student_id left join circles ch on ch.id=s.circle_id where e.competition_id=c.id)x),'[]'::json) entries from competitions c left join circles h on h.id=c.circle_id left join centers ce on ce.id=c.center_id where c.center_id=$1::uuid order by c.start_date desc`,[u.center_id]);
+    if(u.role==='system_admin')rows=await query<any>(selectSql+' order by c.start_date desc');
+    else if(u.role==='teacher')rows=await query<any>(selectSql+` where c.center_id=$1::uuid and (c.circle_id is null or is_circle_teacher(c.circle_id,$2::uuid)) order by c.start_date desc`,[u.center_id,u.id]);
+    else if(u.role==='student'){
+      const s=(await query<any>('select center_id,circle_id from students where user_id=$1 and status=\'active\' limit 1',[u.id]))[0];
+      if(!s)return json(res,200,[]);
+      rows=await query<any>(selectSql+` where c.center_id=$1::uuid and (c.circle_id is null or c.circle_id=$2::uuid) order by c.start_date desc`,[s.center_id,s.circle_id]);
+    }else rows=await query<any>(selectSql+` where c.center_id=$1::uuid order by c.start_date desc`,[u.center_id]);
     return json(res,200,rows);
   }
   if(req.method==='POST'&&sub==='create'){
-    if(!canManage)return json(res,403,{error:'إنشاء سجل مسابقات المركز من صلاحيات إدارة المركز'});
     const b=req.body||{},start=validDate(b.start_date),end=validDate(b.end_date),title=txt(b.title,300);if(!title)return json(res,400,{error:'اسم المسابقة مطلوب'});if(!start||!end||start>end)return json(res,400,{error:'تواريخ المسابقة غير صالحة'});
+    if(u.role==='teacher'){
+      const circleId=validUuid(b.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+      const circle=(await query<any>('select id,center_id from circles where id=$1 and is_circle_teacher(id,$2::uuid)',[circleId,u.id]))[0];if(!circle)return json(res,403,{error:'الحلقة خارج نطاقك'});
+      const row=(await query<any>('insert into competitions(center_id,circle_id,title,start_date,end_date,max_points,created_by) values($1,$2,$3,$4,$5,$6,$7) returning *',[circle.center_id,circle.id,title,start,end,int(b.max_points,1,10000),u.id]))[0];
+      return json(res,201,row);
+    }
+    if(!centerManagers)return json(res,403,{error:'إنشاء المسابقة غير متاح لهذا الحساب'});
     const centerId=u.role==='system_admin'?validUuid(b.center_id):u.center_id;if(!centerId)return json(res,400,{error:'اختر المركز'});
     const row=(await query<any>('insert into competitions(center_id,circle_id,title,start_date,end_date,max_points,created_by) values($1,null,$2,$3,$4,$5,$6) returning *',[centerId,title,start,end,int(b.max_points,1,10000),u.id]))[0];
     return json(res,201,row);
   }
   if(req.method==='PUT'&&sub==='edit'){
-    if(!canManage)return json(res,403,{error:'تعديل سجل مسابقات المركز من صلاحيات إدارة المركز'});
     const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'المسابقة غير صالحة'});
     const c=(await query<any>('select * from competitions where id=$1',[id]))[0];if(!c)return json(res,404,{error:'المسابقة غير موجودة'});
-    if(u.role!=='system_admin'&&c.center_id!==u.center_id)return json(res,403,{error:'المسابقة خارج مركزك'});
+    let allowed=false;
+    if(u.role==='system_admin')allowed=true;
+    else if(['center_manager','supervisor'].includes(u.role))allowed=c.center_id===u.center_id&&c.circle_id===null;
+    else if(u.role==='teacher'&&c.circle_id)allowed=!!(await query<any>('select id from circles where id=$1 and is_circle_teacher(id,$2::uuid)',[c.circle_id,u.id]))[0];
+    if(!allowed)return json(res,403,{error:'المسابقة خارج نطاق صلاحيتك'});
     const row=(await query<any>('update competitions set title=coalesce($2,title),start_date=coalesce($3::date,start_date),end_date=coalesce($4::date,end_date),max_points=coalesce($5,max_points) where id=$1 returning *',[id,b.title?txt(b.title,300):null,b.start_date||null,b.end_date||null,b.max_points?int(b.max_points,1,10000):null]))[0];
     return json(res,200,row);
   }
@@ -271,7 +305,7 @@ export async function competitions(req:any,res:any,u:any){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const b=req.body||{},s=await scopedStudent(u,b.student_id),competitionId=validUuid(b.competition_id);if(!s||!competitionId)return json(res,400,{error:'بيانات الطالب أو المسابقة غير صالحة'});
     const comp=(await query<any>('select id,center_id,circle_id,max_points from competitions where id=$1 and center_id=$2',[competitionId,s.center_id]))[0];if(!comp||(comp.circle_id&&comp.circle_id!==s.circle_id))return json(res,403,{error:'المسابقة غير متاحة لهذا الطالب'});
-    if(u.role==='teacher'&&comp.circle_id&&!(await query<any>('select id from circles where id=$1 and is_circle_teacher(id,$2)',[comp.circle_id,u.id]))[0])return json(res,403,{error:'المسابقة خارج نطاق حلقتك'});
+    if(u.role==='teacher'&&!(await query<any>('select id from circles where id=$1 and is_circle_teacher(id,$2::uuid)',[s.circle_id,u.id]))[0])return json(res,403,{error:'الطالب خارج نطاق حلقتك'});
     const row=(await query<any>(`insert into competition_entries(competition_id,student_id,score,notes,updated_by) values($1,$2,$3,$4,$5)
       on conflict(competition_id,student_id) do update set score=excluded.score,notes=excluded.notes,updated_by=excluded.updated_by,updated_at=now() returning *`,
       [competitionId,s.id,int(b.score,0,Number(comp.max_points||100)),txt(b.notes,1000)||null,u.id]))[0];

@@ -7,6 +7,7 @@ import { joinRequests,motivation,notifications,competitions } from './_ops/engag
 import { managementReport,adminOperations } from './_ops/admin.js';
 import { features,profile } from './_ops/features.js';
 import {evaluationCriteria,criterionRecord,studentNote} from './_ops/evaluation.js';
+import {circleSettings} from './_ops/circleSettings.js';
 
 
 
@@ -44,6 +45,7 @@ export default async function handler(req:any,res:any){
     if(action==='evaluation-criteria')return evaluationCriteria(req,res,u);
     if(action==='criterion-record')return criterionRecord(req,res,u);
     if(action==='student-note')return studentNote(req,res,u);
+    if(action==='circle-settings')return circleSettings(req,res,u);
     return json(res,404,{error:'Unknown operation'});
   }catch(e){return handleError(res,e)}
 }

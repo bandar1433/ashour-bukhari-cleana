@@ -32,16 +32,17 @@ export async function criteriaForCircle(circleId:string,value:string,createdBy?:
  const rows=await query<any>(`select c.*,s.effective_month from circle_evaluation_criteria c join circle_evaluation_sets s on s.id=c.set_id where c.set_id=$1 order by c.sort_order,c.created_at`,[set.id]);
  return rows.map((r:any)=>({...r,weight:Number(r.weight),target_pages:Number(r.target_pages||0),effective_month:String(r.effective_month).slice(0,10)}));
 }
-export function attendancePercent(status:any,late:any){
+export function attendancePercent(status:any,late:any,persisted?:any){
  if(status==='excused')return null;
  if(status==='absent'||!status)return 0;
- const m=Number(late||0);return m<=30?100:m<=60?67:33;
+ const saved=Number(persisted);if(Number.isFinite(saved)&&saved>=0&&saved<=100){if(saved===67)return 200/3;if(saved===33)return 100/3;return saved}
+ const m=Number(late||0);return m<=30?100:m<=60?200/3:100/3;
 }
 export function scoreCriteria(criteria:EvalCriterion[],row:any,customRecords:any[]=[]){
  const custom=new Map(customRecords.map((x:any)=>[String(x.criterion_id),x]));
  const items=criteria.map(c=>{
   let done=0,target=Number(c.target_pages||0),percent:number|null=0,record:any=null;
-  if(c.system_key==='attendance'){percent=attendancePercent(row.status??row.attendance_status,row.late_minutes);done=percent===null?0:percent;target=100}
+  if(c.system_key==='attendance'){percent=attendancePercent(row.status??row.attendance_status,row.late_minutes,row.attendance_percent);done=percent===null?0:percent;target=100}
   else if(c.system_key==='new'){record=row.new_record||row.new||null;done=Number(record?.page_count??record?.pages??row.new_done??0);target=Number(row.new_target_pages||target||0);percent=target>0?Math.min(100,100*done/target):null}
   else if(c.system_key==='review'){record=row.review_record||row.review||null;done=Number(record?.page_count??record?.pages??row.review_done??0);target=Number(row.review_target_pages||target||0);percent=target>0?Math.min(100,100*done/target):null}
   else {

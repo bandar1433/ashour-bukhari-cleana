@@ -781,3 +781,27 @@ footer{background:#082f29;padding:42px max(5%,calc((100vw - 1380px)/2));margin-t
   .circleTeachersCell{min-width:160px;align-items:flex-start;flex-direction:column}
   .modalCard{padding:14px;border-radius:18px}
 }
+
+
+/* Per-circle settings, fixed QR attendance, and competition scope — 2026-09-30 */
+.circleSettingsPage{display:grid;gap:16px}
+.circleSettingsSelector,.circleSettingsHead{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.circleSettingsSelector{padding:16px;border:1px solid #dfe8e3;border-radius:18px;background:linear-gradient(135deg,#f8fbf9,#fff)}
+.circleSettingsSelector h3,.circleSettingsHead h3{margin:3px 0 5px;color:#153e34}.circleSettingsSelector p,.circleSettingsHead p{margin:0;color:#6c7973;font-size:11px;line-height:1.7}
+.circleSettingsSelector>.field{min-width:240px}.circleSettingsSection{border:1px solid #e1e9e5;border-radius:20px;background:#fff;padding:18px;display:grid;gap:15px}
+.circleSettingsHead>div>span{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:9px;background:#e9f3ef;color:#0b5848;font-size:10px;font-weight:900}
+.timingBadge{display:grid;gap:2px;justify-items:center;padding:9px 14px;border-radius:14px;background:#f1f7f4;color:#557067;font-size:9px}.timingBadge b{font-size:18px;color:#0b5848}
+.circleTimingForm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:end}.circleTimingForm .primary{min-height:42px}
+.numberSuffix{display:flex;align-items:center;gap:6px}.numberSuffix input{flex:1}.numberSuffix b{font-size:9px;color:#65736d;white-space:nowrap}
+.attendanceRuleStrip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.attendanceRuleStrip article{padding:11px 8px;border-radius:13px;background:#f7faf8;text-align:center;border:1px solid #e7eeea}.attendanceRuleStrip b{display:block;color:#0b5848;font-size:17px}.attendanceRuleStrip span{font-size:9px;color:#6c7973}
+.fixedQrBadge{padding:7px 13px;border-radius:999px;background:#0b5848;color:#fff;font-size:10px}.qrSettingsGrid{display:grid;grid-template-columns:minmax(250px,360px) 1fr;gap:22px;align-items:center}.qrPrintCard{display:grid;justify-items:center;gap:7px;padding:16px;border:1px dashed #b9cec5;border-radius:18px;background:#fbfdfc;text-align:center}.qrPrintCard img{width:min(300px,100%);aspect-ratio:1;object-fit:contain}.qrPrintCard>b{color:#153e34}.qrPrintCard small{font-size:10px;color:#697771;line-height:1.6}.qrLoading{height:260px;display:grid;place-items:center;color:#7b8983}.qrActions{display:grid;gap:9px;align-content:center}.qrActions p{font-size:10px;line-height:1.7;color:#6d7974;margin:0}
+.settingsItemsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.settingsItemsGrid article{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px;border:1px solid #e3ebe7;border-radius:13px;background:#fafcfb}.settingsItemsGrid article>div{display:grid;gap:3px}.settingsItemsGrid article>div:last-child{display:flex;gap:6px;align-items:center}.settingsItemsGrid b{font-size:11px;color:#153e34}.settingsItemsGrid small{font-size:9px;color:#718079}
+.attendanceSuccess{border-color:#b7ddcb!important;background:#eef9f3!important;color:#145b45!important}
+.competitionScopeBadge{display:inline-flex!important;width:max-content;padding:5px 9px;border-radius:999px;font-size:9px!important;font-weight:900!important}.competitionScopeBadge.center{background:#e8f1ff;color:#24548a}.competitionScopeBadge.circle{background:#eaf7ef;color:#176344}.centerCompetition{border-inline-start:4px solid #4d7fbd!important}.circleCompetition{border-inline-start:4px solid #2f8a63!important}
+
+@media(max-width:760px){
+ .circleSettingsSelector,.circleSettingsHead{flex-direction:column}.circleSettingsSelector>.field{min-width:0;width:100%}
+ .circleSettingsSection{padding:12px;border-radius:16px}.circleTimingForm{grid-template-columns:1fr}.attendanceRuleStrip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .attendanceRuleStrip article:last-child{grid-column:1/-1}.qrSettingsGrid{grid-template-columns:1fr}.settingsItemsGrid{grid-template-columns:1fr}
+ .studentMobileNav{grid-template-columns:repeat(7,minmax(0,1fr))!important}.studentMobileNav button small{font-size:7px!important}
+}

@@ -1,7 +1,7 @@
 import { query } from '../_lib/db.js';
 import { json } from '../_lib/http.js';
 import {today} from './shared.js';
-import {lateMinutes,makkahAsrPlus70,riyadhDate} from '../_lib/prayer.js';
+import {attendanceTiming,makkahAsrTime,riyadhDate} from '../_lib/prayer.js';
 import {isWeekLocked} from '../_lib/weeklyLock.js';
 import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
 
@@ -25,15 +25,15 @@ async function editBlock(circleId:string,date:string,instant:Date,offline:boolea
 }
 export async function selfService(req:any,res:any,u:any){
  if(u.role!=='student')return json(res,403,{error:'Forbidden',message:'هذه الخدمة مخصصة لحساب الطالب.'});
- const s=(await query<any>(`select s.*,h.name circle_name,h.start_time,h.grace_minutes,c.name center_name from students s left join circles h on h.id=s.circle_id left join centers c on c.id=s.center_id where s.user_id=$1 limit 1`,[u.id]))[0];
+ const s=(await query<any>(`select s.*,h.name circle_name,h.start_time,h.attendance_token,h.late_after_minutes,h.deduction_after_minutes,h.major_deduction_after_minutes,c.name center_name from students s left join circles h on h.id=s.circle_id left join centers c on c.id=s.center_id where s.user_id=$1 limit 1`,[u.id]))[0];
  if(!s)return json(res,404,{error:'لم يتم ربط حسابك بسجل الطالب'});
  if(req.method==='GET'){
-  const d=today(),att=(await query<any>('select attendance_date,status,late_minutes,check_in_at,check_out_at from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0]||null;
+  const d=today(),att=(await query<any>('select attendance_date,status,late_minutes,attendance_percent,check_in_at,check_out_at from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0]||null;
   const recent=await query<any>("select record_date,record_type,surah_no,from_ayah,to_ayah,from_page,to_page,page_count,grade from memorization_records where student_id=$1 and record_type in ('new','review') order by record_date desc,created_at desc limit 12",[s.id]);
   const dateObj=new Date(d+'T00:00:00Z'),offset=(dateObj.getUTCDay()+1)%7,wd=new Date(dateObj);wd.setUTCDate(wd.getUTCDate()-offset);const weekStart=wd.toISOString().slice(0,10),dayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'],dayName=dayNames[dateObj.getUTCDay()];
   const plan=(await query<any>('select new_target,review_target,goals from weekly_plans where student_id=$1 and week_start=$2::date and day_name=$3 order by created_at desc limit 1',[s.id,weekStart,dayName]))[0]||{},done=await query<any>("select record_type,coalesce(sum(page_count),0)::numeric pages from memorization_records where student_id=$1 and record_date=$2::date and record_type in ('new','review') group by record_type",[s.id,d]),dm:any={};for(const x of done)dm[x.record_type]=Number(x.pages||0);
-  const nt=targetPages(plan.new_target),rt=targetPages(plan.review_target),attendanceScore=att?.status==='excused'?null:att?.status==='absent'?0:att?.status?Number(att.late_minutes||0)<=30?30:Number(att.late_minutes||0)<=60?20:10:0,newScore=nt>0?Math.min(30,Math.round(30*(dm.new||0)/nt)):30,reviewScore=rt>0?Math.min(40,Math.round(40*(dm.review||0)/rt)):40;
-  return json(res,200,{student:{...s,effective_start_time:String(s.start_time||makkahAsrPlus70(d)).slice(0,5),automatic_start:!s.start_time},attendance:att,recent,today:{date:d,week_start:weekStart,is_friday:dateObj.getUTCDay()===5,new_target:nt,review_target:rt,new_done:dm.new||0,review_done:dm.review||0,attendance_score:attendanceScore,new_score:newScore,review_score:reviewScore,daily_score:dateObj.getUTCDay()===5||attendanceScore===null?null:attendanceScore+newScore+reviewScore,goals:plan.goals||''}});
+  const nt=targetPages(plan.new_target),rt=targetPages(plan.review_target),attendanceScore=att?.status==='excused'?null:att?.status==='absent'?0:att?.status?Math.round(30*Number(att.attendance_percent??100)/100):0,newScore=nt>0?Math.min(30,Math.round(30*(dm.new||0)/nt)):30,reviewScore=rt>0?Math.min(40,Math.round(40*(dm.review||0)/rt)):40;
+  return json(res,200,{student:{...s,attendance_token:undefined,effective_start_time:String(s.start_time||makkahAsrTime(d)).slice(0,5),automatic_start:!s.start_time},attendance:att,recent,today:{date:d,week_start:weekStart,is_friday:dateObj.getUTCDay()===5,new_target:nt,review_target:rt,new_done:dm.new||0,review_done:dm.review||0,attendance_score:attendanceScore,new_score:newScore,review_score:reviewScore,daily_score:dateObj.getUTCDay()===5||attendanceScore===null?null:attendanceScore+newScore+reviewScore,goals:plan.goals||''}});
  }
  if(req.method==='POST'){
   const kind=String(req.query?.kind||'');
@@ -42,12 +42,24 @@ export async function selfService(req:any,res:any,u:any){
    const action=String(req.body?.action||'');if(!['check_in','check_out'].includes(action))return json(res,400,{error:'إجراء الحضور غير صالح'});
    const op=operationTime(req.body||{});if(op.error)return json(res,400,{error:op.error});
    const d=op.date,dateObj=new Date(d+'T00:00:00Z');if(dateObj.getUTCDay()===5)return json(res,403,{error:'يوم الجمعة إجازة ولا يوجد تسجيل حضور.'});
+   const holiday=(await query<any>('select id,title from holidays where holiday_date=$1::date and (center_id is null or center_id=$2::uuid) limit 1',[d,s.center_id]))[0];if(holiday)return json(res,403,{error:'اليوم إجازة',message:holiday.title||'لا يوجد تسجيل حضور اليوم.'});
+   if(action==='check_in'){
+    const token=String(req.body?.attendance_token||'').trim();
+    if(!token||token!==String(s.attendance_token||''))return json(res,403,{error:'امسح رمز QR الخاص بحلقتك لتسجيل الحضور.'});
+   }
    if(!op.offline&&await isWeekLocked(s.circle_id,d))return json(res,403,{error:'الأسبوع مقفل',message:'تم إقفال الأسبوع من الإشراف.'});
    const blocked=await editBlock(s.circle_id,d,op.instant,op.offline);if(blocked)return json(res,403,blocked);
    let a=(await query<any>('select * from attendance where student_id=$1 and attendance_date=$2::date',[s.id,d]))[0];if(action==='check_out'&&!a?.check_in_at)return json(res,400,{error:'سجّل الحضور أولاً قبل تسجيل الانصراف'});
-   if(!a){const late=lateMinutes(d,s.start_time,op.instant),status=late>30?'late':'present';a=(await query<any>(`insert into attendance(student_id,circle_id,attendance_date,status,recorded_by,late_minutes,points_penalty,check_in_at) values($1,$2,$3::date,$4,$5,$6,0,$7::timestamptz) returning *`,[s.id,s.circle_id,d,status,u.id,late,op.instant.toISOString()]))[0]}
-   else if(action==='check_in'&&!a.check_in_at){const late=lateMinutes(d,s.start_time,op.instant),status=late>30?'late':'present';a=(await query<any>('update attendance set check_in_at=$1::timestamptz,status=$2,late_minutes=$3,recorded_by=$4 where id=$5 returning *',[op.instant.toISOString(),status,late,u.id,a.id]))[0]}
-   else if(action==='check_out'&&!a.check_out_at)a=(await query<any>('update attendance set check_out_at=$1::timestamptz,recorded_by=$2 where id=$3 returning *',[op.instant.toISOString(),u.id,a.id]));
+   if(action==='check_in'&&a?.check_in_at)return json(res,200,{...a,already_recorded:true,message:'حضورك مسجل مسبقًا اليوم.'});
+   if(!a){
+    const timing=attendanceTiming(d,s.start_time,op.instant,Number(s.late_after_minutes||70),Number(s.deduction_after_minutes||90),Number(s.major_deduction_after_minutes||120));
+    a=(await query<any>(`insert into attendance(student_id,circle_id,attendance_date,status,recorded_by,late_minutes,attendance_percent,points_penalty,check_in_at) values($1,$2,$3::date,$4,$5,$6,$7,$8,$9::timestamptz) returning *`,[s.id,s.circle_id,d,timing.status,u.id,timing.late_minutes,timing.attendance_percent,timing.points_penalty,op.instant.toISOString()]))[0]
+   }
+   else if(action==='check_in'&&!a.check_in_at){
+    const timing=attendanceTiming(d,s.start_time,op.instant,Number(s.late_after_minutes||70),Number(s.deduction_after_minutes||90),Number(s.major_deduction_after_minutes||120));
+    a=(await query<any>('update attendance set check_in_at=$1::timestamptz,status=$2,late_minutes=$3,attendance_percent=$4,points_penalty=$5,recorded_by=$6 where id=$7 returning *',[op.instant.toISOString(),timing.status,timing.late_minutes,timing.attendance_percent,timing.points_penalty,u.id,a.id]))[0]
+   }
+   else if(action==='check_out'&&!a.check_out_at)a=(await query<any>('update attendance set check_out_at=$1::timestamptz,recorded_by=$2 where id=$3 returning *',[op.instant.toISOString(),u.id,a.id]))[0];
    return json(res,200,a);
   }
   if(kind==='quran'){
