@@ -45,7 +45,7 @@ export async function features(req:any,res:any,u:any){
     let scope='true',args:any[]=[from,to];
     if(u.role==='student'){scope='s.user_id=$3::uuid';args.push(u.id)}
     else if(u.role==='guardian'){scope='exists(select 1 from guardian_student_links g where g.student_id=s.id and g.guardian_user_id=$3::uuid)';args.push(u.id)}
-    else if(u.role==='teacher'){scope='h.teacher_user_id=$3::uuid';args.push(u.id)}
+    else if(u.role==='teacher'){scope='is_circle_teacher(h.id,$3::uuid)';args.push(u.id)}
     else if(['center_manager','supervisor'].includes(u.role)){scope='s.center_id=$3::uuid';args.push(u.center_id)}
     else if(u.role!=='system_admin')return json(res,403,{error:'Forbidden'});
     const rawStudents=await query<any>(`select s.id,s.full_name,s.center_id,s.circle_id,c.name center_name,h.name circle_name,
@@ -114,10 +114,10 @@ export async function features(req:any,res:any,u:any){
     const lookup=String(req.body?.guardian_lookup||'').trim();
     if(!guardianId&&lookup){const g0=(await query<any>(`select id from users where role='guardian' and (lower(email)=lower($1) or regexp_replace(coalesce(phone,''),'[^0-9+]','','g')=regexp_replace($1,'[^0-9+]','','g')) limit 1`,[lookup]))[0];guardianId=g0?.id||''}
     if(!guardianId)return json(res,404,{error:'لم يتم العثور على حساب ولي الأمر بالبريد أو الجوال'});
-    const s=(await query<any>(`select s.id,s.center_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[studentId]))[0];
+    const s=(await query<any>(`select s.id,s.center_id,s.circle_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[studentId]))[0];
     const g=(await query<any>(`select id from users where id=$1 and role='guardian'`,[guardianId]))[0];
     if(!s||!g)return json(res,404,{error:'الطالب أو ولي الأمر غير موجود'});
-    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===s.center_id)||(u.role==='teacher'&&u.id===s.teacher_user_id);if(!allowed)return json(res,403,{error:'خارج نطاق صلاحيتك'});
+    const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&u.center_id===s.center_id)||(u.role==='teacher'&&Boolean((await query<any>('select is_circle_teacher($1,$2) ok',[s.circle_id,u.id]))[0]?.ok));if(!allowed)return json(res,403,{error:'خارج نطاق صلاحيتك'});
     await query(`insert into guardian_student_links(guardian_user_id,student_id) values($1,$2) on conflict do nothing`,[guardianId,studentId]);return json(res,200,{success:true});
   }
 
@@ -151,7 +151,7 @@ export async function features(req:any,res:any,u:any){
     let student:any=null;const sid=validUuid(req.query?.student_id);
     if(u.role==='student')student=(await query<any>('select s.id,s.full_name,c.name circle_name from students s left join circles c on c.id=s.circle_id where s.user_id=$1 limit 1',[u.id]))[0];
     else if(isStaff(u.role)&&sid)student=(await query<any>(`select s.id,s.full_name,c.name circle_name from students s left join circles c on c.id=s.circle_id
-      where s.id=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid))`,[u.role,u.center_id,u.id,sid]))[0];
+      where s.id=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(c.id,$3::uuid)))`,[u.role,u.center_id,u.id,sid]))[0];
     if(!student)return json(res,200,{student:null,pages:[],history:[]});
     const history=await query<any>('select id,record_date,record_type,from_page,to_page,grade from memorization_records where student_id=$1 order by record_date desc,created_at desc limit 100',[student.id]);
     const pages=Array.from({length:604},(_,i)=>({page:i+1,state:'لم يبدأ'})),rank:any={'لم يبدأ':0,'محفوظ':1,'قيد المراجعة':2,'يحتاج تثبيت':3};
@@ -168,7 +168,7 @@ export async function features(req:any,res:any,u:any){
       coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between current_date-interval '28 days' and current_date-interval '15 days'),100) previous_avg,
       coalesce((select count(*) from generate_series(current_date-interval '13 days',current_date,'1 day') d where extract(dow from d)<>5 and not exists(select 1 from memorization_records m where m.student_id=s.id and m.record_type='review' and m.record_date=d::date)),0)::int review_gaps
       from students s left join circles c on c.id=s.circle_id
-      where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid)) order by s.full_name`,[u.role,u.center_id,u.id]);
+      where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(c.id,$3::uuid))) order by s.full_name`,[u.role,u.center_id,u.id]);
     const items:any[]=[];
     for(const r of rows){
       const plans=await query<any>(`select week_start,day_name,new_target,review_target from weekly_plans where student_id=$1 and week_start>=current_date-interval '14 days'`,[r.id]);
