@@ -235,6 +235,16 @@ export async function motivation(req:any,res:any,u:any){
 export async function notifications(req:any,res:any,u:any){
   if(req.method==='GET')return json(res,200,await query<any>('select * from inapp_notifications where user_id=$1 order by created_at desc limit 100',[u.id]));
   const sub=String(req.query?.sub||'');
+  if(req.method==='POST'&&sub==='circle-message'){
+    if(u.role!=='teacher')return json(res,403,{error:'هذه العملية لمعلم الحلقة فقط'});
+    const circleId=validUuid(req.body?.circle_id);if(!circleId)return json(res,400,{error:'اختر الحلقة'});
+    const circle=(await query<any>('select id,name from circles where id=$1 and is_circle_teacher(id,$2::uuid)',[circleId,u.id]))[0];if(!circle)return json(res,403,{error:'الحلقة خارج نطاق صلاحيتك'});
+    const title=txt(req.body?.title||'رسالة من معلم الحلقة',200),body=txt(req.body?.body,2000);if(!body)return json(res,400,{error:'نص الرسالة مطلوب'});
+    const rows=await query<any>(`insert into inapp_notifications(user_id,title,body,kind)
+      select s.user_id,$1,$2,'teacher_message' from students s
+      where s.circle_id=$3 and s.status='active' and s.user_id is not null returning id`,[title,body,circleId]);
+    return json(res,200,{success:true,sent:rows.length,circle_name:circle.name});
+  }
   if(req.method==='POST'&&sub==='student-message'){
     if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
     const s=await scopedStudent(u,req.body?.student_id);if(!s)return json(res,404,{error:'الطالب غير موجود أو خارج نطاقك'});

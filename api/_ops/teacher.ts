@@ -271,18 +271,18 @@ export async function evaluations(req:any,res:any,u:any){
       sum(case when record_type='review' then coalesce(page_count,0) else 0 end)::numeric review_pages
     from memorization_records where record_date between $4 and $5 group by student_id,record_date
   )
-  select d.student_id,d.full_name,d.circle_id,d.record_day as record_date,a.status,a.late_minutes,a.attendance_percent,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
+  select d.student_id,d.full_name,d.circle_id,to_char(d.record_day,'YYYY-MM-DD') as record_date,a.status,a.late_minutes,a.attendance_percent,coalesce(done.new_pages,0) new_pages,coalesce(done.review_pages,0) review_pages,
     coalesce(p.new_target,0) new_daily_target,coalesce(p.review_target,0) review_daily_target
   from days d left join plan p on p.student_id=d.student_id and p.record_day=d.record_day left join done on done.student_id=d.student_id and done.record_date=d.record_day
   left join attendance a on a.student_id=d.student_id and a.attendance_date=d.record_day order by d.record_day desc,d.full_name`,[u.role,u.center_id,u.id,from,to]);
   const studentIds=[...new Set(rows.map((x:any)=>String(x.student_id)))];
-  const custom=studentIds.length?await query<any>('select * from student_criterion_records where student_id=any($1::uuid[]) and record_date between $2::date and $3::date',[studentIds,from,to]):[];
+  const custom=studentIds.length?await query<any>("select *,to_char(record_date,'YYYY-MM-DD') record_date_text from student_criterion_records where student_id=any($1::uuid[]) and record_date between $2::date and $3::date",[studentIds,from,to]):[];
   const cache=new Map<string,any[]>(),enriched:any[]=[];
   for(const r of rows){
     const date=String(r.record_date).slice(0,10),key=String(r.circle_id)+'|'+date.slice(0,7);
     if(!cache.has(key))cache.set(key,await criteriaForCircle(String(r.circle_id),date,u.id));
     const base={...r,new_done:Number(r.new_pages||0),review_done:Number(r.review_pages||0),new_target_pages:Number(r.new_daily_target||0),review_target_pages:Number(r.review_daily_target||0)};
-    const score=scoreCriteria(cache.get(key)||[],base,custom.filter((x:any)=>x.student_id===r.student_id&&String(x.record_date).slice(0,10)===date));
+    const score=scoreCriteria(cache.get(key)||[],base,custom.filter((x:any)=>x.student_id===r.student_id&&String(x.record_date_text||'')===date));
     enriched.push({...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)});
   }
   const grouped=new Map<string,any>();for(const r of enriched){if(r.daily_score===null)continue;const k=String(r.student_id);if(!grouped.has(k))grouped.set(k,{student_id:r.student_id,full_name:r.full_name,circle_id:r.circle_id,scores:[]});grouped.get(k).scores.push(Number(r.daily_score))}

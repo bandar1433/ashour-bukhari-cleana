@@ -89,20 +89,28 @@ export async function features(req:any,res:any,u:any){
   if(sub==='library'){
     if(req.method==='GET'){
       const where=['system_admin','center_manager','supervisor'].includes(u.role)?'true':'is_active=true';
-      return json(res,200,{items:await query<any>(`select * from library_items where ${where} order by is_active desc,program_name,series_name,sort_order,title`)});
+      return json(res,200,{items:await query<any>(`select *,coalesce(nullif(resource_url,''),nullif(youtube_url,'')) display_url from library_items where ${where} order by is_active desc,sort_order,title`)});
     }
     if(!['system_admin','center_manager','supervisor'].includes(u.role))return json(res,403,{error:'Forbidden'});
     if(req.method==='POST'){
-      const b=req.body||{},program=String(b.program_name||'').trim(),series=String(b.series_name||'').trim(),title=String(b.title||'').trim();
-      if(!program||!series||!title)return json(res,400,{error:'البرنامج والسلسلة وعنوان الدرس مطلوبة'});
-      const row=(await query<any>(`insert into library_items(program_name,series_name,title,teacher_name,description,youtube_url,duration,sort_order,created_by)
-        values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
-        [program,series,title,String(b.teacher_name||'').trim()||null,String(b.description||'').trim()||null,validYoutube(b.youtube_url),String(b.duration||'').trim()||null,Math.max(0,Number(b.sort_order)||0),u.id]))[0];
+      const b=req.body||{},title=String(b.title||'').trim();if(!title)return json(res,400,{error:'عنوان المادة مطلوب'});
+      const type=['text','link','video','document'].includes(String(b.item_type))?String(b.item_type):'text';
+      const url=String(b.resource_url||b.youtube_url||'').trim()||null;
+      if(type!=='text'&&!url)return json(res,400,{error:'أدخل رابط المادة أو اختر «مادة نصية»'});
+      const program=String(b.program_name||'المكتبة العامة').trim()||'المكتبة العامة',series=String(b.series_name||'مواد عامة').trim()||'مواد عامة';
+      const row=(await query<any>(`insert into library_items(program_name,series_name,title,teacher_name,description,youtube_url,duration,sort_order,created_by,item_type,resource_url,image_url,public_visible)
+        values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,
+        [program,series,title,String(b.teacher_name||'').trim()||null,String(b.description||'').trim()||null,url||'',String(b.duration||'').trim()||null,Math.max(0,Number(b.sort_order)||0),u.id,type,url,String(b.image_url||'').trim()||null,b.public_visible!==false&&String(b.public_visible)!=='false']))[0];
       return json(res,201,row);
     }
     if(req.method==='PUT'){
-      const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'معرف الدرس غير صالح'});
-      return json(res,200,(await query<any>('update library_items set is_active=coalesce($2,is_active),title=coalesce($3,title),sort_order=coalesce($4,sort_order),updated_at=now() where id=$1 returning *',[id,typeof b.is_active==='boolean'?b.is_active:null,b.title?String(b.title).trim():null,b.sort_order===undefined?null:Math.max(0,Number(b.sort_order)||0)]))[0]);
+      const b=req.body||{},id=validUuid(b.id);if(!id)return json(res,400,{error:'معرف المادة غير صالح'});
+      const old=(await query<any>('select * from library_items where id=$1',[id]))[0];if(!old)return json(res,404,{error:'المادة غير موجودة'});
+      const type=b.item_type===undefined?old.item_type:(['text','link','video','document'].includes(String(b.item_type))?String(b.item_type):old.item_type);
+      const url=b.resource_url===undefined?old.resource_url:(String(b.resource_url||'').trim()||null);
+      const row=(await query<any>(`update library_items set title=$2,program_name=$3,series_name=$4,teacher_name=$5,description=$6,item_type=$7,resource_url=$8,youtube_url=$9,duration=$10,sort_order=$11,is_active=$12,public_visible=$13,updated_at=now() where id=$1 returning *`,
+        [id,b.title===undefined?old.title:String(b.title||'').trim(),b.program_name===undefined?old.program_name:(String(b.program_name||'').trim()||'المكتبة العامة'),b.series_name===undefined?old.series_name:(String(b.series_name||'').trim()||'مواد عامة'),b.teacher_name===undefined?old.teacher_name:(String(b.teacher_name||'').trim()||null),b.description===undefined?old.description:(String(b.description||'').trim()||null),type,url,url||'',b.duration===undefined?old.duration:(String(b.duration||'').trim()||null),b.sort_order===undefined?old.sort_order:Math.max(0,Number(b.sort_order)||0),typeof b.is_active==='boolean'?b.is_active:old.is_active,typeof b.public_visible==='boolean'?b.public_visible:old.public_visible]))[0];
+      return json(res,200,row);
     }
     return json(res,405,{error:'Method not allowed'});
   }

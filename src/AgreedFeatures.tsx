@@ -53,30 +53,33 @@ export default function AgreedFeatures({mode,currentRole,students}:{mode:Mode;cu
     <Mini rows={data?.items||[]} cols={[[ 'full_name','الطالب'],['circle_name','الحلقة'],['absences','الغياب'],['avg_grade','متوسط الأداء'],['reasons_text','سبب التنبيه']]}/>
   </section>;
 
-  if(mode==='library')return <div>
+  if(mode==='library')return <div className="libraryManager">
     {error&&<div className="notice">{error}</div>}
-    {canManageLibrary&&<form className="quickForm" onSubmit={async e=>{
+    {canManageLibrary&&<form className="quickForm libraryManageForm" onSubmit={async e=>{
       e.preventDefault();setBusy(true);
-      try{await apiPost('/api/ops?action=features&sub=library',formBody(e));e.currentTarget.reset();await load()}
+      try{const b:any=formBody(e);b.public_visible=b.public_visible==='on';await apiPost('/api/ops?action=features&sub=library',b);e.currentTarget.reset();await load()}
       catch(x){setError(x instanceof Error?x.message:'تعذر الحفظ')}
       finally{setBusy(false)}
     }}>
-      <label className="field"><span>البرنامج</span><input name="program_name" required/></label>
-      <label className="field"><span>السلسلة</span><input name="series_name" required/></label>
-      <label className="field"><span>عنوان الدرس</span><input name="title" required/></label>
-      <label className="field"><span>المدرب</span><input name="teacher_name"/></label>
-      <label className="field"><span>رقم الدرس</span><input name="sort_order" type="number" min="0" defaultValue="0"/></label>
-      <label className="field"><span>المدة</span><input name="duration"/></label>
-      <label className="field"><span>رابط YouTube</span><input name="youtube_url" type="url" required/></label>
-      <label className="field"><span>وصف مختصر</span><input name="description"/></label>
-      <button className="primary">إضافة الدرس</button>
+      <label className="field"><span>عنوان المادة</span><input name="title" required placeholder="مثال: شرح سورة الفاتحة"/></label>
+      <label className="field"><span>التصنيف</span><input name="program_name" defaultValue="المكتبة العامة" placeholder="برنامج أو تصنيف"/></label>
+      <label className="field"><span>القسم / السلسلة</span><input name="series_name" defaultValue="مواد عامة" placeholder="قسم أو سلسلة"/></label>
+      <label className="field"><span>نوع المادة</span><select name="item_type" defaultValue="text"><option value="text">مادة نصية</option><option value="link">رابط</option><option value="video">فيديو</option><option value="document">ملف / وثيقة</option></select></label>
+      <label className="field"><span>رابط المادة — اختياري للنص</span><input name="resource_url" type="url" placeholder="https://..."/></label>
+      <label className="field"><span>المعلم / المُعد</span><input name="teacher_name"/></label>
+      <label className="field"><span>المدة — إن وجدت</span><input name="duration"/></label>
+      <label className="field"><span>الترتيب</span><input name="sort_order" type="number" min="0" defaultValue="0"/></label>
+      <label className="field libraryDescription"><span>المحتوى أو الوصف</span><textarea name="description" rows={4} placeholder="يمكن للمشرف كتابة المادة نفسها هنا، أو وصفها، أو إرفاق رابط خارجي."/></label>
+      <label className="libraryCheck"><input name="public_visible" type="checkbox" defaultChecked/><span>إظهار المادة في المكتبة العامة بالرئيسية</span></label>
+      <button className="primary">إضافة إلى المكتبة</button>
     </form>}
-    <div className="libraryGrid">{(data?.items||[]).map((x:any)=><article className="libraryCard" key={x.id}>
-      <span>{x.program_name} ← {x.series_name}</span><h3>{x.title}</h3>
-      <small>{x.teacher_name||'—'} {x.duration?'• '+x.duration:''}</small>
+    {(data?.items||[]).length===0&&<div className="emptyState"><b>المكتبة جاهزة للإضافة.</b><span>{canManageLibrary?'أضف مادة نصية أو رابطًا أو فيديو أو وثيقة، وستظهر مباشرة حسب إعداد النشر.':'لم تُنشر مواد في المكتبة حتى الآن.'}</span></div>}
+    <div className="libraryGrid">{(data?.items||[]).map((x:any)=><article className="libraryCard libraryCardGeneral" key={x.id}>
+      <div className="libraryCardTop"><span>{x.program_name||'المكتبة'} • {x.series_name||'مواد عامة'}</span><b>{x.item_type==='video'?'فيديو':x.item_type==='document'?'وثيقة':x.item_type==='link'?'رابط':'مادة'}</b></div>
+      <h3>{x.title}</h3><small>{x.teacher_name||'—'} {x.duration?'• '+x.duration:''}</small>
       <p>{x.description||''}</p>
-      <a href={x.youtube_url} target="_blank" rel="noreferrer">فتح الدرس في YouTube</a>
-      {canManageLibrary&&<div className="opsToolbar"><button className="secondary" onClick={async()=>{const title=prompt('عنوان الدرس',x.title);if(!title)return;const order=prompt('ترتيب الدرس',String(x.sort_order||0));await apiPut('/api/ops?action=features&sub=library',{id:x.id,title,sort_order:Number(order||0)});await load()}}>تعديل / ترتيب</button><button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button></div>}
+      {(x.display_url||x.resource_url||x.youtube_url)&&<a href={x.display_url||x.resource_url||x.youtube_url} target="_blank" rel="noreferrer">فتح المادة ←</a>}
+      {canManageLibrary&&<div className="opsToolbar"><button className="secondary" onClick={async()=>{const title=prompt('عنوان المادة',x.title);if(!title)return;const order=prompt('ترتيب المادة',String(x.sort_order||0));await apiPut('/api/ops?action=features&sub=library',{id:x.id,title,sort_order:Number(order||0)});await load()}}>تعديل / ترتيب</button><button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,is_active:!x.is_active});await load()}}>{x.is_active?'إخفاء':'إظهار'}</button><button className="secondary" onClick={async()=>{await apiPut('/api/ops?action=features&sub=library',{id:x.id,public_visible:!x.public_visible});await load()}}>{x.public_visible?'إخفاء من الرئيسية':'نشر في الرئيسية'}</button></div>}
     </article>)}</div>
   </div>;
 
