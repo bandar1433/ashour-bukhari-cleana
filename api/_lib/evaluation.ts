@@ -5,7 +5,14 @@ export type EvalCriterion={
  weight:number;target_pages:number;sort_order:number;set_id:string;effective_month:string;
 };
 
-export const monthStart=(value:string)=>String(value||'').slice(0,7)+'-01';
+export const monthStart=(value:any)=>{
+ const raw=String(value||'').trim();
+ const iso=raw.match(/^(\d{4})-(\d{2})(?:-\d{2})?/);
+ if(iso)return iso[1]+'-'+iso[2]+'-01';
+ const d=value instanceof Date?value:new Date(raw);
+ if(!Number.isNaN(d.getTime()))return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-01';
+ throw new Error('Invalid evaluation month');
+};
 export function nextMonth(value:string){
  const d=new Date(monthStart(value)+'T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);return d.toISOString().slice(0,7)+'-01';
 }
