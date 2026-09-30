@@ -600,3 +600,115 @@ footer{background:#082f29;padding:42px max(5%,calc((100vw - 1380px)/2));margin-t
 .studentTodayEntryHead{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}.studentTodayEntryHead span{font-size:12px;font-weight:800;color:#1f6b55}.studentTodayEntryHead h3{margin:2px 0 3px;font-size:22px}.studentTodayEntryHead p{margin:0;color:#64756f;font-size:13px}.studentTodayEntryHead>strong{padding:8px 12px;border-radius:999px;background:#e8f5ee;color:#17603d;font-size:12px;white-space:nowrap}
 .studentTodayActions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.todayActionCard{display:flex;flex-direction:column;gap:8px;min-height:175px;padding:15px;border:1px solid #dfe9e4;border-radius:16px;background:#fff}.todayActionCard>span{font-size:12px;font-weight:800;color:#587069}.todayActionCard>b{font-size:15px;line-height:1.7}.todayActionCard>small{color:#6b7b76;line-height:1.6;min-height:38px}.todayActionCard>button{margin-top:auto;width:100%;min-height:44px;font-weight:800}.studentTodayEmpty{padding:18px;text-align:center;border-radius:14px;background:#f5f6f6;color:#68756f}
 @media(max-width:760px){.studentTodayEntry{padding:13px;margin-top:10px}.studentTodayEntryHead{align-items:flex-start;flex-direction:column}.studentTodayActions{grid-template-columns:1fr}.todayActionCard{min-height:0}.studentTodayEntryHead>strong{align-self:flex-start}.todayActionCard>button{min-height:48px;font-size:15px}}
+
+
+/* Mobile application shell — 2026-09-30
+   A dedicated phone layout for the authenticated platform. Desktop/tablet remain unchanged. */
+@media (max-width:760px){
+  html,body,#root{width:100%;max-width:100%;overflow-x:hidden}
+  body{font-size:14px;-webkit-text-size-adjust:100%;padding:0;margin:0}
+  button,a,input,select,textarea{touch-action:manipulation}
+  input,select,textarea{font-size:16px!important;max-width:100%;width:100%;box-sizing:border-box}
+  button,.primary,.secondary,.refreshButton,.tableAction{min-height:44px}
+  .workspacePro{display:block!important;width:100%!important;min-height:100dvh!important;background:#f4f7f5!important}
+  .dashboardContent{width:100%!important;max-width:100%!important;min-width:0!important;padding:10px 10px calc(94px + env(safe-area-inset-bottom))!important;box-sizing:border-box!important}
+  .role-student .dashboardContent{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+
+  /* Compact app header */
+  .adminTopbar{display:block!important;width:100%!important;margin:0 0 10px!important;padding:12px!important;border-radius:16px!important;box-sizing:border-box!important;background:#fff!important;backdrop-filter:none!important}
+  .crumbPath,.crumb>p{display:none!important}
+  .crumb h1{font-size:20px!important;line-height:1.35!important;margin:0 0 10px!important;white-space:normal!important}
+  .adminTopActions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important;width:100%!important}
+  .topbarIdentity{grid-column:1/-1!important;width:100%!important;min-width:0!important;padding:8px 10px!important;box-sizing:border-box!important}
+  .topbarAvatar{width:34px!important;height:34px!important;font-size:14px!important}
+  .topbarIdentity b{font-size:12px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbarIdentity small{display:none!important}
+  .topbarIdentity strong{font-size:9px!important}
+  .adminTopActions>button{width:100%!important;min-width:0!important;min-height:42px!important;padding:7px 5px!important;font-size:9.5px!important;white-space:normal!important;line-height:1.25!important}
+
+  /* Main content behaves like a phone app, not a squeezed desktop */
+  .mainPanel,.panel,.editPanel,.featurePanel,.criteriaManager{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important;border-radius:16px!important;padding:12px!important;margin-bottom:10px!important}
+  .panelHead,.institutionalPanelHead{align-items:stretch!important;flex-direction:column!important;gap:9px!important;margin-bottom:12px!important}
+  .institutionalPanelHead h2,.panelHead h2,.panelHead h3{font-size:17px!important;line-height:1.45!important}
+  .institutionalPanelHead small{line-height:1.55!important}
+  .searchBox{width:100%!important;box-sizing:border-box!important}.searchBox input{min-width:0!important}
+  form,.quickForm,.miniOpsForm{display:grid!important;grid-template-columns:1fr!important;gap:11px!important;width:100%!important;max-width:100%!important;padding:12px!important;box-sizing:border-box!important}
+  .field{min-width:0!important;width:100%!important}.field span{font-size:11px!important;margin-bottom:5px!important}
+  textarea{min-height:96px}
+  .rowActions,.actions,.criteriaFooter{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;width:100%!important}
+  .rowActions button,.actions button,.criteriaFooter button{width:100%!important}
+
+  /* KPI and management cards */
+  .kpis,.roleMetricsGrid,.compactOpsKpis,.monthlyEvaluationCards{grid-template-columns:1fr 1fr!important;gap:8px!important}
+  .kpis article,.interactiveKpis .metricAction,.roleMetricsGrid .metricAction,.compactOpsKpis article{min-height:104px!important;padding:13px!important;border-radius:15px!important}
+  .interactiveKpis .metricAction:before{margin-bottom:8px!important}
+  .interactiveKpis .metricAction b,.roleMetricsGrid .metricAction>b,.compactOpsKpis article b{font-size:25px!important}
+  .roleDashboard{gap:10px!important}.roleDashboardHero{padding:16px!important;border-radius:17px!important;gap:12px!important}
+  .roleDashboardHero h2{font-size:21px!important}.roleDashboardHero p{font-size:11px!important}
+  .roleDashboardColumns{grid-template-columns:1fr!important;gap:9px!important}.roleQuickPanel,.roleAttentionPanel{padding:13px!important}
+  .roleActionsGrid{grid-template-columns:1fr!important}
+
+  /* Tables remain readable inside their own horizontal viewport instead of widening the whole page */
+  .table-wrap,.tableWrap{display:block!important;width:calc(100% + 8px)!important;max-width:calc(100% + 8px)!important;margin-inline:-4px!important;overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-inline:contain!important;border-radius:12px!important}
+  .table-wrap table,.tableWrap table{width:max-content!important;min-width:100%!important;max-width:none!important}
+  .table-wrap th,.table-wrap td,.tableWrap th,.tableWrap td{white-space:nowrap!important;padding:10px 9px!important}
+  .table-wrap th:first-child,.table-wrap td:first-child,.tableWrap th:first-child,.tableWrap td:first-child{position:sticky;right:0;z-index:2;background:#fff}
+  .table-wrap th:first-child,.tableWrap th:first-child{background:#f3f7f5!important;z-index:3}
+
+  /* Student: first screen is the daily action surface */
+  .role-student .mainPanel{padding:9px!important;background:transparent!important;box-shadow:none!important}
+  .role-student .institutionalPanelHead{padding:4px 3px 8px!important;margin-bottom:4px!important}
+  .studentProfileHero{display:grid!important;grid-template-columns:1fr!important;gap:12px!important;padding:16px!important;border-radius:18px!important}
+  .studentProfileHero h2{font-size:21px!important}.studentProfileHero .field{width:100%!important}
+  .offlineStatus{position:static!important;margin-bottom:9px!important;padding:9px 11px!important;border-radius:12px!important}
+  .studentTodayEntry{margin:9px 0 12px!important;padding:11px!important;border-radius:17px!important}
+  .studentTodayEntryHead{margin-bottom:10px!important;gap:7px!important}.studentTodayEntryHead h3{font-size:18px!important}.studentTodayEntryHead p{font-size:11px!important}
+  .studentTodayActions{grid-template-columns:1fr!important;gap:8px!important}
+  .todayActionCard{min-height:0!important;padding:12px!important;border-radius:14px!important;gap:6px!important}
+  .todayActionCard>span{font-size:11px!important}.todayActionCard>b{font-size:14px!important}.todayActionCard>small{min-height:0!important;font-size:10px!important}
+  .todayActionCard>button{min-height:48px!important;font-size:14px!important}
+  .studentPlanHead,.studentMonthlyHead{display:grid!important;grid-template-columns:1fr!important;gap:7px!important;padding:13px!important;border-radius:14px!important}
+  .studentWeekGrid{grid-template-columns:1fr!important;gap:8px!important}
+  .studentDayPlan{padding:13px!important;border-radius:14px!important}
+  .monthlyBand{width:100%!important;min-width:0!important}
+  .flexCriteriaToday{padding:11px!important;margin:10px 0!important}.flexCriteriaGrid{grid-template-columns:1fr!important}
+
+  /* Editors become native-feeling bottom sheets */
+  .recordModalBackdrop{align-items:flex-end!important;padding:0!important;background:rgba(5,35,30,.5)!important}
+  .recordModal{width:100%!important;max-width:100%!important;max-height:92dvh!important;border-radius:24px 24px 0 0!important;margin:0!important;padding:12px!important;padding-bottom:calc(14px + env(safe-area-inset-bottom))!important}
+  .recordModal .panelHead{top:-12px!important;margin:-12px -12px 10px!important;padding:14px 12px!important;background:#fff!important;border-bottom:1px solid #e5ebe8!important;border-radius:24px 24px 0 0!important}
+  .recordModal .quickForm{padding:4px 0 0!important}
+
+  /* All staff navigation is reachable on phones: horizontal app dock, no hidden items */
+  .workspacePro:not(.role-student) .adminSidebar{position:fixed!important;z-index:80!important;right:0!important;left:0!important;bottom:0!important;top:auto!important;width:100%!important;min-width:0!important;height:calc(78px + env(safe-area-inset-bottom))!important;display:flex!important;flex-direction:row!important;justify-content:flex-start!important;align-items:flex-start!important;gap:5px!important;padding:6px 7px calc(6px + env(safe-area-inset-bottom))!important;overflow-x:auto!important;overflow-y:hidden!important;scroll-snap-type:x proximity;scrollbar-width:none;background:#082f29!important;box-sizing:border-box!important}
+  .workspacePro:not(.role-student) .adminSidebar::-webkit-scrollbar{display:none}
+  .workspacePro:not(.role-student) .adminSidebar .sidebarBrand,.workspacePro:not(.role-student) .adminSidebar .sidebarContext,.workspacePro:not(.role-student) .adminSidebar .sidebarSectionLabel,.workspacePro:not(.role-student) .adminSidebar .sidebarAccount{display:none!important}
+  .workspacePro:not(.role-student) .adminSidebar>button,.workspacePro:not(.role-student) .adminSidebar>button:nth-of-type(n+7){display:flex!important;flex:0 0 64px!important;width:64px!important;height:62px!important;min-height:62px!important;margin:0!important;padding:5px 2px!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:3px!important;border-radius:13px!important;scroll-snap-align:start!important;font-size:8px!important;line-height:1.1!important;white-space:normal!important;text-align:center!important}
+  .workspacePro:not(.role-student) .adminSidebar>button .navDot{font-size:18px!important;line-height:1!important}
+  .workspacePro:not(.role-student) .adminSidebar>button>span:not(.navDot){display:block!important;font-size:8px!important;line-height:1.15!important;max-width:60px!important}
+  .workspacePro:not(.role-student) .adminSidebar>button.selected:after{right:auto!important;bottom:-6px!important;width:24px!important;height:3px!important}
+
+  /* Student's dedicated bottom dock */
+  .workspacePro.role-student .adminSidebar{display:none!important}
+  .studentMobileNav{height:calc(72px + env(safe-area-inset-bottom))!important;padding:5px 4px calc(5px + env(safe-area-inset-bottom))!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;background:#082f29!important}
+  .studentMobileNav button{height:58px!important;min-height:58px!important;padding:3px 1px!important;border-radius:12px!important}
+  .studentMobileNav button span{font-size:19px!important}.studentMobileNav button small{font-size:8px!important;line-height:1.05!important;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+  /* Auth also uses the phone width cleanly */
+  .authOverlay{padding:0!important;align-items:flex-end!important}
+  .authDialogPro,.authCard{width:100%!important;max-width:100%!important;max-height:96dvh!important;border-radius:24px 24px 0 0!important}
+  .authDialogBody{padding:22px 16px calc(22px + env(safe-area-inset-bottom))!important}
+  .authBrandPanel{display:none!important}
+}
+
+@media (max-width:430px){
+  .dashboardContent{padding-inline:7px!important}
+  .adminTopbar{padding:10px!important}
+  .adminTopActions{grid-template-columns:1fr 1fr!important}
+  .topbarIdentity{grid-column:1/-1!important}
+  .adminTopActions>button:last-child{grid-column:1/-1!important}
+  .kpis,.roleMetricsGrid,.compactOpsKpis,.monthlyEvaluationCards{grid-template-columns:1fr!important}
+  .mainPanel,.panel,.editPanel,.featurePanel,.criteriaManager{padding:10px!important}
+  .studentProfileHero{padding:14px!important}
+  .studentMobileNav button small{font-size:7.5px!important}
+}
