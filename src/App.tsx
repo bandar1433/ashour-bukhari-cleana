@@ -157,6 +157,7 @@ function RoleOverview({role,summary,onNavigate,currentUser}:{role:string;summary
       <div><span className="roleDashboardEyebrow">{roleLabel[role]||'مستخدم'}</span><h2>{title}</h2><p>{description}</p></div>
       <div className="roleScopeCard"><small>نطاق المسؤولية</small><b>{s.scopeLabel||'—'}</b><span>{currentUser?.full_name||''}</span></div>
     </section>
+    {role==='teacher'&&Number(s.circles||0)===0&&<div className="notice roleScopeWarning"><b>لا توجد حلقة مسندة لهذا الحساب.</b><span>لن تظهر بيانات الطلاب أو سجلات الحلقة حتى يتم إسناد المعلم إلى حلقة من إدارة الحلقات.</span></div>}
     <div className="roleMetricsGrid interactiveKpis">{metrics.map(([label,value,note,tab,suffix])=><InteractiveMetric key={label} label={label} value={Number(value||0)} note={note} suffix={suffix} onClick={()=>onNavigate(tab as Tab)}/>)}</div>
     <div className="roleDashboardColumns">
       <section className="roleQuickPanel"><div className="rolePanelHead"><div><span>الوصول السريع</span><h3>مهامي الأساسية</h3></div><small>بحسب صلاحيات حسابك</small></div><div className="roleActionsGrid">{actions.map(([icon,title,note,tab])=><button type="button" key={title} onClick={()=>onNavigate(tab as Tab)}><span>{icon}</span><div><b>{title}</b><small>{note}</small></div><em>←</em></button>)}</div></section>
@@ -244,14 +245,20 @@ export default function App() {
   const [studentProfile,setStudentProfile]=useState<any>(null);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [tabHistory,setTabHistory]=useState<Tab[]>([]);
+  const [teacherMobileMore,setTeacherMobileMore]=useState(false);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string>('');
   const [query, setQuery] = useState('');
   const currentRole=getSessionRole();
   const isRoot=currentRole==='system_admin';
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
-  const goTab=(tab:Tab)=>{if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));setActiveTab(tab)};
-  const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous)};
+  const goTab=(tab:Tab)=>{
+    if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));
+    setActiveTab(tab);
+    setTeacherMobileMore(false);
+    if(typeof window!=='undefined'&&window.innerWidth<=760)window.requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+  };
+  const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous);setTeacherMobileMore(false);if(typeof window!=='undefined'&&window.innerWidth<=760)window.requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}))};
 
   useEffect(() => {
     const host=window.location.hostname;
@@ -778,6 +785,31 @@ export default function App() {
             {loadState!=='loading'&&activeTab==='news'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/news',e)}><label className="field"><span>العنوان</span><input name="title" required /></label><label className="field"><span>النوع</span><select name="kind" defaultValue="news"><option value="news">خبر</option><option value="event">فعالية</option><option value="achievement">إنجاز</option><option value="media">وسائط</option></select></label><label className="field"><span>المحتوى</span><textarea name="body" rows={3}></textarea></label><label className="field"><span>صورة الخبر</span><input name="image_url" type="url" placeholder="https://..." /></label><label className="field"><span>رابط الفيديو</span><input name="video_url" type="url" placeholder="https://..." /></label><label className="field"><span>تاريخ الفعالية</span><input name="event_date" type="date" /></label><label className="field"><span>الحالة</span><select name="status" defaultValue="published"><option value="published">منشور</option><option value="draft">مسودة</option></select></label><button className="primary" type="submit">حفظ الخبر</button></form><GenericTable rows={news} columns={[[ 'title','العنوان'],['kind','النوع'],['event_date','التاريخ'],['status','الحالة']]}/></>}
           </div>}
         </section>
+        {currentRole==='teacher'&&<>
+          <nav className="staffMobileNav" aria-label="تنقل المعلم">
+            <button type="button" className={activeTab==='overview'?'selected':''} onClick={()=>goTab('overview')}><span>⌂</span><small>الرئيسية</small></button>
+            <button type="button" className={activeTab==='teacherToday'?'selected':''} onClick={()=>goTab('teacherToday')}><span>◈</span><small>اليوم</small></button>
+            <button type="button" className={activeTab==='circleRegister'?'selected':''} onClick={()=>goTab('circleRegister')}><span>▦</span><small>السجل</small></button>
+            <button type="button" className={activeTab==='students'?'selected':''} onClick={()=>goTab('students')}><span>◉</span><small>الطلاب</small></button>
+            <button type="button" className={teacherMobileMore||!['overview','teacherToday','circleRegister','students'].includes(activeTab)?'selected':''} onClick={()=>setTeacherMobileMore(true)}><span>•••</span><small>المزيد</small></button>
+          </nav>
+          {teacherMobileMore&&<div className="staffMoreBackdrop" onClick={()=>setTeacherMobileMore(false)}>
+            <section className="staffMoreSheet" onClick={e=>e.stopPropagation()}>
+              <div className="staffMoreHead"><div><span>قائمة المعلم</span><h3>جميع الوظائف</h3></div><button type="button" className="secondary" onClick={()=>setTeacherMobileMore(false)}>إغلاق</button></div>
+              <div className="staffMoreGrid">
+                <button type="button" onClick={()=>goTab('plans')}><span>▤</span><b>الخطط الأسبوعية</b></button>
+                <button type="button" onClick={()=>goTab('joinRequests')}><span>＋</span><b>طلبات الانضمام</b></button>
+                <button type="button" onClick={()=>goTab('evaluations')}><span>◎</span><b>التقييم والمعايير</b></button>
+                <button type="button" onClick={()=>goTab('motivation')}><span>★</span><b>المهام والجوائز</b></button>
+                <button type="button" onClick={()=>goTab('competitions')}><span>◇</span><b>المسابقات</b></button>
+                <button type="button" onClick={()=>goTab('reports')}><span>▥</span><b>تقارير حلقتي</b></button>
+                <button type="button" onClick={()=>goTab('notifications')}><span>◌</span><b>الإشعارات</b></button>
+                <button type="button" onClick={()=>goTab('library')}><span>▧</span><b>المكتبة</b></button>
+                <button type="button" onClick={()=>goTab('profile')}><span>◉</span><b>الملف الشخصي</b></button>
+              </div>
+            </section>
+          </div>}
+        </>}
         {currentRole==='student'&&<nav className="studentMobileNav" aria-label="تنقل الطالب">
           <button type="button" className={activeTab==='studentProfile'?'selected':''} onClick={()=>goTab('studentProfile')}><span>◇</span><small>ملفي</small></button>
           <button type="button" className={activeTab==='evaluations'?'selected':''} onClick={()=>goTab('evaluations')}><span>◎</span><small>تقييمي</small></button>
