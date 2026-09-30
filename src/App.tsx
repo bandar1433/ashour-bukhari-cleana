@@ -535,7 +535,8 @@ export default function App() {
     setError('');
     const form=event.currentTarget;
     try{
-      const body=Object.fromEntries(new FormData(form).entries());
+      const fd=new FormData(form),body:any=Object.fromEntries(fd.entries());
+      if(fd.has('teacher_user_ids'))body.teacher_user_ids=fd.getAll('teacher_user_ids').map(String).filter(Boolean);
       await apiPost(path,body);
       form.reset();
       await loadDashboard();
@@ -577,7 +578,7 @@ export default function App() {
     const q = query.trim().toLowerCase();
     if (!q) return circles;
     return circles.filter((row) =>
-      [row.name, row.center_name, row.teacher_name, row.teacher_email]
+      [row.name, row.center_name, row.teacher_names, row.teacher_name, row.teacher_email]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(q)),
     );
@@ -737,6 +738,12 @@ export default function App() {
             <div className="crumb"><span className="crumbPath">لوحة التحكم / {tabMeta[activeTab].short}</span><h1>{tabMeta[activeTab].title}</h1><p>{tabMeta[activeTab].subtitle}</p></div>
             <div className="adminTopActions"><div className="topbarIdentity" title={currentUser?.email||''}><span className="topbarAvatar">{currentUser?.full_name?.trim()?.charAt(0)||'م'}</span><div><small>المستخدم الحالي</small><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong></div></div><button className="secondary" type="button" onClick={()=>{setPublicMode(true);setPublicView('الرئيسية')}}>⌂ الواجهة الرئيسية</button><button className="secondary" type="button" onClick={goBack} disabled={activeTab==='overview'&&tabHistory.length===0}>← رجوع</button><button className="refreshButton" onClick={loadDashboard} disabled={loadState==='loading'}>{loadState==='loading'?'جارٍ التحديث…':'تحديث البيانات'}</button></div>
           </div>
+          {currentRole==='teacher'&&<nav className="teacherTabRail" aria-label="تبويبات المعلم">
+            {([
+              ['overview','الرئيسية'],['teacherToday','اليوم'],['circleRegister','السجل'],['students','الطلاب'],['plans','الخطط'],['joinRequests','الطلبات'],
+              ['evaluations','التقييم'],['motivation','المهام'],['competitions','المسابقات'],['reports','التقارير'],['notifications','الإشعارات'],['library','المكتبة']
+            ] as [Tab,string][]).map(([tab,label])=><button type="button" key={tab} className={activeTab===tab?'selected':''} onClick={()=>goTab(tab)}>{label}</button>)}
+          </nav>}
           {error&&<div className="notice">{error}</div>}
           {activeTab==='overview'&&isStaff&&<RoleOverview role={currentRole} summary={summary} onNavigate={goTab} currentUser={currentUser}/>} 
           {activeTab!=='overview'&&<div className="panel mainPanel">
@@ -745,7 +752,7 @@ export default function App() {
 
             {loadState!=='loading'&&activeTab==='centers'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/centers',e)}><label className="field"><span>اسم المركز</span><input name="name" required /></label><label className="field"><span>الموقع</span><input name="location" /></label><label className="field"><span>مدير المركز</span><select name="manager_user_id" defaultValue=""><option value="">بدون مدير محدد</option>{users.filter(u=>u.role==='center_manager'||u.role==='system_admin').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><button className="primary" type="submit">إضافة المركز</button></form><GenericTable rows={centers} columns={[[ 'name','المركز'],['location','الموقع'],['manager_name','المدير'],['circles_count','عدد الحلقات']]}/></>}
             {loadState!=='loading'&&activeTab==='students'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/students',e)}><label className="field"><span>اسم الطالب</span><input name="full_name" required /></label><label className="field"><span>رقم الهوية / الوثيقة</span><input name="document_no" required /></label><label className="field"><span>الجوال الدولي</span><input name="mobile" type="tel" placeholder="+966..." required /></label><label className="field"><span>تاريخ الميلاد</span><input name="birth_date" type="date" /></label><label className="field"><span>الحلقة</span><select name="circle_id" required defaultValue=""><option value="">اختر الحلقة</option>{circles.map((x:any)=><option key={x.id} value={x.id}>{x.name} — {x.center_name||''}</option>)}</select></label><label className="field"><span>الصف/المرحلة</span><input name="grade_level" /></label><button className="primary" type="submit">إضافة الطالب</button></form><StudentsTable rows={filteredStudents.map((s:any)=>({...s,...(users.find(u=>u.id===s.user_id)||{}),id:s.id,user_id:s.user_id}))} circles={circles} currentRole={currentRole} onChanged={loadDashboard}/></>}
-            {loadState!=='loading'&&activeTab==='circles'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/circles',e)}><label className="field"><span>اسم الحلقة</span><input name="name" required /></label><label className="field"><span>المركز</span><select name="center_id" required defaultValue=""><option value="" disabled>اختر المركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label className="field"><span>المعلم</span><select name="teacher_user_id" defaultValue=""><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>المسار الرئيس</span><select name="student_track" defaultValue="الطلاب من أهل مكة"><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></label><label className="field"><span>المسار القرآني</span><select name="quran_track" defaultValue="مسار حفظ القرآن للشباب"><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></label><label className="field"><span>الموعد</span><input name="schedule" /></label><label className="field"><span>وقت بدء الحلقة</span><input name="start_time" type="time" /></label><button className="primary" type="submit">إضافة الحلقة</button></form><CirclesTable rows={filteredCircles} users={users} onChanged={loadDashboard}/></>}
+            {loadState!=='loading'&&activeTab==='circles'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/circles',e)}><label className="field"><span>اسم الحلقة</span><input name="name" required /></label><label className="field"><span>المركز</span><select name="center_id" required defaultValue=""><option value="" disabled>اختر المركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><fieldset className="field teacherMultiField"><legend>معلمو الحلقة</legend><div className="teacherMultiPicker">{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><label key={u.id}><input type="checkbox" name="teacher_user_ids" value={u.id}/><span>{u.full_name}</span></label>)}</div><small>يمكن اختيار أكثر من معلم للحلقة.</small></fieldset><label className="field"><span>المسار الرئيس</span><select name="student_track" defaultValue="الطلاب من أهل مكة"><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></label><label className="field"><span>المسار القرآني</span><select name="quran_track" defaultValue="مسار حفظ القرآن للشباب"><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></label><label className="field"><span>الموعد</span><input name="schedule" /></label><label className="field"><span>وقت بدء الحلقة</span><input name="start_time" type="time" /></label><button className="primary" type="submit">إضافة الحلقة</button></form><CirclesTable rows={filteredCircles} users={users} onChanged={loadDashboard}/></>}
             {loadState!=='loading'&&activeTab==='users'&&<><form className="quickForm" onSubmit={e=>submitForm('/api/users',e)}><label className="field"><span>الاسم</span><input name="full_name" required /></label><label className="field"><span>البريد</span><input name="email" type="email" /></label><label className="field"><span>الجوال</span><input name="phone" /></label><label className="field"><span>الدور</span><select name="role" required defaultValue="teacher"><option value="center_manager">مدير مركز</option><option value="supervisor">مشرف</option><option value="teacher">معلم</option><option value="student">طالب</option><option value="guardian">ولي أمر</option></select></label><label className="field"><span>المركز</span><select name="center_id" defaultValue=""><option value="">بدون مركز</option>{centers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="primary" type="submit">إضافة المستخدم</button></form><UsersTable rows={filteredUsers} centers={centers} onChanged={loadDashboard}/><LoginRequestsPanel rows={loginRequests} users={users} onChanged={loadDashboard}/><form className="quickForm" onSubmit={async e=>{e.preventDefault();try{await apiPost('/api/ops?action=features&sub=guardian-link',Object.fromEntries(new FormData(e.currentTarget).entries()));e.currentTarget.reset();setError('تم ربط الطالب بولي الأمر.')}catch(x){setError(x instanceof Error?x.message:'تعذر الربط')}}}><label className="field"><span>ولي الأمر</span><select name="guardian_user_id" required defaultValue=""><option value="">اختر ولي الأمر</option>{users.filter(u=>u.role==='guardian').map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></label><label className="field"><span>الطالب</span><select name="student_id" required defaultValue=""><option value="">اختر الطالب</option>{students.map(s=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></label><button className="primary">ربط الطالب بولي الأمر</button></form></>}
             {loadState!=='loading'&&activeTab==='roles'&&<RolesPanel data={roleData} onChanged={loadDashboard}/>}
             
@@ -872,22 +879,36 @@ function StudentsTable({ rows, circles, currentRole, onChanged }: { rows: Studen
 }
 
 function CirclesTable({ rows, users, onChanged }: { rows: CircleRow[]; users: UserRow[]; onChanged:()=>Promise<void> }) {
+  const [teacherCircle,setTeacherCircle]=useState<CircleRow|null>(null);
+  const [selectedTeachers,setSelectedTeachers]=useState<string[]>([]);
   if (!rows.length) return <div className="empty">لا توجد حلقات مطابقة.</div>;
   async function updateCircle(id:string,body:any){await apiPut('/api/circles',{id,...body});await onChanged();}
-  return (
+  function openTeachers(row:CircleRow){setTeacherCircle(row);setSelectedTeachers((row.teachers||[]).map(t=>t.id))}
+  function toggleTeacher(id:string){setSelectedTeachers(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])}
+  async function saveTeachers(){
+    if(!teacherCircle)return;
+    await updateCircle(teacherCircle.id,{teacher_user_ids:selectedTeachers});
+    setTeacherCircle(null);
+  }
+  return (<>
     <div className="table-wrap">
       <table>
-        <thead><tr><th>الحلقة</th><th>المركز</th><th>المعلم</th><th>المسار الرئيس</th><th>المسار القرآني</th><th>عدد الطلاب</th></tr></thead>
+        <thead><tr><th>الحلقة</th><th>المركز</th><th>المعلمون</th><th>المسار الرئيس</th><th>المسار القرآني</th><th>عدد الطلاب</th></tr></thead>
         <tbody>{rows.map(row=><tr key={row.id}>
           <td>{row.name}</td><td>{row.center_name||'—'}</td>
-          <td><select aria-label={`معلم ${row.name}`} value={row.teacher_user_id||''} onChange={e=>updateCircle(row.id,{teacher_user_id:e.target.value||null})}><option value="">غير معين</option>{users.filter(u=>u.role==='teacher'&&u.is_active).map(u=><option key={u.id} value={u.id}>{u.full_name}</option>)}</select></td>
+          <td><div className="circleTeachersCell"><span>{row.teacher_names||'غير معين'}</span><button className="secondary compactButton" type="button" onClick={()=>openTeachers(row)}>إسناد المعلمين</button></div></td>
           <td><select aria-label={`مسار رئيس ${row.name}`} value={row.student_track||''} onChange={e=>updateCircle(row.id,{student_track:e.target.value||null})}><option value="">غير مصنف</option><option>الطلاب من أهل مكة</option><option>الطلاب الوافدون</option></select></td>
           <td><select aria-label={`مسار قرآني ${row.name}`} value={row.quran_track||''} onChange={e=>updateCircle(row.id,{quran_track:e.target.value||null})}><option value="">غير مصنف</option><option>مسار التهجي والتلقين</option><option>مسار حفظ القرآن للأشبال</option><option>مسار حفظ القرآن للشباب</option><option>مسار حفظ القرآن والمتون</option><option>مسار القراءات</option></select></td>
           <td>{row.students_count}</td>
         </tr>)}</tbody>
       </table>
     </div>
-  );
+    {teacherCircle&&<div className="modalOverlay" onClick={()=>setTeacherCircle(null)}><section className="modalCard teacherAssignModal" onClick={e=>e.stopPropagation()}>
+      <div className="panelHead"><div><span className="panelEyebrow">إسناد متعدد</span><h3>{teacherCircle.name}</h3><small>اختر معلمًا واحدًا أو أكثر. جميع المعلمين المختارين يملكون صلاحية متابعة الحلقة وطلابها.</small></div><button className="secondary" type="button" onClick={()=>setTeacherCircle(null)}>إغلاق</button></div>
+      <div className="teacherMultiPicker modalTeacherPicker">{users.filter(u=>u.role==='teacher'&&u.is_active&&u.center_id===teacherCircle.center_id).map(u=><label key={u.id} className={selectedTeachers.includes(u.id)?'checked':''}><input type="checkbox" checked={selectedTeachers.includes(u.id)} onChange={()=>toggleTeacher(u.id)}/><span>{u.full_name}<small>{u.email||''}</small></span></label>)}</div>
+      <div className="modalActions"><button className="primary" type="button" onClick={saveTeachers}>حفظ الإسناد</button><button className="secondary" type="button" onClick={()=>setTeacherCircle(null)}>إلغاء</button></div>
+    </section></div>}
+  </>);
 }
 
 function UsersTable({ rows, centers, onChanged }: { rows: UserRow[]; centers: CenterRow[]; onChanged:()=>Promise<void> }) {
