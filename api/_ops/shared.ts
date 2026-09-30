@@ -9,8 +9,8 @@ export const txt=(v:any,max=1000)=>String(v??'').trim().slice(0,max);
 
 export async function scopedStudent(u:any,idValue:any){
   const sid=validUuid(idValue); if(!sid)return null;
-  return (await query<any>(`select s.*,h.teacher_user_id from students s left join circles h on h.id=s.circle_id where s.id=$4 and
+  return (await query<any>(`select s.* from students s left join circles h on h.id=s.circle_id where s.id=$4 and
     ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or
-     ($1='teacher' and h.teacher_user_id=$3::uuid) or ($1='student' and s.user_id=$3::uuid))`,
+     ($1='teacher' and is_circle_teacher(h.id,$3::uuid)) or ($1='student' and s.user_id=$3::uuid))`,
     [u.role,u.center_id,u.id,sid]))[0]||null;
 }
