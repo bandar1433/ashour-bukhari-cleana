@@ -52,7 +52,7 @@ export async function summary(req:any,res:any,u:any){
       from circles c
       where $1='system_admin'
          or ($1 in ('center_manager','supervisor') and c.center_id=$2::uuid)
-         or ($1='teacher' and c.teacher_user_id=$3::uuid)
+         or ($1='teacher' and is_circle_teacher(c.id,$3::uuid))
     ),
     scoped_students as (
       select s.*
@@ -137,10 +137,10 @@ export async function summary(req:any,res:any,u:any){
         else 0
       end::int pending_requests,
       (select count(*) from circle_join_requests r where r.status='pending' and exists(select 1 from scoped_circles c where c.id=r.circle_id))::int pending_join_requests,
-      (select count(*) from scoped_circles where is_active and teacher_user_id is null)::int unassigned_circles,
+      (select count(*) from scoped_circles c where is_active and not exists(select 1 from circle_teachers ct where ct.circle_id=c.id))::int unassigned_circles,
       (select count(*) from scoped_students where circle_id is null)::int unassigned_students,
       (select count(*) from scoped_users where not is_active)::int inactive_users,
-      (select count(*) from scoped_users su where su.role='teacher' and su.is_active and not exists(select 1 from scoped_circles c where c.teacher_user_id=su.id))::int teachers_without_circle,
+      (select count(*) from scoped_users su where su.role='teacher' and su.is_active and not exists(select 1 from scoped_circles c where is_circle_teacher(c.id,su.id)))::int teachers_without_circle,
       (select count(*) from day_approvals da where da.approval_date=current_date and exists(select 1 from scoped_circles c where c.id=da.circle_id))::int approved_circles_today
   `,[u.role,u.center_id,u.id]))[0];
 
@@ -192,7 +192,7 @@ export async function teacherToday(req:any,res:any,u:any){
     coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='new'),0)::int new_records,
     coalesce((select count(*) from memorization_records m where m.student_id=s.id and m.record_date=$4 and m.record_type='review'),0)::int review_records
     from students s join circles h on h.id=s.circle_id left join attendance a on a.student_id=s.id and a.attendance_date=$4
-    where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
+    where s.status='active' and ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(h.id,$3::uuid)))
     order by h.name,s.full_name`,[u.role,u.center_id,u.id,d]);
   const dayNames=['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const dateObj=new Date(d+'T00:00:00Z'),dayName=dayNames[dateObj.getUTCDay()],offset=(dateObj.getUTCDay()+1)%7;
@@ -213,7 +213,7 @@ export async function teacherToday(req:any,res:any,u:any){
     return {...base,criteria_results:score.items,daily_score:score.score,band:score.score===null?null:bandFor(score.score)};
   });
   const approvals=await query<any>(`select da.id,da.circle_id,da.approval_date,da.approved_at from day_approvals da join circles h on h.id=da.circle_id
-    where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))`,
+    where da.approval_date=$4 and ($1='system_admin' or ($1 in ('center_manager','supervisor') and h.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(h.id,$3::uuid)))`,
     [u.role,u.center_id,u.id,d]);
   return json(res,200,{date:d,students:scoredStudents,approvals,criteria_by_circle:Object.fromEntries(criteriaMap)});
 }
@@ -235,7 +235,7 @@ export async function circleRegister(req:any,res:any,u:any){
     order by d.day),'[]'::json) days
     from students s join circles h on h.id=s.circle_id cross join generate_series(($4||'-01')::date,(($4||'-01')::date+interval '1 month' - interval '1 day')::date,interval '1 day') d(day)
     left join attendance a on a.student_id=s.id and a.attendance_date=d.day where s.status='active' and extract(dow from d.day)<>5 and
-    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and h.teacher_user_id=$3::uuid))
+    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(h.id,$3::uuid)))
     group by s.id,s.full_name,h.id,h.name order by h.name,s.full_name`,[u.role,u.center_id,u.id,month]);
   const ids=students.map((x:any)=>x.id),circleIds=[...new Set(students.map((x:any)=>String(x.circle_id)).filter(Boolean))];
   const [customRows,notes]=await Promise.all([
@@ -260,7 +260,7 @@ export async function evaluations(req:any,res:any,u:any){
     select s.id student_id,s.full_name,s.circle_id,d::date record_day,(d::date-((extract(dow from d)::int+1)%7))::date week_start,
       case extract(dow from d)::int when 6 then 'السبت' when 0 then 'الأحد' when 1 then 'الاثنين' when 2 then 'الثلاثاء' when 3 then 'الأربعاء' when 4 then 'الخميس' else 'الجمعة' end day_name
     from students s cross join generate_series($4::date,$5::date,'1 day') d where extract(dow from d)<>5 and s.status='active' and
-    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and h.teacher_user_id=$3::uuid)) or ($1='student' and s.user_id=$3::uuid))
+    ($1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and exists(select 1 from circles h where h.id=s.circle_id and is_circle_teacher(h.id,$3::uuid))) or ($1='student' and s.user_id=$3::uuid))
   ), plan as (
     select d.student_id,d.record_day,
       case when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?\\s*\\|' then trim(split_part(w.new_target,'|',1))::numeric when coalesce(w.new_target,'')~'^\\d+(\\.\\d+)?$' then w.new_target::numeric else 0 end new_target,
@@ -351,7 +351,7 @@ export async function dayApprove(req:any,res:any,u:any){
   if(!isStaff(u.role))return json(res,403,{error:'Forbidden',message:'ليست لديك صلاحية لاعتماد اليوم.'});
   const b=req.body||{},circleId=validUuid(b.circle_id),d=validDate(b.approval_date);
   if(!circleId||!d)return json(res,400,{error:'بيانات الاعتماد غير مكتملة'});
-  const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,[circleId,u.role,u.center_id,u.id]))[0];
+  const allowed=(await query<any>(`select id from circles where id=$1 and ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and is_circle_teacher(id,$4::uuid)))`,[circleId,u.role,u.center_id,u.id]))[0];
   if(!allowed)return json(res,403,{error:'Forbidden',message:'الحلقة خارج نطاق صلاحيتك.'});
   const row=(await query<any>(`insert into day_approvals(circle_id,approval_date,approved_by) values($1,$2,$3) on conflict(circle_id,approval_date) do update set approved_by=excluded.approved_by,approved_at=now() returning *`,[circleId,d,u.id]))[0];
   return json(res,200,row);
