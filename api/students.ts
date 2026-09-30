@@ -18,7 +18,7 @@ export default async function handler(req:any,res:any){
         left join centers ce on ce.id=s.center_id
         where $1='system_admin'
            or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid)
-           or ($1='teacher' and c.teacher_user_id=$3::uuid)
+           or ($1='teacher' and is_circle_teacher(c.id,$3::uuid))
            or ($1='student' and s.user_id=$3::uuid)
         order by s.full_name limit 500
       `,[u.role,u.center_id,u.id]);
@@ -30,9 +30,9 @@ export default async function handler(req:any,res:any){
       const duplicate=(await query<any>('select id from students where document_no=$1 limit 1',[String(b.document_no).trim()]))[0];if(duplicate)return json(res,409,{error:'رقم الهوية أو الوثيقة مسجل مسبقًا'});
       let centerId=b.center_id||u.center_id||null;
       if(b.circle_id){
-        const circle=(await query<any>('select center_id,teacher_user_id from circles where id=$1',[b.circle_id]))[0];
+        const circle=(await query<any>('select center_id,id from circles where id=$1',[b.circle_id]))[0];
         if(!circle)return json(res,400,{error:'الحلقة المحددة غير موجودة'});
-        centerId=circle.center_id;if(u.role==='teacher'&&circle.teacher_user_id!==u.id)return json(res,403,{error:'Forbidden',message:'المعلم يضيف الطلاب إلى حلقته فقط'});
+        centerId=circle.center_id;if(u.role==='teacher'&&!(await query<any>('select is_circle_teacher($1,$2) ok',[circle.id,u.id]))[0]?.ok)return json(res,403,{error:'Forbidden',message:'المعلم يضيف الطلاب إلى حلقته فقط'});
       }
       if(u.role==='teacher'&&!b.circle_id)return json(res,400,{error:'يجب ربط الطالب بحلقة المعلم'});
       if(u.role!=='system_admin'&&centerId!==u.center_id)return json(res,403,{error:'Forbidden',message:'لا يمكنك إضافة طالب خارج مركزك.'});
@@ -46,9 +46,9 @@ export default async function handler(req:any,res:any){
     if(req.method==='PUT'){
       if(!['system_admin','center_manager','supervisor','teacher'].includes(u.role))return json(res,403,{error:'Forbidden',message:'تعديل الطلاب غير متاح لهذا الحساب.'});
       const b=req.body||{};if(!b.id)return json(res,400,{error:'معرف الطالب مطلوب'});
-      const existing=(await query<any>('select s.*,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1',[b.id]))[0];
+      const existing=(await query<any>('select s.* from students s left join circles c on c.id=s.circle_id where s.id=$1',[b.id]))[0];
       if(!existing)return json(res,404,{error:'الطالب غير موجود'});
-      if(u.role==='teacher'&&existing.teacher_user_id!==u.id)return json(res,403,{error:'Forbidden',message:'الطالب خارج حلقتك.'});
+      if(u.role==='teacher'&&!(await query<any>('select is_circle_teacher($1,$2) ok',[existing.circle_id,u.id]))[0]?.ok)return json(res,403,{error:'Forbidden',message:'الطالب خارج حلقتك.'});
       if(u.role==='teacher'&&Date.now()-new Date(existing.registration_date).getTime()>7*86400000)return json(res,403,{error:'انتهت مهلة التعديل',message:'يسمح للمعلم بتعديل الطالب خلال 7 أيام من التسجيل فقط.'});
       if(['center_manager','supervisor'].includes(u.role)&&existing.center_id!==u.center_id)return json(res,403,{error:'Forbidden',message:'الطالب خارج مركزك.'});
       let centerId=b.center_id!==undefined?(b.center_id||null):existing.center_id;
