@@ -270,11 +270,36 @@ export default function App() {
   const isStaff=['system_admin','center_manager','supervisor','teacher'].includes(currentRole);
   const goTab=(tab:Tab)=>{
     if(tab!==activeTab)setTabHistory(h=>[...h,activeTab].slice(-20));
+    setError('');
     setActiveTab(tab);
     setTeacherMobileMore(false);
-    if(typeof window!=='undefined'&&window.innerWidth<=760)window.requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+    if(typeof window!=='undefined'){
+      const next='#tab='+tab;
+      if(window.location.hash!==next)window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search+next);
+      if(window.innerWidth<=760)window.requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}));
+    }
   };
   const goBack=()=>{const previous=tabHistory[tabHistory.length-1]||'overview';setTabHistory(h=>h.slice(0,-1));setActiveTab(previous);setTeacherMobileMore(false);if(typeof window!=='undefined'&&window.innerWidth<=760)window.requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'auto'}))};
+
+  useEffect(()=>{
+    const openFromHash=()=>{
+      const match=window.location.hash.match(/^#tab=([A-Za-z]+)$/);
+      const tab=match?.[1] as Tab|undefined;
+      if(tab&&tabMeta[tab])setActiveTab(tab);
+    };
+    openFromHash();
+    window.addEventListener('hashchange',openFromHash);
+    return()=>window.removeEventListener('hashchange',openFromHash);
+  },[]);
+
+  const forceActionTab=(event:React.MouseEvent<HTMLDivElement>)=>{
+    const button=(event.target as HTMLElement).closest('button');
+    if(!button)return;
+    const label=(button.textContent||'').trim();
+    const direct:Record<string,Tab>={'المسابقات':'competitions','الإشعارات':'notifications','المكتبة':'library'};
+    const tab=direct[label];
+    if(tab&&tab!==activeTab)goTab(tab);
+  };
 
   useEffect(() => {
     const scanned=new URLSearchParams(window.location.search).get('attendance');
@@ -775,7 +800,7 @@ export default function App() {
           </section>
         </div>}
       </> :
-      <div className={`workspace workspacePro role-${currentRole}`}>
+      <div className={`workspace workspacePro role-${currentRole}`} onClickCapture={forceActionTab}>
         <aside className="adminSidebar">
           <div className="sidebarBrand"><div className="sidebarLogo"><img src="/resources/logo-halaqat-ashour-bukhari.png" alt="" /></div><div><b>حلقات عاشور بخاري</b><small>المنصة القرآنية التعليمية</small></div></div>
           <div className="sidebarContext"><span>المستخدم الحالي</span><b>{currentUser?.full_name||'مستخدم المنصة'}</b><strong>{roleLabel[currentUser?.role||currentRole]||'مستخدم'}</strong><small>{currentUser?.email||''}</small></div>
