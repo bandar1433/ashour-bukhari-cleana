@@ -32,6 +32,8 @@ export default async function handler(req:any,res:any){
    const rows=await query(`
     select c.id,c.name,c.center_id,c.teacher_user_id,c.schedule,c.circle_type,c.start_time,c.grace_minutes,c.student_track,c.quran_track,c.is_active,
       ce.name center_name,
+      (select full_name from users where id=c.teacher_user_id) teacher_name,
+      (select email from users where id=c.teacher_user_id) teacher_email,
       coalesce((select json_agg(json_build_object('id',t.id,'full_name',t.full_name,'email',t.email,'is_primary',ct.is_primary) order by ct.is_primary desc,t.full_name)
         from circle_teachers ct join users t on t.id=ct.teacher_user_id where ct.circle_id=c.id),'[]'::json) teachers,
       coalesce((select string_agg(t.full_name,'، ' order by ct.is_primary desc,t.full_name)
