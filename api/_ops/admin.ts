@@ -8,14 +8,14 @@ export async function managementReport(req:any,res:any,u:any){
   if(req.method!=='GET'||!isStaff(u.role))return json(res,403,{error:'Forbidden'});
   const from=validDate(req.query?.from)||new Date(Date.now()-29*86400000).toISOString().slice(0,10),to=validDate(req.query?.to)||today();
   let filter='true',args:any[]=[from,to];
-  if(u.role==='teacher'){filter='c.id=$3::uuid and h.teacher_user_id=$4::uuid';args=[from,to,u.center_id,u.id]}
+  if(u.role==='teacher'){filter='c.id=$3::uuid and is_circle_teacher(h.id,$4::uuid)';args=[from,to,u.center_id,u.id]}
   else if(u.role!=='system_admin'){filter='c.id=$3::uuid';args=[from,to,u.center_id]}
   const circles=await query<any>(`select h.id,h.name,c.name center_name,u.full_name teacher_name,count(distinct s.id)::int students,
     coalesce(round(avg((select case when count(*)=0 then null else 100.0*count(*) filter(where a.status in ('present','late'))/count(*) end from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2)))::int,0) attendance_rate,
     coalesce(round(avg((select avg(m.grade) from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2)))::int,0) quran_average
     from circles h join centers c on c.id=h.center_id left join users u on u.id=h.teacher_user_id left join students s on s.circle_id=h.id and s.status='active'
     where ${filter} group by h.id,h.name,c.name,u.full_name order by attendance_rate desc,quran_average desc`,args);
-  const scoped=u.role==='system_admin'?'true':u.role==='teacher'?'s.center_id=$3::uuid and h.teacher_user_id=$4::uuid':'s.center_id=$3::uuid';
+  const scoped=u.role==='system_admin'?'true':u.role==='teacher'?'s.center_id=$3::uuid and is_circle_teacher(h.id,$4::uuid)':'s.center_id=$3::uuid';
   const follow=await query<any>(`select s.id,s.full_name,c.name center_name,h.name circle_name,
     coalesce((select round(100.0*count(*) filter(where a.status in ('present','late'))/nullif(count(*),0))::int from attendance a where a.student_id=s.id and a.attendance_date between $1 and $2),0) attendance_rate,
     coalesce((select round(avg(m.grade))::int from memorization_records m where m.student_id=s.id and m.record_date between $1 and $2),0) quran_average
@@ -35,7 +35,7 @@ export async function adminOperations(req:any,res:any,u:any){
     const centerWhere=u.role==='system_admin'?'true':'id=$1::uuid',circleWhere=u.role==='system_admin'?'true':'center_id=$1::uuid',studentWhere=u.role==='system_admin'?'true':'center_id=$1::uuid';
     const [centers,circles,students,teachers,settings,holidays,audit,weeklyLocks]=await Promise.all([
       query<any>(`select count(*)::int n from centers where ${centerWhere}`,scope),
-      query<any>(`select count(*)::int n,count(*) filter(where teacher_user_id is not null)::int assigned from circles where ${circleWhere}`,scope),
+      query<any>(`select count(*)::int n,count(*) filter(where exists(select 1 from circle_teachers ct where ct.circle_id=circles.id))::int assigned from circles where ${circleWhere}`,scope),
       query<any>(`select count(*)::int n,count(*) filter(where circle_id is not null)::int assigned from students where ${studentWhere} and status='active'`,scope),
       u.role==='system_admin'?query<any>(`select count(*)::int n from users where role='teacher' and is_active`):query<any>(`select count(*)::int n from users where center_id=$1::uuid and role='teacher' and is_active`,scope),
       query<any>('select * from operational_settings where id=1'),
