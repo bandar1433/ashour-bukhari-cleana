@@ -10,7 +10,7 @@ export default async function handler(req:any,res:any){
   const u=await getActor(req,res);if(!u)return;
   if(req.method==='GET'){
    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
-   const rows=await query(`select m.id,m.student_id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_surah_no,m.to_ayah,m.from_page,m.to_page,m.page_count,m.grade,m.notes,m.qiraah,m.approved,coalesce(s.full_name,us.full_name,'بدون اسم') full_name from memorization_records m join students s on s.id=m.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid) order by m.record_date desc,m.created_at desc limit 300`,[u.role,u.center_id,u.id]);
+   const rows=await query(`select m.id,m.student_id,m.record_date,m.record_type,m.surah_no,m.from_ayah,m.to_surah_no,m.to_ayah,m.from_page,m.to_page,m.page_count,m.grade,m.notes,m.qiraah,m.approved,coalesce(s.full_name,us.full_name,'بدون اسم') full_name from memorization_records m join students s on s.id=m.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(c.id,$3::uuid)) order by m.record_date desc,m.created_at desc limit 300`,[u.role,u.center_id,u.id]);
    return json(res,200,{items:rows});
   }
   if(req.method==='POST'||req.method==='PUT'){
@@ -25,9 +25,9 @@ export default async function handler(req:any,res:any){
    const toPage=Number.isInteger(requestedToPage)&&requestedToPage>=1&&requestedToPage<=604?requestedToPage:Number(findPage(toSurah as any,(rawToAyah||maxTo) as any));
    if(toPage<fromPage)return json(res,400,{error:'صفحة النهاية يجب أن تكون بعد صفحة البداية'});
    const fromAyah=rawFromAyah||null,toAyah=rawToAyah||null,pageCount=Math.max(1,toPage-fromPage+1),ayahCount=fromAyah&&toAyah&&toSurah===fromSurah?Math.max(1,toAyah-fromAyah+1):null;
-   const s=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
+   const s=(await query<any>(`select s.id,s.center_id,s.circle_id,is_circle_teacher(c.id,$2::uuid) teacher_allowed from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id,u.id]))[0];
    if(!s)return json(res,404,{error:'الطالب غير موجود'});
-   const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_user_id===u.id);
+   const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&s.center_id===u.center_id)||(u.role==='teacher'&&s.teacher_allowed);
    if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
    const locked=(await query<any>('select id from day_approvals where circle_id=$1 and approval_date=$2',[s.circle_id,recordDate]))[0],weekLocked=s.circle_id?await isWeekLocked(s.circle_id,recordDate):false;
    const exception=(await query<any>("select id from edit_exceptions where student_id=$1 and record_date=$2 and status='approved' and expires_at>now()",[s.id,recordDate]))[0];
