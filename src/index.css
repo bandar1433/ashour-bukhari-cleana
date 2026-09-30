@@ -754,3 +754,30 @@ footer{background:#082f29;padding:42px max(5%,calc((100vw - 1380px)/2));margin-t
 @media (max-width:380px){
   .staffMoreGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
+
+
+/* Multi-teacher circles + compact named teacher tabs */
+.teacherTabRail{display:none}
+.teacherMultiField{border:0;margin:0;padding:0;min-width:0}
+.teacherMultiField legend{font-size:10px;font-weight:800;color:#53655e;margin-bottom:6px}
+.teacherMultiField>small{display:block;margin-top:5px;font-size:9px;color:#74817b}
+.teacherMultiPicker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:148px;overflow:auto;padding:5px;border:1px solid #d9e2dd;border-radius:10px;background:#fff}
+.teacherMultiPicker label{display:flex;align-items:center;gap:7px;min-width:0;padding:7px 8px;border:1px solid #e7ece9;border-radius:9px;background:#fafcfb;cursor:pointer}
+.teacherMultiPicker label.checked{border-color:#9db8ad;background:#eef6f2}
+.teacherMultiPicker input{width:16px;height:16px;min-height:0!important;flex:0 0 auto}
+.teacherMultiPicker label>span{min-width:0;font-size:10px;font-weight:700;color:#29483f;white-space:normal}
+.teacherMultiPicker label>span small{display:block;font-size:8px;font-weight:500;color:#78847f;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+.circleTeachersCell{display:flex;align-items:center;gap:8px;min-width:190px}.circleTeachersCell>span{flex:1;line-height:1.6;font-size:10px}.compactButton{padding:6px 8px!important;min-height:32px!important;font-size:9px!important;white-space:nowrap}
+.modalOverlay{position:fixed;inset:0;z-index:130;background:rgba(5,35,30,.52);backdrop-filter:blur(4px);display:grid;place-items:center;padding:16px}
+.modalCard{width:min(620px,96vw);max-height:88dvh;overflow:auto;background:#fff;border-radius:20px;padding:18px;box-shadow:0 26px 70px rgba(0,0,0,.22)}
+.teacherAssignModal .panelHead{margin-bottom:13px}.modalTeacherPicker{grid-template-columns:repeat(2,minmax(0,1fr));max-height:48dvh;padding:8px}.modalActions{display:flex;gap:8px;justify-content:flex-start;margin-top:14px}
+
+@media (max-width:760px){
+  .teacherTabRail{display:flex!important;position:sticky;top:0;z-index:45;gap:5px;overflow-x:auto;scrollbar-width:none;padding:5px 2px 7px;margin:-2px 0 8px;background:var(--workspace-bg);white-space:nowrap}
+  .teacherTabRail::-webkit-scrollbar{display:none}
+  .teacherTabRail button{flex:0 0 auto;min-height:30px;padding:5px 9px;border:1px solid #dfe8e3;border-radius:999px;background:#fff;color:#53655e;font-size:9px;font-weight:800}
+  .teacherTabRail button.selected{background:#0b4a3d;color:#fff;border-color:#0b4a3d}
+  .teacherMultiPicker,.modalTeacherPicker{grid-template-columns:1fr}
+  .circleTeachersCell{min-width:160px;align-items:flex-start;flex-direction:column}
+  .modalCard{padding:14px;border-radius:18px}
+}
