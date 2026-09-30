@@ -19,9 +19,9 @@ export default async function handler(req:any,res:any){
   if(req.method==='POST'||req.method==='PUT'){
    if(!isStaff(u.role))return json(res,403,{error:'Forbidden'});
    const b=req.body||{},week=String(b.week_start||'');
-   const student=(await query<any>(`select s.id,s.center_id,s.circle_id,c.teacher_user_id from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id]))[0];
+   const student=(await query<any>(`select s.id,s.center_id,s.circle_id,is_circle_teacher(c.id,$2::uuid) teacher_allowed from students s left join circles c on c.id=s.circle_id where s.id=$1`,[b.student_id,u.id]))[0];
    if(!student)return json(res,404,{error:'الطالب غير موجود'});
-   const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&student.center_id===u.center_id)||(u.role==='teacher'&&student.teacher_user_id===u.id);
+   const allowed=u.role==='system_admin'||(['center_manager','supervisor'].includes(u.role)&&student.center_id===u.center_id)||(u.role==='teacher'&&student.teacher_allowed);
    if(!allowed)return json(res,403,{error:'Forbidden',message:'الطالب خارج نطاق صلاحيتك.'});
    if(!/^\d{4}-\d{2}-\d{2}$/.test(week))return json(res,400,{error:'بداية الأسبوع مطلوبة'});
    const wd=new Date(week+'T00:00:00Z');if(wd.getUTCDay()!==6)return json(res,400,{error:'بداية الأسبوع يجب أن تكون يوم السبت.'});
@@ -38,7 +38,7 @@ export default async function handler(req:any,res:any){
    return json(res,200,row);
   }
   if(req.method!=='GET')return json(res,405,{error:'Method not allowed'});
-  const rows=await query<any>(`select w.id,w.student_id,w.week_start,w.day_name,w.new_target,w.review_target,w.goals,coalesce(s.full_name,us.full_name,'بدون اسم') full_name from weekly_plans w join students s on s.id=w.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and c.teacher_user_id=$3::uuid) or ($1='student' and s.user_id=$3::uuid) order by w.week_start desc,coalesce(s.full_name,us.full_name,'بدون اسم'),case w.day_name when 'السبت' then 0 when 'الأحد' then 1 when 'الاثنين' then 2 when 'الثلاثاء' then 3 when 'الأربعاء' then 4 when 'الخميس' then 5 else 6 end limit 300`,[u.role,u.center_id,u.id]);
+  const rows=await query<any>(`select w.id,w.student_id,w.week_start,w.day_name,w.new_target,w.review_target,w.goals,coalesce(s.full_name,us.full_name,'بدون اسم') full_name from weekly_plans w join students s on s.id=w.student_id left join users us on us.id=s.user_id left join circles c on c.id=s.circle_id where $1='system_admin' or ($1 in ('center_manager','supervisor') and s.center_id=$2::uuid) or ($1='teacher' and is_circle_teacher(c.id,$3::uuid)) or ($1='student' and s.user_id=$3::uuid) order by w.week_start desc,coalesce(s.full_name,us.full_name,'بدون اسم'),case w.day_name when 'السبت' then 0 when 'الأحد' then 1 when 'الاثنين' then 2 when 'الثلاثاء' then 3 when 'الأربعاء' then 4 when 'الخميس' then 5 else 6 end limit 300`,[u.role,u.center_id,u.id]);
   return json(res,200,{items:rows.map((r:any)=>({...r,new_target_display:display(r.new_target),review_target_display:display(r.review_target)}))});
  }catch(e){return handleError(res,e)}
 }
