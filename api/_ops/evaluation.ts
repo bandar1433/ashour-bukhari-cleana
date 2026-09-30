@@ -6,8 +6,8 @@ import {today} from './shared.js';
 import {findPage,getAyahCountInSurah} from 'quran-meta/hafs';
 
 async function allowedCircle(u:any,circleId:string){
- return (await query<any>(`select id,name,center_id,teacher_user_id from circles where id=$1 and
-  ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and teacher_user_id=$4::uuid))`,
+ return (await query<any>(`select id,name,center_id from circles where id=$1 and
+  ($2='system_admin' or ($2 in ('center_manager','supervisor') and center_id=$3::uuid) or ($2='teacher' and is_circle_teacher(id,$4::uuid)))`,
   [circleId,u.role,u.center_id,u.id]))[0]||null;
 }
 export async function evaluationCriteria(req:any,res:any,u:any){
@@ -49,7 +49,7 @@ async function resolveStudent(u:any,studentIdRaw:any){
  if(u.role==='student')return (await query<any>('select * from students where user_id=$1 limit 1',[u.id]))[0]||null;
  const id=validUuid(studentIdRaw);if(!id)return null;
  return (await query<any>(`select s.* from students s left join circles c on c.id=s.circle_id where s.id=$1 and
- ($2='system_admin' or ($2 in ('center_manager','supervisor') and s.center_id=$3::uuid) or ($2='teacher' and c.teacher_user_id=$4::uuid))`,[id,u.role,u.center_id,u.id]))[0]||null;
+ ($2='system_admin' or ($2 in ('center_manager','supervisor') and s.center_id=$3::uuid) or ($2='teacher' and is_circle_teacher(c.id,$4::uuid)))`,[id,u.role,u.center_id,u.id]))[0]||null;
 }
 export async function criterionRecord(req:any,res:any,u:any){
  if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
