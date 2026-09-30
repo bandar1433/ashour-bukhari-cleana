@@ -72,6 +72,8 @@ export type CircleRow = {
   center_name: string | null;
   teacher_name: string | null;
   teacher_email: string | null;
+  teacher_names?: string | null;
+  teachers?: Array<{id:string;full_name:string;email?:string|null;is_primary?:boolean}>;
   students_count: number;
   schedule?: string | null;
   circle_type?: string | null;
