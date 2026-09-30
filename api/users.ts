@@ -119,7 +119,9 @@ export default async function handler(req:any,res:any){
       try{
         await client.query('begin');
         await client.query('update centers set manager_user_id=null where manager_user_id=$1',[target.id]);
-        await client.query('update circles set teacher_user_id=null where teacher_user_id=$1',[target.id]);
+        await client.query('delete from circle_teachers where teacher_user_id=$1',[target.id]);
+        await client.query(`update circles c set teacher_user_id=(select ct.teacher_user_id from circle_teachers ct where ct.circle_id=c.id order by ct.is_primary desc,ct.assigned_at limit 1) where c.teacher_user_id=$1`,[target.id]);
+        await client.query(`update circle_teachers ct set is_primary=(ct.teacher_user_id=c.teacher_user_id) from circles c where c.id=ct.circle_id and not exists(select 1 from circle_teachers x where x.circle_id=c.id and x.is_primary)`);
         await client.query('delete from circle_join_requests where user_id=$1',[target.id]);
         await client.query('delete from guardian_students where guardian_user_id=$1',[target.id]).catch(()=>null);
         await client.query('delete from login_requests where auth_subject=$1 or ($2::text is not null and lower(email)=lower($2))',[target.auth_subject,target.email]);
